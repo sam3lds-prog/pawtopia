@@ -614,3 +614,91 @@
   flex: 1;
   min-height: 0;
 }
+
+/* Win sheet: one appreciative face. Static art (outside the board, pets don't animate). */
+.win-pet {
+  width: 84px;
+  height: 84px;
+  margin: -4px auto 2px;
+  padding: 8px;
+  border-radius: 50%;
+  background: var(--gold-soft);
+  box-shadow: inset 0 0 0 2px rgba(213, 160, 75, 0.35);
+}
+
+/* ---------- Dev expression gallery ---------- */
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+.gallery .screen-head {
+  justify-content: flex-start;
+  gap: var(--s3);
+}
+.gallery__live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+.gallery__tiles {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px var(--board-frame);
+}
+.gallery__tile {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+.gallery__tile > span {
+  width: 84%;
+  height: 84%;
+}
+.gallery__btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.gallery__grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+.gallery__pet h3 small {
+  font-family: var(--font-ui);
+  font-size: var(--t-xs);
+  font-weight: 600;
+}
+.gallery__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 6px;
+  margin-top: var(--s2);
+}
+.gallery__row figure {
+  margin: 0;
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted-ink);
+}
+.gallery__face {
+  aspect-ratio: 1;
+  background: var(--surface-2);
+  border-radius: 12px;
+  padding: 6px;
+}
+.gallery__sizes {
+  display: flex;
+  gap: 8px;
+  align-items: end;
+  margin-top: var(--s2);
+}
+.gallery__size {
+  display: grid;
+  place-items: center;
+  padding: 3px;
+  border-radius: 4px;
+}

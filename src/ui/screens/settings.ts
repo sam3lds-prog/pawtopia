@@ -7,6 +7,7 @@ import { track } from '../../services/analytics';
 import { openSheet, toast } from '../components/sheet';
 import { actionOf, esc } from '../dom';
 import type { Scope } from '../router';
+import { featureFlags } from '../../config/featureFlags';
 
 type BoolKey = 'autoMark' | 'showTimer' | 'largeBoard' | 'sound' | 'haptics' | 'highContrast' | 'regionPatterns' | 'leftHanded';
 
@@ -79,6 +80,7 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
         <div class="row"><span class="row__label">Saved on this device<small>Pawtopia plays fully offline. No account, no tracking of who you are.</small></span></div>
         <button class="row" data-act="reset"><span class="row__label" style="color:var(--error)">Erase progress<small>Purchases and settings are kept</small></span></button>
       </div>
+      ${featureFlags.devGallery ? `<div class="rows-title">Developer</div><div class="rows"><button class="row" data-act="gallery"><span class="row__label">Expression gallery<small>Development builds only</small></span></button></div>` : ''}
       <p class="muted settings-foot">Pawtopia · original art and sounds · fonts: Fredoka and Nunito Sans (SIL Open Font License)</p>`,
   });
 
@@ -117,6 +119,9 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
         app.persist();
         toast('Purchases restored.');
       } else toast(res.ok ? 'No purchases to restore.' : 'The store is not available right now.');
+    } else if (a.act === 'gallery') {
+      sh.close();
+      app.router.go({ screen: 'gallery' });
     } else if (a.act === 'reset') {
       confirmErase(sh.scope, () => sh.close());
     }

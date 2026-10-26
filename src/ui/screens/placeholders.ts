@@ -17,4 +17,3 @@ export const petsPlaceholder = simple('pets', 'Pets', 'Your residents will live 
 export const leaguePlaceholder = simple('league', 'League', 'Paw Cup is on its way.');
 export const shopPlaceholder = simple('shop', 'Shop', 'Decorations and keepsakes are on their way.');
 export const sanctuaryPlaceholder = simple('home', 'Sanctuary', 'The sanctuary is being built.');
-export const galleryPlaceholder = simple(null, 'Gallery', 'Developer gallery.');

@@ -7,7 +7,8 @@ import { mountNav } from './ui/components/nav';
 import { homeScreen } from './ui/screens/home';
 import { playScreen } from './ui/screens/play';
 import { gameScreen } from './ui/screens/game';
-import { galleryPlaceholder, leaguePlaceholder, petsPlaceholder, sanctuaryPlaceholder, shopPlaceholder } from './ui/screens/placeholders';
+import { leaguePlaceholder, petsPlaceholder, sanctuaryPlaceholder, shopPlaceholder } from './ui/screens/placeholders';
+import { galleryScreen } from './ui/screens/gallery';
 import { track } from './services/analytics';
 
 const root = document.getElementById('app')!;
@@ -21,7 +22,7 @@ router.register({
   league: leaguePlaceholder,
   shop: shopPlaceholder,
   sanctuary: sanctuaryPlaceholder,
-  gallery: galleryPlaceholder,
+  gallery: galleryScreen,
 });
 app.applySettings();
 mountNav(router);

@@ -62,3 +62,24 @@ The App Store listing name is set in App Store Connect and can say Pawtopia with
 continuations. The game screen groups the board with its one-line coach in a flexible zone, so on tall phones the
 spare height is shared above and below instead of separating the board from its feedback. Cells are sized from the
 zone (max 76px, min 26px; 9×9 fits a 320px phone at ~31px cells). "Large board" keeps cells ≥46px and scrolls.
+
+## 2026-10-25 · D11 — Faces are pose data on fixed SVG layers; the head never moves
+Each pet is one 64×64 SVG with fixed layers: `head-static` (never transformed), `cheeks`, `eyes` (pupils glance
+inside the eye; closed "smiling" arcs crossfade in), `lids` (fur-colored eyelids lowering from the top), `brows`
+and `mouth` (discrete shapes that crossfade). An expression is a small `Pose` (eye state, lid coverage, pupil
+offset, brow lift/tilt, mouth shape, blush) written as CSS custom properties and two data attributes, so a
+reaction never touches layout and the tile's size and hit area never change. A test parses `pets.css` and fails if
+any `transform` targets something other than pupils, lids or brows, and checks that board pets have no transform or
+animation (the mistake ghost only fades).
+
+Reactions come only from explicit session events: correct placement → happy; line/region complete → proud (the new
+pet and its partner, two faces at most); a mistake → the faint ghost of the attempted pet looks puzzled (no placed
+pet ever reacts to a mistake); hint → pets already in the highlighted line look attentive; picking the Cat/Dog
+tool → one pet of that species glances down at the toolbar; marking a tile → one neighbor glances at it; win → a
+staggered smile/wink wave that ends within 1.5 s. A tile's pet identity depends only on its region, the board seed
+and the player's roster, never the solution. Glance direction depends only on tile positions.
+
+`FaceDirector` (DOM-free, fake-clock tested) caps concurrent reactions at three, staggers idle blinks with a seeded
+random per tile (4–9 s), lets pets doze after 20 s without input, pauses ambient life when the board is paused or
+hidden, stops blinks in reduced-motion mode (reactions then switch instantly), and clears every timer when a pet
+leaves its tile or the screen unmounts. Outside the board (tool buttons, win sheet, collection) pets are static.

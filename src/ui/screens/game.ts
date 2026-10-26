@@ -12,7 +12,11 @@ import { ads, shouldShowInterstitial } from '../../services/ads';
 import { track } from '../../services/analytics';
 import { sfx } from '../../services/audio';
 import { haptic } from '../../services/haptics';
-import { tilePet, toolPetSvg } from '../art/petTiles';
+import { rosterFor, tilePetId, toolPetSvg } from '../art/petTiles';
+import { applyFace, petElement, petSvg, speciesKey } from '../art/pets';
+import { FaceDirector, lookToward, type Clock } from '../animation/faceDirector';
+import type { ReactionMood } from '../animation/faceMachine';
+import type { PetId } from '../../meta/catalogs/pets';
 import { Board } from '../components/board';
 import { openSheet, type SheetHandle } from '../components/sheet';
 import { actionOf, capitalize, esc, h, plural, qs } from '../dom';
@@ -50,6 +54,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   let hint: { info: HintInfo; tier: 1 | 2 } | null = null;
   let finished = false;
   let sheet: SheetHandle | null = null;
+  let lastPlaced: PetId | null = null;
+  let winPet: PetId | null = null;
 
   const el = h(`
     <div class="game" data-mode="${mode.kind}">
@@ -96,7 +102,33 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   const timerEl = el.querySelector('[data-timer] span') as HTMLElement | null;
   const heartsEl = el.querySelector('[data-hearts]') as HTMLElement | null;
 
-  const board = new Board(s.puzzle, scope, { onPress, onDrag, onKey }, { pannable: settings.largeBoard, pet: (_r, _c, sp) => tilePet(sp) });
+  // ---------------------------------------------------------------- faces (facial-only animation)
+  const roster = rosterFor(app.save);
+  const tilePets = new Map<string, PetId>();
+  const clock: Clock = { now: () => performance.now(), set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => clearTimeout(id) };
+  const faces = new FaceDirector({ clock, seed: s.puzzle.seed, reducedMotion: app.reducedMotion, slowBlink: (k) => tilePets.get(k) === 'mochi' });
+  scope.onDispose(() => faces.dispose());
+  const keyOf = (r: number, c: number) => `${r},${c}`;
+
+  const board = new Board(
+    s.puzzle,
+    scope,
+    { onPress, onDrag, onKey },
+    {
+      pannable: settings.largeBoard,
+      pet: (r, c, sp) => {
+        const id = tilePetId(s.puzzle, r, c, sp, roster);
+        const { el, svg } = petElement(id);
+        tilePets.set(keyOf(r, c), id);
+        faces.add(keyOf(r, c), speciesKey(sp), { apply: (v) => applyFace(svg, id, v) });
+        return el;
+      },
+      onPetRemoved: (r, c) => {
+        faces.remove(keyOf(r, c));
+        tilePets.delete(keyOf(r, c));
+      },
+    },
+  );
   stage.appendChild(board.el);
 
   const zone = qs(el, '[data-zone]');
@@ -129,6 +161,23 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     if (timerEl) timerEl.textContent = fmtClock(s.elapsedSeconds());
   }
 
+  /** Pauses the clock and the pets' ambient life (blinks, dozing). */
+  function pauseBoard(): void {
+    s.pause();
+    faces.setAmbient(false);
+  }
+
+  /** Placed pets of a unit (at most `max`), for proud / focused reactions. */
+  function petsIn(cells: Array<[number, number]>, max: number, first?: string): string[] {
+    const out: string[] = first && faces.has(first) ? [first] : [];
+    for (const [r, c] of cells) {
+      if (out.length >= max) break;
+      const k = keyOf(r, c);
+      if (!out.includes(k) && faces.has(k)) out.push(k);
+    }
+    return out;
+  }
+
   function coach(text: string): void {
     coachEl.textContent = text;
   }
@@ -144,6 +193,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
 
   function onPress(r: number, c: number): 'mark' | 'unmark' | null {
     if (finished || s.paused) return null;
+    faces.activity();
     if (classic) {
       handle(s.tap(r, c, tool === 'dog' ? DOG : CAT), r, c);
       return null;
@@ -190,6 +240,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
 
   function keyApply(r: number, c: number, t: Tool): boolean {
     if (finished || s.paused) return true;
+    faces.activity();
     handle(s.apply(r, c, t), r, c);
     return true;
   }
@@ -202,26 +253,50 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
       else if (s.givenMask[r][c]) coach('This pet is already home. Its spot is locked.');
       return;
     }
+    let react: (() => void) | undefined;
     if (res.wrong && res.placed) {
       onMistake(r, c, res.placed);
     } else if (res.placed) {
       sfx('place');
       haptic('place');
       board.flash([[r, c]], 'is-fresh', 720);
-      if (res.completed?.length) onUnits(res.completed);
-      else coach(encouragement());
+      const key = keyOf(r, c);
+      if (res.completed?.length) {
+        const units = res.completed;
+        onUnits(units);
+        // The new pet and its partner in the completed line beam with pride (two faces at most).
+        react = () => petsIn(s.unitCells(units[0]), 2, key).forEach((k) => faces.react(k, 'proud'));
+      } else {
+        coach(encouragement());
+        react = () => faces.react(key, 'happy');
+      }
     } else if (res.marked) {
       sfx('mark');
       haptic('tap');
+      react = () => glanceFromNeighbor(r, c);
     }
-    afterChange();
+    afterChange(react);
+  }
+
+  /** A pet beside a tile the player just marked glances toward it (position only, never the answer). */
+  function glanceFromNeighbor(r: number, c: number): void {
+    for (let dr = -1; dr <= 1; dr++)
+      for (let dc = -1; dc <= 1; dc++) {
+        if (!dr && !dc) continue;
+        const k = keyOf(r + dr, c + dc);
+        if (faces.has(k)) {
+          faces.react(k, 'curious', lookToward({ r: r + dr, c: c + dc }, { r, c }));
+          return;
+        }
+      }
   }
 
   function onMistake(r: number, c: number, sp: Species): void {
     sfx('oops');
     haptic('error');
     board.flash([[r, c]], 'is-miss', MISS_MS);
-    board.ghost(r, c, tilePet(sp), MISS_MS);
+    // The attempted pet appears faintly, puzzled, and fades. It is the only face that reacts to a mistake.
+    board.ghost(r, c, petElement(tilePetId(s.puzzle, r, c, sp, roster), 'confused').el, MISS_MS);
     const word = SPECIES_WORD[sp];
     if (!rules.hearts) coach(`Not a ${word} spot. No rush, try another line of thought.`);
     else if (s.hearts > 0) coach(`Not a ${word} spot. ${plural(s.hearts, 'heart')} left.`);
@@ -243,12 +318,15 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     return lines[encourageIdx++ % lines.length];
   }
 
-  function afterChange(): void {
+  function afterChange(react?: () => void): void {
     if (hint) {
       hint = null;
       board.clearHint();
     }
     paint();
+    react?.();
+    const newest = [...tilePets.keys()].pop();
+    if (newest) lastPlaced = tilePets.get(newest) ?? lastPlaced;
     app.saveActive();
     checkOutcome();
   }
@@ -259,6 +337,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     if (finished) return;
     if (s.undo()) {
       haptic('tap');
+      faces.activity();
+      faces.calmAll();
       afterChange();
     }
   }
@@ -267,6 +347,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     if (finished) return;
     if (s.redo()) {
       haptic('tap');
+      faces.activity();
+      faces.calmAll();
       afterChange();
     }
   }
@@ -279,8 +361,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
       s.noteHint(info);
       track('hint_used', { mode: mode.kind, tier: 1 });
       hint = { info, tier: 1 };
+      faces.activity();
       if (info.unit) {
         board.setHint(s.unitCells(info.unit), null);
+        focusFaces(s.unitCells(info.unit));
         coach(`Look at ${unitPhrase(info.unit)}. One spot there is already decided.`);
       } else {
         board.setHint([], [info.r, info.c]);
@@ -290,25 +374,34 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
       hint.tier = 2;
       track('hint_used', { mode: mode.kind, tier: 2 });
       board.setHint(hint.info.unit ? s.unitCells(hint.info.unit) : [], [hint.info.r, hint.info.c]);
+      if (hint.info.unit) focusFaces(s.unitCells(hint.info.unit));
       coach(friendlyReason(hint.info.reason));
     } else {
       track('hint_used', { mode: mode.kind, tier: 3 });
       const info = s.hint();
       hint = null;
       board.clearHint();
+      let reactTo: { key: string; mood: ReactionMood } | null = null;
       if (info) {
         sfx('place');
         board.flash([[info.r, info.c]], 'is-fresh', 720);
         const units = s.completedUnitsAt(info.r, info.c);
         coach(friendlyReason(info.reason));
         if (units.length) onUnits(units);
+        reactTo = { key: keyOf(info.r, info.c), mood: 'happy' };
       }
       paint();
+      if (reactTo) faces.react(reactTo.key, reactTo.mood);
       app.saveActive();
       checkOutcome();
       return;
     }
     paint();
+  }
+
+  /** Pets already in the hinted line look attentive. They are where the player is already looking. */
+  function focusFaces(cells: Array<[number, number]>): void {
+    for (const k of petsIn(cells, 2)) faces.react(k, 'focused');
   }
 
   function unitPhrase(u: UnitRef): string {
@@ -326,6 +419,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     if (t) {
       tool = t.dataset.tool as Tool;
       haptic('select');
+      faces.activity();
+      if (tool === 'cat' || tool === 'dog') faces.curiousOne(tool, [0, 1.3]);
       paint();
       return;
     }
@@ -348,7 +443,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
         doHint();
         break;
       case 'rules':
-        s.pause();
+        pauseBoard();
         showRules(scope, () => resumeIfOnScreen());
         break;
     }
@@ -373,6 +468,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   function resumeIfOnScreen(): void {
     if (!scope.alive || finished || sheet) return;
     s.resume();
+    faces.setAmbient(!document.hidden);
+    faces.activity();
   }
 
   function leave(): void {
@@ -382,7 +479,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
 
   function openPause(): void {
     if (finished || sheet) return;
-    s.pause();
+    pauseBoard();
     el.classList.add('is-paused');
     const veil = h(`<div class="board-veil">${mode.kind === 'cup' ? 'Board hidden while paused' : ''}</div>`);
     if (mode.kind === 'cup') board.el.appendChild(veil);
@@ -413,7 +510,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
         confirmRestart();
       } else if (a.act === 'settings') {
         ps.close();
-        s.pause();
+        pauseBoard();
         showSettings(scope, { inGame: true, onClose: () => app.router.refresh() });
       } else if (a.act === 'leave') {
         ps.close();
@@ -423,7 +520,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   }
 
   function confirmRestart(): void {
-    s.pause();
+    pauseBoard();
     const cs = openSheet(scope, {
       title: 'Restart this board?',
       body: `<p class="sheet__lead">Your placements and marks on this board will be cleared.</p>
@@ -455,6 +552,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     finished = true;
     s.pause();
     paint();
+    // Every pet smiles or winks in a short staggered wave (≤1.5s total), faces only.
+    const order: string[] = [];
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) order.push(keyOf(r, c));
+    faces.celebrate(order);
+    winPet = lastPlaced ?? tilePets.values().next().value ?? null;
     const result = { size: n, seconds: s.elapsedSeconds(), mistakes: s.mistakes, hintsUsed: s.hintsUsed, revives: s.revives, hearts: rules.hearts };
     const rec = recordWin(app.save, mode, result);
     app.save.lastSession = null;
@@ -466,7 +568,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     sfx('win');
     haptic('success');
     coach('Harmony restored.');
-    scope.timeout(() => showWin(rec, result.seconds), app.reducedMotion ? 150 : 900);
+    scope.timeout(() => showWin(rec, result.seconds), app.reducedMotion ? 150 : 1000);
   }
 
   function showWin(rec: WinRecord, seconds: number): void {
@@ -484,6 +586,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
       dismissible: false,
       className: 'win-sheet',
       body: `
+        ${winPet ? `<div class="win-pet">${petSvg(winPet, { mood: 'proud' })}</div>` : ''}
         ${stars}
         <div class="stats">
           <div class="stat"><div class="stat__v">${fmtClock(seconds)}</div><div class="stat__k">${rules.timer ? 'time' : 'time (untimed)'}</div></div>
@@ -548,7 +651,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   }
 
   function onLose(): void {
-    s.pause();
+    pauseBoard();
     recordLoss(app.save);
     app.saveActive();
     track('puzzle_fail', { mode: mode.kind, size: n });
@@ -601,6 +704,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
 
   // ---------------------------------------------------------------- start
 
+  scope.on(document, 'visibilitychange', () => faces.setAmbient(!document.hidden && !s.paused && !finished));
+
   coach(defaultCoach());
   paint();
   if (rules.timer) scope.interval(tick, 500);
@@ -612,7 +717,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   });
   s.resume();
   if (!app.save.onboarding.seenRules) {
-    s.pause();
+    pauseBoard();
     showRules(scope, () => {
       app.save.onboarding.seenRules = true;
       app.persist();
