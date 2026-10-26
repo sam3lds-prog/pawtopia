@@ -1,19 +1,41 @@
-// Bundles dist/ into one self-contained HTML fragment for publishing as a Claude artifact.
-import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
-const html = readFileSync('dist/index.html', 'utf8');
-const assets = readdirSync('dist/assets');
-const css = readFileSync('dist/assets/' + assets.find((f) => f.endsWith('.css')), 'utf8');
-const js = readFileSync('dist/assets/' + assets.find((f) => f.endsWith('.js')), 'utf8');
+// Builds a single self-contained HTML file of the release game (fonts, code and icon inlined), for sharing a
+// playable web preview. Usage: npm run artifact  →  artifact/pawtopia.html
+//
+// It is a release build: no dev hooks, no test store, no test ads. Progress is kept in that browser only.
+import { build } from 'vite';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+
+const outDir = 'artifact/dist';
+await build({
+  logLevel: 'warn',
+  build: {
+    outDir,
+    emptyOutDir: true,
+    assetsInlineLimit: 1_000_000, // fonts become data: URIs inside the CSS
+    cssCodeSplit: false,
+    modulePreload: false,
+    rollupOptions: { output: { inlineDynamicImports: true } }, // one JS file
+  },
+});
+
+const html = readFileSync(`${outDir}/index.html`, 'utf8');
+const assets = readdirSync(`${outDir}/assets`);
+const jsFiles = assets.filter((f) => f.endsWith('.js'));
+if (jsFiles.length !== 1) throw new Error(`expected one JS bundle, found ${jsFiles.join(', ')}`);
+const css = readFileSync(`${outDir}/assets/${assets.find((f) => f.endsWith('.css'))}`, 'utf8');
+const js = readFileSync(`${outDir}/assets/${jsFiles[0]}`, 'utf8');
 const favicon = readFileSync('public/favicon.svg', 'utf8');
 const body = html.match(/<body>([\s\S]*?)<\/body>/)[1].replace(/<script[^>]*><\/script>/g, '').trim();
+
+// The artifact viewer already pads the page by the top safe area; avoid doubling it.
+const hostFix = ':root{--safe-top:0px}';
 const out = `<title>Pawtopia</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <link rel="icon" href="data:image/svg+xml;base64,${Buffer.from(favicon).toString('base64')}">
-<style>${css}</style>
+<style>${css}${hostFix}</style>
 ${body}
 <script type="module">${js.replace(/<\/script/g, '<\\/script')}</script>
 `;
 mkdirSync('artifact', { recursive: true });
 writeFileSync('artifact/pawtopia.html', out);
-console.log('artifact/pawtopia.html', out.length, 'bytes');
+console.log(`artifact/pawtopia.html ${(out.length / 1024).toFixed(0)} KB`);

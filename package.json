@@ -15,7 +15,8 @@
     "cap:open:ios": "cap open ios",
     "pack:build": "tsx scripts/build-level-pack.ts --write",
     "pack:check": "tsx scripts/build-level-pack.ts",
-    "e2e": "node test/e2e/smoke.mjs"
+    "e2e": "node test/e2e/smoke.mjs",
+    "artifact": "node scripts/make-artifact.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.1.2",
