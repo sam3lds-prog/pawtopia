@@ -9,6 +9,7 @@ import { playScreen } from './ui/screens/play';
 import { gameScreen } from './ui/screens/game';
 import { leaguePlaceholder, petsPlaceholder, sanctuaryPlaceholder, shopPlaceholder } from './ui/screens/placeholders';
 import { galleryScreen } from './ui/screens/gallery';
+import { needsWelcome, welcomeScreen } from './ui/screens/welcome';
 import { track } from './services/analytics';
 
 const root = document.getElementById('app')!;
@@ -23,6 +24,7 @@ router.register({
   shop: shopPlaceholder,
   sanctuary: sanctuaryPlaceholder,
   gallery: galleryScreen,
+  welcome: welcomeScreen,
 });
 app.applySettings();
 mountNav(router);
@@ -52,4 +54,4 @@ if (import.meta.env.DEV) {
   });
 }
 
-router.go({ screen: 'home' });
+router.go({ screen: needsWelcome() ? 'welcome' : 'home' });

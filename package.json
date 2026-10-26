@@ -12,7 +12,9 @@
     "gen:check": "tsx scripts/verify-generator.ts",
     "cap:add:ios": "cap add ios",
     "cap:sync": "npm run build && cap sync",
-    "cap:open:ios": "cap open ios"
+    "cap:open:ios": "cap open ios",
+    "pack:build": "tsx scripts/build-level-pack.ts --write",
+    "pack:check": "tsx scripts/build-level-pack.ts"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.1.2",

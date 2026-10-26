@@ -230,6 +230,12 @@ export class Board {
     this.setHint([], null);
   }
 
+  /** Tutorial: a pulsing ring on the one tile the coach is talking about (overlay only). */
+  setGuide(target: [number, number] | null): void {
+    for (const row of this.cellEls) for (const el of row) el.classList.remove('is-guide');
+    if (target) this.cellEls[target[0]][target[1]].classList.add('is-guide');
+  }
+
   focusCell(r: number, c: number): void {
     this.cellEls[this.focusR][this.focusC].tabIndex = -1;
     this.focusR = r;

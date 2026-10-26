@@ -11,6 +11,8 @@ import { cupBoardSpec } from '../competitions/cup';
 import { dateFromKey } from './dates';
 import type { ModeRef } from './modes';
 import { modeKey } from './modes';
+import { LEVEL_PACK } from '../data/levelPack';
+import { decodePack, type PackLevel } from '../data/packFormat';
 
 /**
  * Bump when the generator's output for an existing (size, seed, difficulty) changes. Saved sessions and
@@ -20,8 +22,18 @@ export const GENERATOR_VERSION = 1;
 
 export type PuzzleSource = (mode: ModeRef) => Puzzle | null;
 
-/** Optional curated/frozen boards (the shipped level pack) consulted before generating. */
-let packSource: PuzzleSource | null = null;
+const PACK = new Map(decodePack(LEVEL_PACK).map((e) => [e.level, e]));
+
+/** The frozen, verified Journey launch pack (levels 1–60). Identical to what the generator made for v1. */
+export const levelPackSource: PuzzleSource = (mode) => (mode.kind === 'level' ? (PACK.get(mode.level)?.puzzle ?? null) : null);
+
+/** Grading metadata for a shipped level (null beyond the pack). */
+export function levelMeta(level: number): PackLevel | null {
+  return PACK.get(level)?.meta ?? null;
+}
+
+/** Curated/frozen boards consulted before generating. Defaults to the launch pack. */
+let packSource: PuzzleSource | null = levelPackSource;
 export function setPuzzlePack(src: PuzzleSource | null): void {
   packSource = src;
   cache.clear();

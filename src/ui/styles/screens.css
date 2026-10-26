@@ -702,3 +702,117 @@
   padding: 3px;
   border-radius: 4px;
 }
+
+/* ---------- Welcome (first run) ---------- */
+.welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 28px);
+  text-align: center;
+}
+.welcome__art {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 160px;
+  max-height: 56dvh;
+  border-radius: 28px;
+  overflow: hidden;
+  background: var(--brand-tint);
+  box-shadow: var(--shadow-1);
+  border: 1px solid var(--line);
+}
+.welcome__scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.welcome__pair {
+  position: absolute;
+  left: 50%;
+  bottom: 9%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  width: min(56%, 220px);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 3px var(--board-frame),
+    0 18px 30px -16px rgba(40, 52, 52, 0.55);
+}
+.welcome__tile {
+  aspect-ratio: 1;
+  background: var(--rc);
+  display: grid;
+  place-items: center;
+}
+.welcome__tile + .welcome__tile {
+  box-shadow: inset 2.5px 0 0 var(--divider);
+}
+.welcome__tile .pet {
+  width: 82%;
+  height: 82%;
+}
+.welcome__copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  align-items: center;
+}
+.wordmark--lg {
+  font-size: 44px;
+}
+.welcome__story {
+  font-size: var(--t-lg);
+  line-height: 1.45;
+  color: var(--muted-ink);
+  max-width: 30ch;
+}
+.welcome__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.btn--lg {
+  min-height: 58px;
+  font-size: 20px;
+}
+
+/* ---------- Tutorial coach ---------- */
+.coach.is-guide {
+  color: var(--brand-dark);
+}
+.cell.is-guide::before {
+  opacity: 1;
+  background: rgba(40, 123, 112, 0.18);
+  box-shadow: inset 0 0 0 3px var(--brand);
+  animation: guide-pulse 1.6s ease-in-out infinite;
+}
+@keyframes guide-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+.chip--guide {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
+}
+
+@media (max-height: 700px) {
+  .welcome {
+    gap: var(--s4);
+  }
+  .wordmark--lg {
+    font-size: 36px;
+  }
+  .welcome__story {
+    font-size: var(--t-md);
+  }
+}

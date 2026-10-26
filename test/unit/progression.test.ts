@@ -105,3 +105,22 @@ describe('chapters', () => {
     expect(visibleChapters(85)).toHaveLength(5);
   });
 });
+
+import { isTutorial, levelTip } from '../../src/meta/onboarding';
+
+describe('onboarding', () => {
+  it('only the first, never-solved Journey board is the guided tutorial', () => {
+    const s = defaultSave();
+    expect(isTutorial({ kind: 'level', level: 1 }, s)).toBe(true);
+    expect(isTutorial({ kind: 'level', level: 2 }, s)).toBe(false);
+    expect(isTutorial({ kind: 'daily', dateKey: '2026-10-25' }, s)).toBe(false);
+    recordWin(s, { kind: 'level', level: 1 }, clean);
+    expect(isTutorial({ kind: 'level', level: 1 }, s)).toBe(false);
+  });
+  it('introduces one idea at a time, one sentence each', () => {
+    expect(levelTip(4)).toMatch(/region/);
+    expect(levelTip(7)).toMatch(/side by side/);
+    expect(levelTip(3)).toBeNull();
+    for (const L of [2, 4, 7, 11, 12, 19, 27, 41]) expect(levelTip(L)!.split('. ').length).toBeLessThanOrEqual(2);
+  });
+});

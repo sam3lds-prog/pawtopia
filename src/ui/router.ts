@@ -101,7 +101,8 @@ export type Route =
   | { screen: 'shop' }
   | { screen: 'sanctuary' }
   | { screen: 'game' }
-  | { screen: 'gallery' };
+  | { screen: 'gallery' }
+  | { screen: 'welcome' };
 
 export interface ScreenDef {
   /** Which bottom-nav tab is highlighted; null hides the nav (focused play). */

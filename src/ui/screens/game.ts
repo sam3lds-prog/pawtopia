@@ -17,6 +17,8 @@ import { applyFace, petElement, petSvg, speciesKey } from '../art/pets';
 import { FaceDirector, lookToward, type Clock } from '../animation/faceDirector';
 import type { ReactionMood } from '../animation/faceMachine';
 import type { PetId } from '../../meta/catalogs/pets';
+import { isTutorial, levelTip, TUTORIAL_STEPS } from '../../meta/onboarding';
+import { EMPTY } from '../../engine/types';
 import { Board } from '../components/board';
 import { openSheet, type SheetHandle } from '../components/sheet';
 import { actionOf, capitalize, esc, h, plural, qs } from '../dom';
@@ -45,7 +47,9 @@ export const gameScreen: ScreenDef = {
 };
 
 function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): void {
-  const rules = rulesFor(mode);
+  const tutorial = isTutorial(mode, app.save);
+  // Hearts follow the session (the guided first board has none to lose).
+  const rules = { ...rulesFor(mode), hearts: s.heartsEnabled };
   const n = s.size;
   const total = 2 * n;
   const settings = app.settings;
@@ -55,6 +59,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   let finished = false;
   let sheet: SheetHandle | null = null;
   let lastPlaced: PetId | null = null;
+  /** Tutorial: the placement the coach is pointing at. */
+  let guide: { step: number; r: number; c: number; species: Species; unit: UnitRef | null; text: string } | null = null;
   let winPet: PetId | null = null;
 
   const el = h(`
@@ -66,7 +72,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
           <div class="game-sub"><span class="chip">${n}×${n}</span><span class="chip">${capitalize(s.puzzle.difficulty)}</span></div>
         </div>
         <div class="game-top__end">
-          ${rules.hearts ? '<div class="hearts" data-hearts role="img"></div>' : `<span class="zen-mark" aria-label="No hearts in Zen">${ICON.leaf}</span>`}
+          ${rules.hearts ? '<div class="hearts" data-hearts role="img"></div>' : tutorial ? '<span class="chip chip--guide">Practice</span>' : `<span class="zen-mark" aria-label="No hearts in Zen">${ICON.leaf}</span>`}
           <button class="icon-btn" data-act="pause" aria-label="Pause">${ICON.pause}</button>
         </div>
       </header>
@@ -155,6 +161,50 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     const hintLabel = el.querySelector('[data-hint-label]');
     if (hintLabel) hintLabel.textContent = !hint ? 'Hint' : hint.tier === 1 ? 'Closer' : 'Show me';
     tick();
+    syncGuide();
+  }
+
+  // ---------------------------------------------------------------- tutorial
+
+  function startGuide(step: number): void {
+    const info = step <= TUTORIAL_STEPS && !finished ? s.peekHint() : null;
+    if (!info) {
+      guide = null;
+      board.setGuide(null);
+      board.clearHint();
+      coachGuide("That's the idea! Finish the board on your own. Hint is there if you need it.");
+      track('onboarding_step', { step: 'tutorial_free_play' });
+      return;
+    }
+    const word = SPECIES_WORD[info.species];
+    const text =
+      step === 1
+        ? `Every row, column and color needs one cat and one dog. Tap the glowing tile to place a ${word}.`
+        : `${friendlyReason(info.reason)} Tap the glowing tile.`;
+    guide = { step, r: info.r, c: info.c, species: info.species, unit: info.unit, text };
+    tool = info.species === CAT ? 'cat' : 'dog';
+    coachGuide(text);
+    track('onboarding_step', { step: `tutorial_${step}` });
+  }
+
+  function syncGuide(): void {
+    if (!guide) return;
+    if (s.cells[guide.r][guide.c] === guide.species) {
+      const next = guide.step + 1;
+      guide = null;
+      board.setGuide(null);
+      startGuide(next);
+      if (guide) paint();
+      return;
+    }
+    board.setGuide(s.cells[guide.r][guide.c] === EMPTY || s.cells[guide.r][guide.c] === MARK ? [guide.r, guide.c] : null);
+    // The line whose logic forces the placement is softly lit, so the player sees why.
+    if (!hint) board.setHint(guide.unit ? s.unitCells(guide.unit) : [], null);
+  }
+
+  function coachGuide(text: string): void {
+    coach(text);
+    coachEl.classList.add('is-guide');
   }
 
   function tick(): void {
@@ -180,10 +230,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
 
   function coach(text: string): void {
     coachEl.textContent = text;
+    coachEl.classList.remove('is-guide');
   }
 
   function defaultCoach(): string {
     if (mode.kind === 'cup') return 'Paw Cup rules: no hints, three hearts, your time counts.';
+    const tip = mode.kind === 'level' ? levelTip(mode.level) : null;
+    if (tip) return tip;
     if (mode.kind === 'zen') return 'No clock, no hearts. Take all the time you like.';
     if (classic) return 'Tap once to mark a tile empty, again to place your pet.';
     return 'One cat and one dog in every row, column and color.';
@@ -298,7 +351,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     // The attempted pet appears faintly, puzzled, and fades. It is the only face that reacts to a mistake.
     board.ghost(r, c, petElement(tilePetId(s.puzzle, r, c, sp, roster), 'confused').el, MISS_MS);
     const word = SPECIES_WORD[sp];
-    if (!rules.hearts) coach(`Not a ${word} spot. No rush, try another line of thought.`);
+    if (guide) {
+      coach(`Not quite. That tile can't hold a ${word}.`);
+      const g = guide;
+      scope.timeout(() => guide === g && coachGuide(g.text), 1800);
+    } else if (!rules.hearts) coach(`Not a ${word} spot. No rush, try another line of thought.`);
     else if (s.hearts > 0) coach(`Not a ${word} spot. ${plural(s.hearts, 'heart')} left.`);
   }
 
@@ -716,7 +773,12 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     }
   });
   s.resume();
-  if (!app.save.onboarding.seenRules) {
+  if (tutorial) {
+    app.save.onboarding.seenRules = true;
+    app.persist();
+    startGuide(1);
+    paint();
+  } else if (!app.save.onboarding.seenRules) {
     pauseBoard();
     showRules(scope, () => {
       app.save.onboarding.seenRules = true;

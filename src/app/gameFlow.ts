@@ -7,10 +7,12 @@ import { puzzleFor } from '../game/puzzles';
 import { Session } from '../game/session';
 import { resumeSession } from '../game/sessionPersistence';
 import { track } from '../services/analytics';
+import { isTutorial } from '../meta/onboarding';
 
 export function startGame(mode: ModeRef): void {
   const puzzle = puzzleFor(mode);
-  const session = new Session(puzzle, { hearts: rulesFor(mode).hearts });
+  // The guided first board is forgiving: mistakes are explained, never punished.
+  const session = new Session(puzzle, { hearts: rulesFor(mode).hearts && !isTutorial(mode, app.save) });
   app.active = { mode, session };
   track('puzzle_start', { mode: mode.kind, size: puzzle.size, difficulty: puzzle.difficulty });
   app.router.go({ screen: 'game' });

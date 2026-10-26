@@ -83,3 +83,20 @@ and the player's roster, never the solution. Glance direction depends only on ti
 random per tile (4–9 s), lets pets doze after 20 s without input, pauses ambient life when the board is paused or
 hidden, stops blinks in reduced-motion mode (reactions then switch instantly), and clears every timer when a pet
 leaves its tile or the screen unmounts. Outside the board (tool buttons, win sheet, collection) pets are static.
+
+## 2026-10-25 · D12 — The 60-level launch pack is the v1 boards, frozen and verified
+`src/data/levelPack.ts` holds levels 1–60 exactly as the deterministic generator produced them for v1 (same seeds),
+so a returning player's level 14 is the same board, and a saved in-progress board still matches its digest. Freezing
+them means a future generator change can never alter a shipped level. `npm run pack:check` and the test suite verify
+every board: n connected regions, the solution obeys the rules, givens agree with it, the exact solver finds exactly
+one solution, and the human deduction engine solves it without guessing. The test also regenerates all 60 and
+compares digests, which is the "seed determinism across releases" guard. The curve: 5×5 (1–10, with the spacing
+technique arriving at 7), 6×6 (11–26), 7×7 (27–40), 8×8 (41–60); levels beyond 60 are generated and verified on
+device by the same generator.
+
+## 2026-10-25 · D13 — Onboarding: one guided board, then one idea per level
+Fresh installs see a welcome screen (two-sentence story, the founding pair in two tiles) and go straight into level 1.
+Level 1 is forgiving (no hearts to lose, a "Practice" chip instead) and the deduction engine picks two forced
+placements that are highlighted one at a time with the forcing line softly lit; then the player finishes alone.
+Later levels show a single coaching sentence when a new idea first matters (rows/columns at 2, regions at 4, spacing at
+7, hints at 12, "pointing" at 19). Returning v1 players skip all of this.
