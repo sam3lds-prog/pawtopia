@@ -453,10 +453,12 @@ body[data-nav='on'] .nav {
   box-shadow: 0 1px 3px rgba(40, 52, 52, 0.3);
   transition: transform var(--dur-fade) var(--ease);
 }
-.switch[aria-checked='true'] {
+.switch[aria-checked='true'],
+[role='switch'][aria-checked='true'] .switch {
   background: var(--brand);
 }
-.switch[aria-checked='true']::after {
+.switch[aria-checked='true']::after,
+[role='switch'][aria-checked='true'] .switch::after {
   transform: translateX(20px);
 }
 

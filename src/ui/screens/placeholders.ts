@@ -13,7 +13,4 @@ function simple(tab: TabId | null, title: string, text: string): ScreenDef {
   };
 }
 
-export const petsPlaceholder = simple('pets', 'Pets', 'Your residents will live here.');
 export const leaguePlaceholder = simple('league', 'League', 'Paw Cup is on its way.');
-export const shopPlaceholder = simple('shop', 'Shop', 'Decorations and keepsakes are on their way.');
-export const sanctuaryPlaceholder = simple('home', 'Sanctuary', 'The sanctuary is being built.');

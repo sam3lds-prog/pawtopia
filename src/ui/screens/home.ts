@@ -7,7 +7,9 @@ import { localDateKey } from '../../game/dates';
 import { modeTitle, puzzleFor, sizeFor } from '../../game/puzzles';
 import { chapterOf } from '../../meta/chapters';
 import { liveStreak } from '../../meta/progression';
-import { sceneBackdrop } from '../art/scene';
+import { sceneMarkup } from './sanctuary';
+import { openSheet } from '../components/sheet';
+import { DECOR_BY_ID } from '../../meta/catalogs/decor';
 import { miniBoard } from '../components/board';
 import { toast } from '../components/sheet';
 import { actionOf, esc, h, plural } from '../dom';
@@ -49,7 +51,7 @@ export const homeScreen: ScreenDef = {
         </header>
 
         <button class="scene-card" data-act="sanctuary" aria-label="Visit the Harmony Sanctuary">
-          <svg class="scene-card__art" viewBox="0 0 360 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${sceneBackdrop({ id: 'home' })}</svg>
+          <svg class="scene-card__art" viewBox="0 52 360 216" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${sceneMarkup('home')}</svg>
           <span class="scene-card__label">Harmony Sanctuary</span>
         </button>
 
@@ -98,6 +100,29 @@ export const homeScreen: ScreenDef = {
         /* thumbnail is decorative */
       }
     }, 30);
+
+    // Players coming from v1: say what their earlier progress turned into, once.
+    const gift = app.upgradeGift;
+    if (gift) {
+      app.upgradeGift = null;
+      const gs = openSheet(scope, {
+        title: 'Welcome to Pawtopia',
+        center: true,
+        body: `<p class="sheet__lead">Cats vs Dogs has grown into Pawtopia. Every level you solved is still solved, and it earned you a head start:</p>
+          <div class="win-rewards">
+            ${gift.coins ? `<div class="reward-coins"><span class="reward-coins__amt">${ICON.coin}<b class="num">+${gift.coins}</b></span><span class="muted">Paw Coins for ${plural(Object.keys(app.save.journey.clears).length, 'solved level')}</span></div>` : ''}
+            ${gift.pets.length ? `<p><b>${gift.pets.length} residents</b> moved into your sanctuary.</p>` : ''}
+            ${gift.decor.length ? `<p>Chapter gifts: ${esc(gift.decor.map((d) => DECOR_BY_ID[d].name).join(', '))}.</p>` : ''}
+          </div>
+          <div class="sheet__actions"><button class="btn btn--block" data-act="see">See the sanctuary</button><button class="btn btn--quiet" data-act="later">Later</button></div>`,
+      });
+      gs.scope.on(gs.el, 'click', (e) => {
+        const a = actionOf(e);
+        if (!a) return;
+        gs.close();
+        if (a.act === 'see') app.router.go({ screen: 'sanctuary', welcome: gift.pets });
+      });
+    }
 
     scope.on(el, 'click', (e) => {
       const a = actionOf(e);

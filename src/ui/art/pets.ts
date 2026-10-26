@@ -327,6 +327,13 @@ export function petSvg(id: PetId, o: PetSvgOptions = {}): string {
   return `<svg class="pet pet--${def.species}${o.className ? ` ${o.className}` : ''}" data-pet="${id}" data-mood="${mood}" data-eyes="${p.eyes}" data-mouth="${p.mouth}" style="${poseStyle(p)}" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" ${a11y}>${rigBody(id)}</svg>`;
 }
 
+/** The rig as a <g> for embedding in a larger illustration (static; e.g. the sanctuary). */
+export function petRigMarkup(id: PetId, mood: FaceMood, transform: string): string {
+  const def = PET_BY_ID[id];
+  const p = poseFor(id, mood);
+  return `<g class="pet pet--${def.species}" data-pet="${id}" data-mood="${mood}" data-eyes="${p.eyes}" data-mouth="${p.mouth}" style="${poseStyle(p)}" transform="${transform}">${rigBody(id)}</g>`;
+}
+
 /** Builds a live rig element (for board tiles that animate). */
 export function petElement(id: PetId, mood: FaceMood = 'idle'): { el: HTMLElement; svg: SVGSVGElement } {
   const span = document.createElement('span');

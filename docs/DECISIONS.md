@@ -100,3 +100,19 @@ Level 1 is forgiving (no hearts to lose, a "Practice" chip instead) and the dedu
 placements that are highlighted one at a time with the forcing line softly lit; then the player finishes alone.
 Later levels show a single coaching sentence when a new idea first matters (rows/columns at 2, regions at 4, spacing at
 7, hints at 12, "pointing" at 19). Returning v1 players skip all of this.
+
+## 2026-10-25 · D14 — Free soft currency on an idempotent ledger; one reward path for wins and migration
+Paw Coins are earned only by playing and spent only on cosmetic decor (`config/economy.ts`: 35 first clear, +10 first
+clean solve, 15 (+10 clean) for a day's daily, 100 per finished chapter; Zen and Paw Cup pay nothing). Every grant and
+spend is a ledger entry with a stable id (`clear:L12`, `clean:L12`, `daily:2026-10-25`, `chapter:1`,
+`buy:decor:rug`) applied at most once, and the balance is the sum of the ledger, so replays, double taps and re-runs
+can't mint or charge twice. The same `applyLevelRewards` runs at win time and, on startup, over every cleared level
+(`reconcileRewards`): a v1 player at level 14 receives 13 × 35 coins and the residents for levels 1, 5 and 10, once,
+with a "Welcome to Pawtopia" note. Pets arrive at fixed milestones (1: Mochi + Biscuit, 5: Pip, 10: Nori,
+15: Clover, 20: Peanut); chapters gift Stone Fountain, Blossom Tree, Little Bridge. Nothing is random or purchasable.
+
+## 2026-10-25 · D15 — Sanctuary decor has fixed homes
+Each of the 15 decorations has one spot in the garden, so items can't overlap or form invalid combinations; players
+customize by earning, buying, and showing / hiding. Residents sit on their favorite piece when it's out (Mochi on the
+cushion, Biscuit in the basket, Pip on the perch, Clover on the blanket, Nori on the rug). Pets outside the board are
+static art. After the first board the player picks one of two starter gifts (Paper Lamp or Plump Cushion).

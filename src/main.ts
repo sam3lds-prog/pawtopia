@@ -7,7 +7,10 @@ import { mountNav } from './ui/components/nav';
 import { homeScreen } from './ui/screens/home';
 import { playScreen } from './ui/screens/play';
 import { gameScreen } from './ui/screens/game';
-import { leaguePlaceholder, petsPlaceholder, sanctuaryPlaceholder, shopPlaceholder } from './ui/screens/placeholders';
+import { leaguePlaceholder } from './ui/screens/placeholders';
+import { petsScreen } from './ui/screens/pets';
+import { shopScreen } from './ui/screens/shop';
+import { sanctuaryScreen } from './ui/screens/sanctuary';
 import { galleryScreen } from './ui/screens/gallery';
 import { needsWelcome, welcomeScreen } from './ui/screens/welcome';
 import { track } from './services/analytics';
@@ -19,10 +22,10 @@ router.register({
   home: homeScreen,
   play: playScreen,
   game: gameScreen,
-  pets: petsPlaceholder,
+  pets: petsScreen,
   league: leaguePlaceholder,
-  shop: shopPlaceholder,
-  sanctuary: sanctuaryPlaceholder,
+  shop: shopScreen,
+  sanctuary: sanctuaryScreen,
   gallery: galleryScreen,
   welcome: welcomeScreen,
 });

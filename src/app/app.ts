@@ -11,6 +11,8 @@ import type { Router } from '../ui/router';
 import type { ModeRef } from '../game/modes';
 import type { Session } from '../game/session';
 import { captureSession } from '../game/sessionPersistence';
+import { reconcileRewards, type RewardSummary } from '../meta/rewards';
+import { balance } from '../meta/ledger';
 
 type Listener = () => void;
 
@@ -23,8 +25,17 @@ class App {
   private listeners = new Set<Listener>();
   private systemReduced = false;
 
+  /** What a v1 player received when their earlier progress was converted (shown once on Home). */
+  upgradeGift: RewardSummary | null = null;
+
   constructor() {
     this.save = loadSave().save;
+    // Grant anything already earned but not yet recorded (v1 levels). Idempotent, so it is a no-op after the first run.
+    const gift = reconcileRewards(this.save);
+    if (gift.coins > 0 || gift.pets.length || gift.decor.length) {
+      this.upgradeGift = gift;
+      saveSave(this.save);
+    }
     try {
       const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
       this.systemReduced = mq.matches;
@@ -71,9 +82,7 @@ class App {
   }
 
   coins(): number {
-    let sum = 0;
-    for (const e of this.save.inventory.ledger) sum += e.delta;
-    return sum;
+    return balance(this.save);
   }
 
   applySettings(): void {

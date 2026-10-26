@@ -8,6 +8,10 @@ import { nextAfterWin, rulesFor, type ModeRef } from '../../game/modes';
 import { modeShortTitle, modeTitle } from '../../game/puzzles';
 import { MARK, type HintInfo, type MoveResult, type Session, type Tool, type UnitRef } from '../../game/session';
 import { recordLoss, recordWin, type WinRecord } from '../../meta/progression';
+import { rewardsForWin, type RewardSummary } from '../../meta/rewards';
+import { DECOR_BY_ID } from '../../meta/catalogs/decor';
+import { PET_BY_ID } from '../../meta/catalogs/pets';
+import { decorIcon } from '../art/sanctuary';
 import { ads, shouldShowInterstitial } from '../../services/ads';
 import { track } from '../../services/analytics';
 import { sfx } from '../../services/audio';
@@ -616,21 +620,45 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     winPet = lastPlaced ?? tilePets.values().next().value ?? null;
     const result = { size: n, seconds: s.elapsedSeconds(), mistakes: s.mistakes, hintsUsed: s.hintsUsed, revives: s.revives, hearts: rules.hearts };
     const rec = recordWin(app.save, mode, result);
+    const rewards = rewardsForWin(app.save, mode, rec);
     app.save.lastSession = null;
     app.active = null;
     app.persist();
     cadence.boardsSinceLast++;
     track('puzzle_complete', { mode: mode.kind, size: n, seconds: result.seconds, mistakes: result.mistakes, hints: result.hintsUsed });
     if (mode.kind === 'daily' && rec.newDaily) track('daily_complete', { streak: rec.streak ?? 0 });
+    for (const p of rewards.pets) track('pet_unlocked', { pet: p });
     sfx('win');
     haptic('success');
     coach('Harmony restored.');
-    scope.timeout(() => showWin(rec, result.seconds), app.reducedMotion ? 150 : 1000);
+    scope.timeout(() => showWin(rec, result.seconds, rewards), app.reducedMotion ? 150 : 1000);
   }
 
-  function showWin(rec: WinRecord, seconds: number): void {
+  function rewardsMarkup(r: RewardSummary): string {
+    if (!r.coins && !r.pets.length && !r.decor.length) return '';
+    const coins = r.coins
+      ? `<div class="reward-coins"><span class="reward-coins__amt">${ICON.coin}<b class="num">+${r.coins}</b></span><span class="muted">${esc(r.lines.map((l) => l.label).join(' · '))}</span></div>`
+      : '';
+    const pets = r.pets
+      .map((id) => `<div class="reward-item"><span class="reward-item__art">${petSvg(id, { mood: 'happy' })}</span><span><b>${esc(PET_BY_ID[id].name)} moved in!</b><small>${esc(PET_BY_ID[id].trait)}</small></span></div>`)
+      .join('');
+    const decor = r.decor
+      .map((id) => `<div class="reward-item"><span class="reward-item__art">${decorIcon(id)}</span><span><b>${esc(DECOR_BY_ID[id].name)}</b><small>${r.chapter ? `Gift for finishing ${esc(r.chapter.name)}` : 'New decoration'}</small></span></div>`)
+      .join('');
+    return `<div class="win-rewards">${coins}${pets}${decor}</div>`;
+  }
+
+  function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary): void {
     const next = nextAfterWin(mode);
-    const primaryLabel = typeof next === 'object' && next.kind === 'level' ? `Play level ${next.level}` : next === 'cup' ? 'Back to Paw Cup' : 'Back home';
+    const meet = rewards.pets.length > 0;
+    const firstBoard = mode.kind === 'level' && mode.level === 1 && rec.firstClear;
+    const primaryLabel = firstBoard
+      ? 'Meet your residents'
+      : typeof next === 'object' && next.kind === 'level'
+        ? `Play level ${next.level}`
+        : next === 'cup'
+          ? 'Back to Paw Cup'
+          : 'Back home';
     const badges: string[] = [];
     if (rec.clean) badges.push(`<span class="chip chip--brand">${ICON.check}Clean solve</span>`);
     if (rec.isBest && rec.prevBest !== null) badges.push(`<span class="chip chip--gold">${ICON.sparkle}New best</span>`);
@@ -651,9 +679,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
           <div class="stat"><div class="stat__v">${s.hintsUsed}</div><div class="stat__k">${s.hintsUsed === 1 ? 'hint' : 'hints'}</div></div>
         </div>
         ${badges.length ? `<div class="win-badges">${badges.join('')}</div>` : ''}
+        ${rewardsMarkup(rewards)}
         <div class="sheet__actions">
-          <button class="btn btn--block" data-act="next" data-autofocus>${esc(primaryLabel)}</button>
-          <button class="btn btn--quiet" data-act="share">${ICON.share}Share result</button>
+          <button class="btn btn--block" data-act="${firstBoard ? 'meet' : 'next'}" data-autofocus>${esc(primaryLabel)}</button>
+          <div class="win-secondary">
+            ${firstBoard ? '' : `<button class="btn btn--quiet" data-act="${meet ? 'meet' : 'sanctuary'}">${ICON.home}${meet ? `Meet ${esc(PET_BY_ID[rewards.pets[0]].name)}` : 'Visit sanctuary'}</button>`}
+            <button class="btn btn--quiet" data-act="share" aria-label="Share result">${ICON.share}${firstBoard ? 'Share result' : 'Share'}</button>
+          </div>
         </div>`,
     });
     const ws = sheet;
@@ -667,6 +699,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
       }
       leaving = true;
       ws.close();
+      if (a.act === 'meet' || a.act === 'sanctuary') {
+        app.router.go({ screen: 'sanctuary', welcome: a.act === 'meet' ? rewards.pets : [] });
+        return;
+      }
+      // Celebration first, always. An interstitial (if any network is live) can only follow the player's tap.
       await maybeInterstitial();
       if (typeof next === 'object') startGame(next);
       else app.router.go({ screen: next === 'cup' ? 'league' : 'home' });
