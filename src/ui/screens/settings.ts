@@ -3,11 +3,14 @@
 import { app } from '../../app/app';
 import { resetProgress, type Settings } from '../../services/storage';
 import { iap } from '../../services/iap';
+import { ads } from '../../services/ads';
 import { track } from '../../services/analytics';
 import { openSheet, toast } from '../components/sheet';
 import { actionOf, esc } from '../dom';
 import type { Scope } from '../router';
 import { featureFlags } from '../../config/featureFlags';
+import { showRules } from './rules';
+import { ICON } from '../icons';
 
 type BoolKey = 'autoMark' | 'showTimer' | 'largeBoard' | 'sound' | 'haptics' | 'highContrast' | 'regionPatterns' | 'leftHanded';
 
@@ -48,6 +51,7 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
     body: `
       <div class="rows-title">Play</div>
       <div class="rows">
+        <button class="row" data-act="rules"><span class="row__label">How to play<small>The two rules, with pictures</small></span>${ICON.chevron}</button>
         ${choice('controls', 'Controls', [
           ['tools', 'Tools'],
           ['classic', 'Tap cycle'],
@@ -77,11 +81,13 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
       ${purchaseState}
       <div class="rows-title">Your data</div>
       <div class="rows">
-        <div class="row"><span class="row__label">Saved on this device<small>Pawtopia plays fully offline. No account, no tracking of who you are.</small></span></div>
+        <div class="row"><span class="row__label">Saved on this device<small>Pawtopia plays fully offline. No account, no sign-in.</small></span></div>
+        <div class="row"><span class="row__label">Analytics<small>None are sent in this version. Gameplay events stay in memory on your device and are never linked to you.</small></span></div>
+        <div class="row"><span class="row__label">Ads<small>${ads.available ? (ads.isStub ? 'Development test ads only, clearly labeled.' : 'At most one short ad after several boards. Never during play, Paw Cup, or before your results.') : 'This version shows no ads.'}</small></span></div>
         <button class="row" data-act="reset"><span class="row__label" style="color:var(--error)">Erase progress<small>Purchases and settings are kept</small></span></button>
       </div>
       ${featureFlags.devGallery ? `<div class="rows-title">Developer</div><div class="rows"><button class="row" data-act="gallery"><span class="row__label">Expression gallery<small>Development builds only</small></span></button></div>` : ''}
-      <p class="muted settings-foot">Pawtopia · original art and sounds · fonts: Fredoka and Nunito Sans (SIL Open Font License)</p>`,
+      <p class="muted settings-foot">Pawtopia ${esc(__APP_VERSION__)} · original art and sounds · fonts: Fredoka and Nunito Sans (SIL Open Font License)</p>`,
   });
 
   sh.scope.on(sh.el, 'click', async (e) => {
@@ -119,6 +125,8 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
         app.persist();
         toast('Purchases restored.');
       } else toast(res.ok ? 'No purchases to restore.' : 'The store is not available right now.');
+    } else if (a.act === 'rules') {
+      showRules(sh.scope);
     } else if (a.act === 'gallery') {
       sh.close();
       app.router.go({ screen: 'gallery' });

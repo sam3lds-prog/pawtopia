@@ -14,7 +14,8 @@
     "cap:sync": "npm run build && cap sync",
     "cap:open:ios": "cap open ios",
     "pack:build": "tsx scripts/build-level-pack.ts --write",
-    "pack:check": "tsx scripts/build-level-pack.ts"
+    "pack:check": "tsx scripts/build-level-pack.ts",
+    "e2e": "node test/e2e/smoke.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.1.2",

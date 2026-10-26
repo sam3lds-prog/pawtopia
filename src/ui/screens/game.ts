@@ -140,6 +140,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
         faces.remove(keyOf(r, c));
         tilePets.delete(keyOf(r, c));
       },
+      petName: (r, c) => {
+        const id = tilePets.get(keyOf(r, c));
+        return id ? PET_BY_ID[id].name : null;
+      },
     },
   );
   stage.appendChild(board.el);

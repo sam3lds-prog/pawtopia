@@ -11,6 +11,7 @@ import { sceneMarkup } from './sanctuary';
 import { openSheet } from '../components/sheet';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
 import { claimMission, missionStates } from '../../meta/missions';
+import { nextPetMilestone } from '../../meta/rewards';
 import { addDaysKey, localWeekStart } from '../../game/dates';
 import { sfx } from '../../services/audio';
 import { track } from '../../services/analytics';
@@ -56,6 +57,7 @@ export const homeScreen: ScreenDef = {
     const dailyDone = !!save.daily.done[daily.dateKey];
     const streak = liveStreak(save, localDateKey());
     const weekday = WEEKDAY[new Date().getDay()];
+    const nextPet = nextPetMilestone(save);
 
     const continueTitle = resumeMode ? `Resume ${modeTitle(resumeMode).toLowerCase().replace(/^level/, 'level')}` : `Play level ${level}`;
     const thumbMode = resumeMode ?? { kind: 'level' as const, level };
@@ -82,6 +84,7 @@ export const homeScreen: ScreenDef = {
             <p class="continue__eyebrow">${resumeMode ? 'Board in progress' : esc(`Chapter ${chapter.index + 1}: ${chapter.name}`)}</p>
             <h2 id="continue-title">${esc(resumeMode ? modeTitle(resumeMode) : `Level ${level}`)}</h2>
             <p class="muted">${thumbSize}×${thumbSize} board${resumeMode ? ', saved where you left it' : ''}</p>
+            ${nextPet && !resumeMode ? `<p class="continue__next">${ICON.paw}${nextPet.level === level ? 'A new resident arrives when you solve this one' : `Next resident at level ${nextPet.level}`}</p>` : ''}
           </div>
           <div class="continue__thumb" data-thumb style="--n:${thumbSize}"></div>
           <button class="btn btn--block continue__go" data-act="continue">${esc(continueTitle)}</button>

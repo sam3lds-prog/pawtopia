@@ -140,3 +140,8 @@ Three daily missions (always "solve any board", plus two chosen by the date, so 
 mission; missing a day costs nothing and no mission asks for an ad. Twelve badges with fixed small coin gifts.
 Claims and gifts use the idempotent ledger. v1 history (cleared levels, best times by board size) is folded into
 stats during migration so returning players' Journal and badges reflect what they actually did.
+
+## 2026-10-25 · D19 — Settings say exactly what this build does
+Settings states plainly that progress is on-device, no analytics are sent, and (in release) no ads are shown; the store
+row says purchases aren't connected. Board cells announce the resident's name to VoiceOver. The v1 glyph module
+(`src/game/icons.ts`) was removed once every surface used the new rigs; it remains in git history.

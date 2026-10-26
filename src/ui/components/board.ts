@@ -30,6 +30,8 @@ export interface BoardOptions {
   pet: PetFactory;
   /** Called when a pet element leaves the board (cleared / undone) so its animator can stop. */
   onPetRemoved?: (r: number, c: number) => void;
+  /** The resident's name on a tile, for screen-reader labels. */
+  petName?: (r: number, c: number) => string | null;
 }
 
 const SPECIES_NAME: Record<number, string> = { [CAT]: 'cat', [DOG]: 'dog' };
@@ -190,7 +192,10 @@ export class Board {
 
   private label(r: number, c: number, val: CellState, given: boolean, dead: boolean): string {
     const where = `Row ${r + 1}, column ${c + 1}, ${this.regionName(this.puzzle.regions[r][c])}`;
-    if (val === CAT || val === DOG) return `${where}: ${SPECIES_NAME[val]}${given ? ', already home' : ''}`;
+    if (val === CAT || val === DOG) {
+      const name = this.opts.petName?.(r, c);
+      return `${where}: ${SPECIES_NAME[val]}${name ? `, ${name}` : ''}${given ? ', already home' : ''}`;
+    }
     if (val === MARK) return `${where}: marked empty`;
     return `${where}: empty${dead ? ', no pet can go here' : ''}`;
   }

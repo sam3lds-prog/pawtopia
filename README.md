@@ -1,72 +1,78 @@
-# Cats vs Dogs — logic puzzle
+# Pawtopia
 
-A two-species take on the Queens / Star Battle puzzle. Built as a web app (Vite + TypeScript, no framework) and shipped to iOS through Capacitor.
+*A clever little puzzle with a whole lot of heart.*
 
-**Rules**
+Pawtopia is a cozy, portrait-first logic puzzle for iPhone. Every row, column and color region needs exactly
+**one cat and one dog**, and pets never sit side by side. Every board has one answer you can reach by logic alone.
+Solving boards welcomes residents into the Harmony Sanctuary, a garden you decorate with coins you earn by playing.
+The pets on the board are alive in the smallest way: they blink, glance, smile and frown, but only their faces move.
 
-1. Every row, column and color region gets exactly **one cat and one dog**.
-2. A cat and a dog **never sit side by side**. Diagonal is fine.
+Built with Vite + TypeScript (no UI framework) and shipped to iOS with Capacitor. It grew out of Cats vs Dogs v1; the
+puzzle engine, its tests and every v1 board are preserved, and v1 saves migrate automatically.
 
-Every board has exactly one solution and is solvable by pure logic — the generator only accepts puzzles its own deduction engine can finish without guessing.
+## What's in the game
+
+| | |
+| --- | --- |
+| **Journey** | 60 verified launch levels in chapters of 20 (5×5 → 8×8), then endless generated boards up to 9×9. Stars for clean, hint-free solves. A new resident at levels 1, 5, 10, 15 and 20; a decoration gift per chapter. |
+| **First run** | A two-sentence welcome, then a forgiving guided board where the deduction engine highlights two forced moves one at a time. Later levels introduce one idea each in one sentence. |
+| **Daily Cozy Puzzle** | One shared board per day, with a gentle streak and one free Cozy Day per month. |
+| **Zen Garden** | Any size, no clock, no hearts. |
+| **Paw Cup** | Five fixed boards per UTC week, two attempts each, no hints, best counts. Practice-only (clearly labeled) until the verified backend exists. |
+| **Sanctuary** | An illustrated garden with 15 decorations in fixed spots and your residents sitting on their favorites. |
+| **Residents** | Six original pets (Mochi, Pip, Clover, Biscuit, Nori, Peanut) with personalities that shape their expressions. |
+| **Meta** | Free Paw Coins on an idempotent ledger, 3 daily missions + 1 weekly, 12 badges, a Journal of stats. |
+| **Comfort** | Tool or tap-cycle controls, left-handed layout, reduced motion, high contrast, region patterns, large board mode, VoiceOver labels, offline play, no sign-in. |
 
 ## Run it
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173 — open on your phone via the LAN URL vite prints
-npm test           # engine + session tests
-npm run gen:check  # generates 1,000 puzzles and verifies uniqueness/validity
-npm run build      # production build → dist/
+npm run dev        # http://localhost:5173 (open the LAN URL on your phone)
+npm test           # 140 unit tests: engine, session, storage, faces, economy, scoring, verifier
+npm run gen:check  # generates 1,000 puzzles and verifies uniqueness / validity
+npm run pack:check # re-verifies the 60-level launch pack
+npm run build      # typecheck + production build → dist/
+npm run e2e        # browser smoke test against `npm run dev` (needs Playwright, see test/e2e/smoke.mjs)
 ```
 
-## Ship it to iOS (first time)
+In development builds, Settings → Developer → *Expression gallery* shows every pet in every mood with live tiles.
 
-Needs a Mac with Xcode and an Apple Developer account ($99/yr).
+## Ship it to iOS
+
+Needs a Mac with Xcode and an Apple Developer account.
 
 ```bash
 npm run build
-npx cap add ios          # creates ios/App (once)
+npx cap add ios          # once; creates ios/App
 npx cap sync             # copies dist/ into the native shell
 npx cap open ios         # opens Xcode
 ```
 
-In Xcode: set your Team under *Signing & Capabilities*, bump the bundle id if you change `appId` in `capacitor.config.ts`, add the app icon set, then *Product → Archive → Distribute* to TestFlight.
-
-After every web change: `npm run cap:sync`, then build/run from Xcode.
+The bundle id stays `com.sam3lds.catsvsdogs` so Pawtopia ships as an update to the existing app (see
+`docs/DECISIONS.md` D9). Before TestFlight, work through `docs/release-checklist.md`.
 
 ## Project layout
 
 ```
-src/engine/   pure puzzle logic — no DOM
-  types.ts      Puzzle, Kind, rules
-  solver.ts     exact backtracking solver (uniqueness check)
-  deduce.ts     human-style deduction engine (grading + hints)
-  generator.ts  placement → regions → minimized givens → verify
-  levels.ts     level ladder + daily seeds
-  rng.ts        seeded RNG (same seed = same puzzle everywhere)
-src/game/     session state (marks, hearts, undo, hints) + icons
-src/services/ storage, ads (stub), iap (stub)
-src/main.ts   screens: home, levels, game, overlays
-scripts/      verify-generator.ts
-test/         vitest
+src/engine/        puzzle engine (unchanged from v1): solver, deduction, generator, levels, rng
+src/data/          frozen, verified 60-level launch pack + pack format/verification
+src/game/          session (marks, hearts, undo/redo, hints, snapshots, event log), modes, dates, persistence
+src/meta/          progression, rewards, ledger, sanctuary, missions, achievements, onboarding, catalogs
+src/competitions/  scoring formula, replay verifier, league rules, weekly cup boards, local practice cup
+src/services/      storage (v2 + migration), kv guard, ads/iap adapters, analytics, audio, haptics
+src/ui/            router + screen lifecycle, screens, components, art (pet rigs, sanctuary), face animation
+src/config/        feature flags, economy tuning
+test/              unit tests (vitest) + e2e smoke (playwright)
+docs/              roadmap, decisions, architecture, design system, assets, privacy, backend plan, release checklist
 ```
 
-## Monetization hooks (stubbed, ready to wire)
+## Honest by design
 
-| Placement | Where | Native plugin to drop in |
-| --- | --- | --- |
-| Interstitial after each solved level, cooldown 120s → 100s → 90s by tenure | `services/ads.ts` `maybeShowInterstitial` | `@capacitor-community/admob` or AppLovin MAX |
-| Rewarded: refill hearts on game over | `onLose()` in `main.ts` | same |
-| Rewarded: hint | `giveHint()` in `main.ts` | same |
-| Remove Ads $3.99 (non-consumable) | `services/iap.ts` | RevenueCat `@revenuecat/purchases-capacitor` |
+- Paw Coins are earned only by playing and buy only cosmetics. Nothing random, nothing pay-to-win.
+- Release builds can't buy anything or show an ad until a real, verified store / ad network is integrated.
+- League scores are labeled practice and never ranked against anyone until server verification exists.
+  No made-up players, ever.
+- No account, no sign-in, no analytics sent. Everything stays on the device.
 
-Replace `StubAdService` / `StubIapService` with real implementations; nothing else changes.
-
-## Roadmap after v1
-
-- App icon + App Store screenshots
-- Analytics (GameAnalytics) on level start/complete/fail/ad shown
-- Dark mode
-- More deduction techniques → fewer given pets on big boards
-- Localization (strings are already in one file)
-- Publisher prototype submissions (Supercent, Voodoo, Rollic, Homa)
+See `docs/PAWTOPIA_ROADMAP.md` for status and the steps that need you (Apple, StoreKit, Firebase).

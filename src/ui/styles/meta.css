@@ -1028,3 +1028,16 @@ ul.rows {
   padding: 0;
   pointer-events: none;
 }
+.continue__next {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: var(--t-xs);
+  font-weight: 800;
+  color: var(--coral-ink);
+}
+.continue__next .ico {
+  width: 15px;
+  height: 15px;
+}
