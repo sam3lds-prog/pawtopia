@@ -50,3 +50,15 @@ snapshot onto a different puzzle.
 The Daily Cozy Puzzle keeps v1's local-date keys so existing records and streaks remain valid. Paw Cup weeks
 use ISO weeks in UTC (Monday 00:00 UTC) so every competitor shares one boundary. Date math uses calendar
 fields, never fixed 24-hour offsets, so DST can't skip or repeat a day.
+
+## 2026-10-25 · D9 — Rename the app, keep the bundle id
+The display name becomes **Pawtopia** (`capacitor.config.ts` `appName`, page title, icon). The iOS bundle id stays
+`com.sam3lds.catsvsdogs`: changing it would make Pawtopia a different App Store app, so existing players would not
+receive it as an update and their on-device save (which the v2 migration carries forward) would be stranded.
+The App Store listing name is set in App Store Connect and can say Pawtopia without touching the bundle id.
+
+## 2026-10-25 · D10 — Screens own a lifecycle scope; the board is the hero
+`ui/router.ts` mounts one screen at a time with a `Scope` that owns its timers, listeners, sheets and async
+continuations. The game screen groups the board with its one-line coach in a flexible zone, so on tall phones the
+spare height is shared above and below instead of separating the board from its feedback. Cells are sized from the
+zone (max 76px, min 26px; 9×9 fits a 320px phone at ~31px cells). "Large board" keeps cells ≥46px and scrolls.

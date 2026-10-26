@@ -31,7 +31,7 @@ Defects confirmed in source and fixed in Sprint 0:
 ## Sprint status
 
 - [x] **Sprint 0** — bug fixes, v2 save + migration, session persistence, ad/IAP safety, regression tests
-- [ ] **Sprint 1** — design system, router, modular screens, bottom nav
+- [x] **Sprint 1** — design system, router, modular screens, bottom nav
 - [ ] **Sprint 2** — pet face rigs, facial-only animation scheduler
 - [ ] **Sprint 3** — onboarding, Zen, hint tiers, verified 60-level pack, chapters
 - [ ] **Sprint 4** — sanctuary, collection, decor, idempotent coin ledger

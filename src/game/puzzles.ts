@@ -91,3 +91,17 @@ export function modeTitle(mode: ModeRef): string {
       return `Paw Cup · Board ${mode.index + 1}`;
   }
 }
+
+/** Compact title for the in-game top bar. */
+export function modeShortTitle(mode: ModeRef): string {
+  switch (mode.kind) {
+    case 'level':
+      return `Level ${mode.level}`;
+    case 'daily':
+      return 'Daily';
+    case 'zen':
+      return 'Zen';
+    case 'cup':
+      return `Cup ${mode.index + 1}`;
+  }
+}
