@@ -1,8 +1,8 @@
 {
-  "name": "cats-vs-dogs-logic",
-  "version": "0.1.0",
+  "name": "pawtopia",
+  "version": "0.2.0",
   "private": true,
-  "description": "Cats vs Dogs — a two-species logic puzzle. One cat and one dog per row, column and region.",
+  "description": "Pawtopia \u2014 a cozy logic puzzle. One cat and one dog in every row, column and region; a sanctuary that grows as you solve.",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -12,7 +12,10 @@
     "gen:check": "tsx scripts/verify-generator.ts",
     "cap:add:ios": "cap add ios",
     "cap:sync": "npm run build && cap sync",
-    "cap:open:ios": "cap open ios"
+    "cap:open:ios": "cap open ios",
+    "pack:build": "tsx scripts/build-level-pack.ts --write",
+    "pack:check": "tsx scripts/build-level-pack.ts",
+    "e2e": "node test/e2e/smoke.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.1.2",
@@ -24,6 +27,9 @@
   },
   "dependencies": {
     "@capacitor/core": "^6.1.2",
-    "@capacitor/ios": "^6.1.2"
+    "@capacitor/haptics": "^6.0.3",
+    "@capacitor/ios": "^6.1.2",
+    "@fontsource-variable/fredoka": "^5.3.0",
+    "@fontsource-variable/nunito-sans": "^5.3.0"
   }
 }

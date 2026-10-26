@@ -1,0 +1,267 @@
+/* ---------- Board ----------
+   Cells only paint their region color and content. Grid lines and region dividers are one SVG overlay,
+   so their weight is identical everywhere and nothing shifts when a tile's content changes.
+   Pets are never transformed here: all tile feedback lives on the ::before overlay (color, ring, opacity). */
+
+.board-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+}
+.board-stage.is-scroll {
+  overflow: auto;
+  justify-content: flex-start;
+  align-items: flex-start;
+  -webkit-overflow-scrolling: touch;
+}
+
+.board {
+  --n: 5;
+  --cell: 56px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n), var(--cell));
+  grid-auto-rows: var(--cell);
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 3px var(--board-frame),
+    0 22px 40px -22px rgba(40, 52, 52, 0.45);
+  touch-action: none;
+  flex: none;
+}
+.board.is-pannable {
+  touch-action: pan-x pan-y;
+}
+
+.board__lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+.board__lines .grid {
+  stroke: var(--grid);
+  stroke-width: 1;
+}
+.board__lines .div {
+  stroke: var(--divider);
+  stroke-width: 2.75;
+  stroke-linecap: round;
+}
+
+.cell {
+  position: relative;
+  width: var(--cell);
+  height: var(--cell);
+  display: grid;
+  place-items: center;
+  background-color: var(--rc, var(--r0));
+  outline-offset: -4px;
+}
+.cell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-fade) var(--ease);
+}
+.cell > * {
+  grid-area: 1 / 1;
+  z-index: 2;
+}
+.cell:focus-visible {
+  outline: 3px solid var(--brand-dark);
+  border-radius: 6px;
+}
+
+.cell__pet {
+  width: 84%;
+  height: 84%;
+  display: block;
+}
+.cell__pet > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+.cell__ghost {
+  width: 84%;
+  height: 84%;
+  opacity: 0;
+  animation: ghost var(--miss-ms, 650ms) linear forwards;
+}
+.cell__ghost > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+@keyframes ghost {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.75;
+  }
+  70% {
+    opacity: 0.75;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.cell__mark {
+  width: 40%;
+  height: 40%;
+  color: var(--muted-ink);
+  opacity: 0.75;
+}
+.cell__mark .ico {
+  width: 100%;
+  height: 100%;
+  stroke-width: 2.6;
+}
+.cell__dot {
+  width: 13%;
+  height: 13%;
+  min-width: 4px;
+  min-height: 4px;
+  border-radius: 50%;
+  background: rgba(40, 52, 52, 0.24);
+}
+.cell__lock {
+  position: absolute;
+  top: 6%;
+  left: 6%;
+  width: 22%;
+  height: 22%;
+  max-width: 14px;
+  max-height: 14px;
+  color: rgba(40, 52, 52, 0.55);
+  z-index: 3;
+}
+.cell__lock .ico {
+  width: 100%;
+  height: 100%;
+  stroke-width: 2.4;
+}
+
+/* Givens: a subtle embossed plate so they read as "already home". */
+.cell.is-given::before {
+  opacity: 1;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.6),
+    inset 0 -3px 0 rgba(40, 52, 52, 0.08);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* Hint tier 1: the unit to look at. */
+.cell.is-focus::before {
+  opacity: 1;
+  background: rgba(40, 123, 112, 0.2);
+}
+/* Hint tier 2: the exact cell. */
+.cell.is-target::before {
+  opacity: 1;
+  background: rgba(40, 123, 112, 0.24);
+  box-shadow: inset 0 0 0 3px var(--brand);
+}
+
+/* Mistake: red ring plus hatch, never color alone. */
+.cell.is-miss::before {
+  opacity: 1;
+  box-shadow: inset 0 0 0 3px var(--error);
+  background: repeating-linear-gradient(-45deg, rgba(200, 80, 80, 0.2) 0 4px, transparent 4px 9px);
+}
+
+/* Correct placement: a faint success ring that fades. */
+.cell.is-fresh::before {
+  box-shadow: inset 0 0 0 3px rgba(40, 123, 112, 0.65);
+  animation: ring-fade 700ms var(--ease) forwards;
+}
+/* Row / column / region complete: a soft warm wash that fades. */
+.cell.is-glow::before {
+  background: rgba(213, 160, 75, 0.28);
+  box-shadow: inset 0 0 0 2px rgba(213, 160, 75, 0.55);
+  animation: ring-fade 900ms var(--ease) forwards;
+}
+@keyframes ring-fade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Accessibility: region patterns in addition to color. */
+:root[data-patterns='on'] .cell {
+  background-image: var(--rp);
+}
+.cell.p0 {
+  --rp: radial-gradient(rgba(40, 52, 52, 0.16) 1.4px, transparent 1.6px) 0 0 / 9px 9px;
+}
+.cell.p1 {
+  --rp: repeating-linear-gradient(45deg, rgba(40, 52, 52, 0.13) 0 1.5px, transparent 1.5px 8px);
+}
+.cell.p2 {
+  --rp: repeating-linear-gradient(0deg, rgba(40, 52, 52, 0.13) 0 1.5px, transparent 1.5px 8px);
+}
+.cell.p3 {
+  --rp: repeating-linear-gradient(-45deg, rgba(40, 52, 52, 0.13) 0 1.5px, transparent 1.5px 8px);
+}
+.cell.p4 {
+  --rp: repeating-linear-gradient(90deg, rgba(40, 52, 52, 0.13) 0 1.5px, transparent 1.5px 8px);
+}
+.cell.p5 {
+  --rp: repeating-linear-gradient(45deg, rgba(40, 52, 52, 0.11) 0 1.2px, transparent 1.2px 9px), repeating-linear-gradient(-45deg, rgba(40, 52, 52, 0.11) 0 1.2px, transparent 1.2px 9px);
+}
+.cell.p6 {
+  --rp: radial-gradient(circle, transparent 2.2px, rgba(40, 52, 52, 0.15) 2.4px 3.2px, transparent 3.4px) 0 0 / 12px 12px;
+}
+.cell.p7 {
+  --rp: repeating-linear-gradient(0deg, rgba(40, 52, 52, 0.11) 0 1.2px, transparent 1.2px 8px), repeating-linear-gradient(90deg, rgba(40, 52, 52, 0.11) 0 1.2px, transparent 1.2px 8px);
+}
+.cell.p8 {
+  --rp: radial-gradient(rgba(40, 52, 52, 0.2) 2px, transparent 2.2px) 0 0 / 14px 14px;
+}
+
+/* Paused / covered board */
+.board-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  background: rgba(251, 248, 241, 0.92);
+  border-radius: inherit;
+  color: var(--muted-ink);
+  font-weight: 700;
+}
+
+/* Mini board thumbnail (home / level cards) */
+.mini-board {
+  --n: 5;
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px var(--board-frame);
+  background: var(--surface);
+}
+.mini-board i {
+  display: block;
+  background: var(--rc);
+  box-shadow: inset -0.5px -0.5px 0 rgba(40, 52, 52, 0.1);
+}

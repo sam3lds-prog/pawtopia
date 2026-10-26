@@ -1,0 +1,133 @@
+/* Pawtopia design tokens.
+   Fonts: Fredoka and Nunito Sans, both SIL Open Font License 1.1, self-hosted (Latin subset) for offline play. */
+
+@font-face {
+  font-family: 'Fredoka';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url('../../../node_modules/@fontsource-variable/fredoka/files/fredoka-latin-wght-normal.woff2') format('woff2-variations');
+}
+@font-face {
+  font-family: 'Nunito Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 1000;
+  src: url('../../../node_modules/@fontsource-variable/nunito-sans/files/nunito-sans-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+:root {
+  /* Surfaces */
+  --canvas: #fbf8f1;
+  --canvas-deep: #f2ede1;
+  --surface: #ffffff;
+  --surface-2: #f8f5ed;
+
+  /* Ink */
+  --ink: #283434;
+  --muted-ink: #56665f;
+  --faint-ink: #85928d;
+
+  /* Brand: teal is the only action color */
+  --brand: #287b70;
+  --brand-dark: #185c55;
+  --brand-soft: #d7ece6;
+  --brand-tint: #ecf6f2;
+  --on-brand: #ffffff;
+
+  /* Warmth & achievement */
+  --coral: #eb8978;
+  --coral-ink: #a8483a;
+  --coral-soft: #fbe4de;
+  --gold: #d5a04b;
+  --gold-ink: #8a6220;
+  --gold-soft: #f7ebd2;
+
+  /* Lines & feedback */
+  --line: #e6e7dd;
+  --line-strong: #d2d5c8;
+  --error: #c85050;
+  --error-soft: #f9e1df;
+
+  /* Board */
+  --divider: #34433f;
+  --grid: rgba(40, 52, 52, 0.11);
+  --board-frame: #34433f;
+  --r0: #ddd3f6; /* lavender */
+  --r1: #d2eedb; /* mint */
+  --r2: #f9dcc6; /* apricot */
+  --r3: #cbe6ef; /* sky */
+  --r4: #f7d4dc; /* blush */
+  --r5: #f3e5b0; /* butter */
+  --r6: #dde7c4; /* sage */
+  --r7: #c7e8e1; /* sea glass */
+  --r8: #d2dbf6; /* periwinkle */
+
+  /* Type */
+  --font-display: 'Fredoka', ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
+  --font-ui: 'Nunito Sans', ui-rounded, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --t-xs: 12px;
+  --t-sm: 14px;
+  --t-md: 16px;
+  --t-lg: 19px;
+  --t-xl: 24px;
+  --t-2xl: 32px;
+
+  /* Geometry */
+  --r-sheet: 24px;
+  --r-card: 20px;
+  --r-inner: 14px;
+  --r-small: 10px;
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --content-max: 520px;
+  --nav-h: 64px;
+
+  /* Depth: soft warm shadow plus an engraved top highlight */
+  --shadow-1: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(40, 52, 52, 0.06), 0 6px 16px -6px rgba(40, 52, 52, 0.12);
+  --shadow-2: 0 2px 4px rgba(40, 52, 52, 0.05), 0 18px 40px -12px rgba(40, 52, 52, 0.22);
+  --press-edge: 0 2px 0 var(--brand-dark);
+
+  /* Motion */
+  --dur-press: 100ms;
+  --dur-fade: 160ms;
+  --dur-sheet: 200ms;
+  --dur-pop: 380ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+/* High contrast: deeper ink, stronger dividers, more saturated regions. */
+:root[data-contrast='high'] {
+  --muted-ink: #3c4a46;
+  --faint-ink: #56645f;
+  --line: #c9ccbf;
+  --line-strong: #9da397;
+  --divider: #111a18;
+  --board-frame: #111a18;
+  --grid: rgba(17, 26, 24, 0.22);
+  --r0: #c6b6f0;
+  --r1: #b3e3c2;
+  --r2: #f4c29d;
+  --r3: #a9d5e6;
+  --r4: #f1b5c4;
+  --r5: #ecd57e;
+  --r6: #c6d99a;
+  --r7: #9fd8cc;
+  --r8: #b2c2f1;
+}
+
+:root[data-motion='reduce'] {
+  --dur-press: 0ms;
+  --dur-fade: 0ms;
+  --dur-sheet: 0ms;
+  --dur-pop: 0ms;
+}
