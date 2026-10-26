@@ -116,3 +116,27 @@ Each of the 15 decorations has one spot in the garden, so items can't overlap or
 customize by earning, buying, and showing / hiding. Residents sit on their favorite piece when it's out (Mochi on the
 cushion, Biscuit in the basket, Pip on the perch, Clover on the blanket, Nori on the rug). Pets outside the board are
 static art. After the first board the player picks one of two starter gifts (Paper Lamp or Plump Cushion).
+
+## 2026-10-25 · D16 — One scoring function and one replay verifier, shared with the future server
+`competitions/scoring.ts` implements the spec formula in integer arithmetic (round half up), with the published
+fixtures as tests (par 150: 75 s clean → 900, 150 s → 850, 300 s → 800, one mistake → 775). Ties: total → clean
+clears → less summed time → earlier final verified finish. `competitions/verify.ts` replays an attempt's discrete
+event log on a fresh session built from the official board: mistakes and completion are recomputed, hints/revives in
+ranked play void the attempt, out-of-order timestamps, off-board moves and edits to givens are rejected, elapsed time
+comes from the server clock, and a client clock running ahead of the server is rejected. Implausibly fast solves
+are flagged for review, never auto-rejected (slow or fast accessibility users must not be disqualified). Both files are
+pure and DOM-free so the Phase 6 Cloud Functions can import them unchanged. `leagueRules.ts` settles a cohort: top 5
+promote, bottom 3 relegate only with ≥15 qualified players, provisional players and non-participants never drop,
+rewards are coins and cosmetics only.
+
+## 2026-10-25 · D17 — The League tab is honest practice until the backend exists
+With `featureFlags.onlineLeagues` off, the Paw Cup screen offers the real five weekly boards (UTC week) under real
+rules — no hints, no refills, two attempts, best counts — scored by the same verifier, but labeled everywhere as a
+practice score kept on the device. The division preview contains only "You" and says real players will appear when
+leagues launch; nothing is fabricated. "You vs last week" compares the player with themself.
+
+## 2026-10-25 · D18 — Missions and badges are small, deterministic and optional
+Three daily missions (always "solve any board", plus two chosen by the date, so everyone shares them) and one weekly
+mission; missing a day costs nothing and no mission asks for an ad. Twelve badges with fixed small coin gifts.
+Claims and gifts use the idempotent ledger. v1 history (cleared levels, best times by board size) is folded into
+stats during migration so returning players' Journal and badges reflect what they actually did.

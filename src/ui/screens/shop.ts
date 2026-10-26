@@ -10,6 +10,7 @@ import { chapterAt } from '../../meta/chapters';
 import { balance } from '../../meta/ledger';
 import { buyDecor, owns } from '../../meta/sanctuary';
 import { track } from '../../services/analytics';
+import { afterDecorChange } from '../../app/events';
 import { sfx } from '../../services/audio';
 import { haptic } from '../../services/haptics';
 import { iap, PRODUCT_CATALOG, type ProductId, type ProductInfo } from '../../services/iap';
@@ -163,13 +164,14 @@ function decorSheet(scope: Scope, id: DecorId, rerender: () => void): void {
       busy = true;
       const r = buyDecor(app.save, id);
       if (r === 'ok') {
+        const news = afterDecorChange();
         app.persist();
         sfx('coin');
         haptic('success');
         track('decor_bought', { item: id, cost: d.cost ?? 0 });
         sh.close();
         rerender();
-        toast(`${d.name} is in the garden.`);
+        toast(news.achievements.length ? `${d.name} is in the garden. Badge unlocked: ${news.achievements[0].name}!` : `${d.name} is in the garden.`);
       } else {
         busy = false;
         toast(r === 'insufficient' ? 'Not enough Paw Coins yet.' : r === 'owned' ? 'Already yours.' : 'This one is a chapter gift.');

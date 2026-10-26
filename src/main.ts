@@ -7,13 +7,15 @@ import { mountNav } from './ui/components/nav';
 import { homeScreen } from './ui/screens/home';
 import { playScreen } from './ui/screens/play';
 import { gameScreen } from './ui/screens/game';
-import { leaguePlaceholder } from './ui/screens/placeholders';
+import { leagueScreen } from './ui/screens/league';
+import { profileScreen } from './ui/screens/profile';
 import { petsScreen } from './ui/screens/pets';
 import { shopScreen } from './ui/screens/shop';
 import { sanctuaryScreen } from './ui/screens/sanctuary';
 import { galleryScreen } from './ui/screens/gallery';
 import { needsWelcome, welcomeScreen } from './ui/screens/welcome';
 import { track } from './services/analytics';
+import { catchUpAchievements } from './app/events';
 
 const root = document.getElementById('app')!;
 const router = new Router(root);
@@ -23,17 +25,19 @@ router.register({
   play: playScreen,
   game: gameScreen,
   pets: petsScreen,
-  league: leaguePlaceholder,
+  league: leagueScreen,
   shop: shopScreen,
   sanctuary: sanctuaryScreen,
   gallery: galleryScreen,
   welcome: welcomeScreen,
+  profile: profileScreen,
 });
 app.applySettings();
 mountNav(router);
 router.onChange((r) => track('screen_view', { screen: r.screen }));
 
 app.save.onboarding.sessions++;
+catchUpAchievements();
 app.persist();
 track('app_open', { sessions: app.save.onboarding.sessions });
 

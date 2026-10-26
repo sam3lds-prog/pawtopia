@@ -10,6 +10,10 @@ import { liveStreak } from '../../meta/progression';
 import { sceneMarkup } from './sanctuary';
 import { openSheet } from '../components/sheet';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
+import { claimMission, missionStates } from '../../meta/missions';
+import { addDaysKey, localWeekStart } from '../../game/dates';
+import { sfx } from '../../services/audio';
+import { track } from '../../services/analytics';
 import { miniBoard } from '../components/board';
 import { toast } from '../components/sheet';
 import { actionOf, esc, h, plural } from '../dom';
@@ -21,6 +25,23 @@ const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday
 
 export function coinPill(): string {
   return `<span class="coin-pill" data-coins aria-label="${app.coins()} Paw Coins">${ICON.coin}<span>${app.coins()}</span></span>`;
+}
+
+/** Monday–Sunday strip of this week's dailies. Missing a day never removes anything you've earned. */
+function weekStrip(): string {
+  const today = localDateKey();
+  const start = localWeekStart(today);
+  const names = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const cozy = Object.values(app.save.daily.cozyDays);
+  const days = names.map((n, i) => {
+    const k = addDaysKey(start, i);
+    const done = !!app.save.daily.done[k];
+    const saved = cozy.includes(k);
+    const cls = done ? 'is-done' : saved ? 'is-cozy' : k === today ? 'is-today' : k > today ? 'is-future' : '';
+    const label = `${new Date(`${k}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long' })}: ${done ? 'daily solved' : saved ? 'kept by a Cozy Day' : k > today ? 'upcoming' : k === today ? 'today' : 'missed'}`;
+    return `<li class="${cls}" aria-label="${label}"><span aria-hidden="true">${n}</span></li>`;
+  });
+  return `<ol class="week-strip" aria-label="This week's daily puzzles">${days.join('')}</ol>`;
 }
 
 export const homeScreen: ScreenDef = {
@@ -46,6 +67,7 @@ export const homeScreen: ScreenDef = {
           <h1 class="wordmark" data-autofocus>Pawtopia</h1>
           <div class="screen-head__end">
             ${coinPill()}
+            <button class="icon-btn" data-act="journal" aria-label="Journal: stats and badges">${ICON.star}</button>
             <button class="icon-btn" data-act="settings" aria-label="Settings">${ICON.gear}</button>
           </div>
         </header>
@@ -66,6 +88,7 @@ export const homeScreen: ScreenDef = {
           ${resumeMode && resumeMode.kind !== 'level' ? `<button class="btn btn--quiet" data-act="journey">Play level ${level} instead</button>` : ''}
         </section>
 
+        <div class="daily-block">
         <button class="card card--tap daily-card ${dailyDone ? 'is-done' : ''}" data-act="daily">
           <span class="card__icon card__icon--coral">${dailyDone ? ICON.check : ICON.calendar}</span>
           <span class="card__body">
@@ -74,6 +97,10 @@ export const homeScreen: ScreenDef = {
           </span>
           ${streak > 0 ? `<span class="daily-card__streak" aria-label="${plural(streak, 'day')} streak">${ICON.flame}<b class="num">${streak}</b></span>` : ''}
         </button>
+          ${weekStrip()}
+        </div>
+
+        <section class="missions card" aria-labelledby="missions-title" data-missions></section>
 
         <div class="duo">
           <button class="card card--tap mini-card" data-act="zen">
@@ -101,6 +128,33 @@ export const homeScreen: ScreenDef = {
       }
     }, 30);
 
+    const missionsEl = el.querySelector('[data-missions]') as HTMLElement;
+    function renderMissions(): void {
+      const ms = missionStates(app.save);
+      const left = ms.filter((m) => !m.weekly && !m.claimed).length;
+      missionsEl.innerHTML = `
+        <div class="missions__head"><h2 id="missions-title">Today's errands</h2><span class="muted">${left ? `${left} to go` : 'All done for today'}</span></div>
+        <ul class="missions__list">
+          ${ms
+            .map(
+              (m) => `<li class="mission ${m.claimed ? 'is-claimed' : m.done ? 'is-done' : ''}">
+                <span class="mission__check" aria-hidden="true">${m.claimed || m.done ? ICON.check : ''}</span>
+                <span class="mission__body"><span class="mission__title">${esc(m.def.title)}${m.weekly ? ' <span class="chip">This week</span>' : ''}</span>
+                ${m.def.target > 1 && !m.done ? `<span class="muted num">${m.progress} of ${m.def.target}</span>` : ''}</span>
+                ${
+                  m.claimed
+                    ? `<span class="mission__reward is-claimed">${ICON.coin}<span class="num">${m.def.coins}</span></span>`
+                    : m.done
+                      ? `<button class="btn btn--small" data-claim="${esc(m.key)}">Claim ${ICON.coin}<span class="num">${m.def.coins}</span></button>`
+                      : `<span class="mission__reward">${ICON.coin}<span class="num">${m.def.coins}</span></span>`
+                }
+              </li>`,
+            )
+            .join('')}
+        </ul>`;
+    }
+    renderMissions();
+
     // Players coming from v1: say what their earlier progress turned into, once.
     const gift = app.upgradeGift;
     if (gift) {
@@ -125,6 +179,20 @@ export const homeScreen: ScreenDef = {
     }
 
     scope.on(el, 'click', (e) => {
+      const claim = (e.target as HTMLElement).closest('[data-claim]') as HTMLElement | null;
+      if (claim) {
+        const coins = claimMission(app.save, claim.dataset.claim!);
+        if (coins) {
+          app.persist();
+          sfx('coin');
+          track('mission_claimed', { coins });
+          renderMissions();
+          const pill = el.querySelector('[data-coins]');
+          if (pill) pill.outerHTML = coinPill();
+          toast(`+${coins} Paw Coins`);
+        }
+        return;
+      }
       const a = actionOf(e);
       if (!a) return;
       switch (a.act) {
@@ -154,6 +222,9 @@ export const homeScreen: ScreenDef = {
           break;
         case 'settings':
           showSettings(scope, { onClose: () => app.router.refresh() });
+          break;
+        case 'journal':
+          app.router.go({ screen: 'profile' });
           break;
       }
     });

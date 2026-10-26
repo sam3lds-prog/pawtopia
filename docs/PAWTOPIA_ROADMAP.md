@@ -35,7 +35,7 @@ Defects confirmed in source and fixed in Sprint 0:
 - [x] **Sprint 2** — pet face rigs, facial-only animation scheduler
 - [x] **Sprint 3** — onboarding, Zen, hint tiers, verified 60-level pack, chapters
 - [x] **Sprint 4** — sanctuary, collection, decor, idempotent coin ledger
-- [ ] **Sprint 5** — achievements, missions, streaks, scoring + replay verifier, honest League UI
+- [x] **Sprint 5** — achievements, missions, streaks, scoring + replay verifier, honest League UI
 - [ ] **Sprint 6** — shop honesty, settings, accessibility, analytics hooks, polish
 
 ## Needs you (external)

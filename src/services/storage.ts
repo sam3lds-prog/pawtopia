@@ -14,6 +14,7 @@ import { type KV, platformKV, safeParse } from './kv';
 import type { ModeRef } from '../game/modes';
 import { isValidModeRef } from '../game/modes';
 import type { SessionSnapshot } from '../game/session';
+import { dailySpec, levelSpec } from '../engine/levels';
 
 // ------------------------------------------------------------------ keys
 
@@ -406,6 +407,18 @@ export function migrateV1(v1raw: unknown, seenRules: boolean, now = new Date()):
   if (v1.removeAds === true) {
     // Honored, but flagged: v1 used a stub store, so this must be confirmed by a real restore later.
     s.purchases.removeAds = { active: true, source: 'legacy-v1', verifiedAt: null };
+  }
+  // v1 had no lifetime stats: derive what we can so the Journal and badges reflect real history.
+  s.stats.solved = Object.keys(s.journey.clears).length + Object.keys(s.daily.done).length;
+  const best = (size: number, secs: number) => {
+    if (secs <= 0) return;
+    const k = String(size);
+    if (s.stats.bestBySize[k] === undefined || secs < s.stats.bestBySize[k]) s.stats.bestBySize[k] = secs;
+  };
+  for (const [k, secs] of Object.entries(s.journey.bestTimes)) best(levelSpec(Number(k.slice(1))).size, secs);
+  for (const [k, secs] of Object.entries(s.daily.bestTimes)) {
+    const [y, m, d] = k.slice(1).split('-').map(Number);
+    best(dailySpec(new Date(y, m - 1, d, 12)).size, secs);
   }
   if (isObj(v1.settings)) {
     s.settings.autoMark = bool(v1.settings.autoMark, s.settings.autoMark);

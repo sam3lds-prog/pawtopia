@@ -104,7 +104,8 @@ export type Route =
   | { screen: 'sanctuary'; welcome?: PetId[] }
   | { screen: 'game' }
   | { screen: 'gallery' }
-  | { screen: 'welcome' };
+  | { screen: 'welcome' }
+  | { screen: 'profile' };
 
 export interface ScreenDef {
   /** Which bottom-nav tab is highlighted; null hides the nav (focused play). */

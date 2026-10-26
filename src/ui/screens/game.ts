@@ -9,6 +9,9 @@ import { modeShortTitle, modeTitle } from '../../game/puzzles';
 import { MARK, type HintInfo, type MoveResult, type Session, type Tool, type UnitRef } from '../../game/session';
 import { recordLoss, recordWin, type WinRecord } from '../../meta/progression';
 import { rewardsForWin, type RewardSummary } from '../../meta/rewards';
+import { finishAttempt } from '../../competitions/localCup';
+import type { ScoreBreakdown } from '../../competitions/scoring';
+import { afterSolve, type MetaNews } from '../../app/events';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
 import { PET_BY_ID } from '../../meta/catalogs/pets';
 import { decorIcon } from '../art/sanctuary';
@@ -550,9 +553,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
         <p class="sheet__lead">${rules.timer ? `Clock stopped at ${fmtClock(s.elapsedSeconds())}.` : 'Your board is saved.'}</p>
         <div class="sheet__actions">
           <button class="btn btn--block" data-act="resume">${ICON.resume}Resume</button>
-          <button class="btn btn--secondary btn--block" data-act="restart">${ICON.restart}Restart board</button>
+          ${mode.kind === 'cup' ? '' : `<button class="btn btn--secondary btn--block" data-act="restart">${ICON.restart}Restart board</button>`}
           <button class="btn btn--quiet" data-act="settings">Settings</button>
-          <button class="btn btn--quiet" data-act="leave">Leave and keep progress</button>
+          <button class="btn btn--quiet" data-act="leave">${mode.kind === 'cup' ? 'Leave (this attempt stays open)' : 'Leave and keep progress'}</button>
         </div>`,
       onClose: () => {
         sheet = null;
@@ -621,6 +624,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     const result = { size: n, seconds: s.elapsedSeconds(), mistakes: s.mistakes, hintsUsed: s.hintsUsed, revives: s.revives, hearts: rules.hearts };
     const rec = recordWin(app.save, mode, result);
     const rewards = rewardsForWin(app.save, mode, rec);
+    const cupScore = mode.kind === 'cup' ? finishAttempt(app.save, mode, s.events, s.elapsedMs()) : null;
+    const news = afterSolve(mode, n, result.mistakes, result.hintsUsed);
     app.save.lastSession = null;
     app.active = null;
     app.persist();
@@ -631,7 +636,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     sfx('win');
     haptic('success');
     coach('Harmony restored.');
-    scope.timeout(() => showWin(rec, result.seconds, rewards), app.reducedMotion ? 150 : 1000);
+    scope.timeout(() => showWin(rec, result.seconds, rewards, news, cupScore), app.reducedMotion ? 150 : 1000);
   }
 
   function rewardsMarkup(r: RewardSummary): string {
@@ -648,7 +653,29 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     return `<div class="win-rewards">${coins}${pets}${decor}</div>`;
   }
 
-  function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary): void {
+  function newsMarkup(nw: MetaNews): string {
+    if (!nw.achievements.length && !nw.missions.length) return '';
+    const badges = nw.achievements
+      .map((a) => `<div class="reward-item"><span class="reward-item__art reward-item__art--badge">${ICON[a.icon]}</span><span><b>Badge: ${esc(a.name)}</b><small>${esc(a.description)} +${a.coins} coins</small></span></div>`)
+      .join('');
+    const missions = nw.missions.length ? `<p class="win-missions">${ICON.check}${nw.missions.length === 1 ? `Mission done: ${esc(nw.missions[0].title)}` : `${nw.missions.length} missions done`}. Claim on Home.</p>` : '';
+    return `<div class="win-news">${badges}${missions}</div>`;
+  }
+
+  function cupMarkup(sc: ScoreBreakdown | null): string {
+    if (!sc) return '';
+    return `<div class="score-card">
+      <div class="score-card__total"><span class="num">${sc.total}</span><small>points</small></div>
+      <dl class="score-card__rows">
+        <div><dt>Finished</dt><dd class="num">${sc.base}</dd></div>
+        <div><dt>Speed</dt><dd class="num">+${sc.time}</dd></div>
+        <div><dt>Accuracy</dt><dd class="num">+${sc.accuracy}</dd></div>
+      </dl>
+      <p class="score-card__note">${ICON.info}Practice score, kept on this device. Not ranked against anyone.</p>
+    </div>`;
+  }
+
+  function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary, news: MetaNews, cupScore: ScoreBreakdown | null): void {
     const next = nextAfterWin(mode);
     const meet = rewards.pets.length > 0;
     const firstBoard = mode.kind === 'level' && mode.level === 1 && rec.firstClear;
@@ -679,7 +706,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
           <div class="stat"><div class="stat__v">${s.hintsUsed}</div><div class="stat__k">${s.hintsUsed === 1 ? 'hint' : 'hints'}</div></div>
         </div>
         ${badges.length ? `<div class="win-badges">${badges.join('')}</div>` : ''}
+        ${cupMarkup(cupScore)}
         ${rewardsMarkup(rewards)}
+        ${newsMarkup(news)}
         <div class="sheet__actions">
           <button class="btn btn--block" data-act="${firstBoard ? 'meet' : 'next'}" data-autofocus>${esc(primaryLabel)}</button>
           <div class="win-secondary">
@@ -747,6 +776,12 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   function onLose(): void {
     pauseBoard();
     recordLoss(app.save);
+    if (mode.kind === 'cup') {
+      finishAttempt(app.save, mode, s.events, s.elapsedMs());
+      app.save.lastSession = null;
+      app.active = null;
+      app.persist();
+    }
     app.saveActive();
     track('puzzle_fail', { mode: mode.kind, size: n });
     haptic('error');

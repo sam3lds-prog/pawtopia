@@ -11,6 +11,7 @@ import { PET_BY_ID, PETS, type PetId } from '../../meta/catalogs/pets';
 import { chooseStarter, isShown, owns, setShown } from '../../meta/sanctuary';
 import { unlockedPets } from '../../meta/rewards';
 import { track } from '../../services/analytics';
+import { afterDecorChange, afterSanctuaryVisit } from '../../app/events';
 import { sfx } from '../../services/audio';
 import { decorIcon, sanctuaryScene, SCENE_VIEWBOX } from '../art/sanctuary';
 import { portrait, showPetSheet } from '../components/petSheet';
@@ -36,7 +37,9 @@ export const sanctuaryScreen: ScreenDef = {
     const welcome = route.screen === 'sanctuary' ? (route.welcome ?? []) : [];
     track('sanctuary_open', { pets: unlockedPets(app.save).length, decor: shownDecor().length });
     app.save.sanctuary.visits++;
+    const news = afterSanctuaryVisit();
     app.persist();
+    for (const a of news.achievements) toast(`Badge unlocked: ${a.name}`);
 
     const el = h(`<div class="sanctuary"></div>`);
     root.appendChild(el);
@@ -97,6 +100,7 @@ export const sanctuaryScreen: ScreenDef = {
       if (tog) {
         const id = tog.dataset.toggle as DecorId;
         setShown(app.save, id, !isShown(app.save, id));
+        afterDecorChange();
         app.persist();
         render();
         (el.querySelector(`[data-toggle="${id}"]`) as HTMLElement | null)?.focus();
@@ -171,6 +175,7 @@ function offerStarter(scope: Scope, rerender: () => void): void {
     if (!b) return;
     const id = b.dataset.choose as DecorId;
     if (chooseStarter(app.save, id)) {
+      afterDecorChange();
       app.persist();
       sfx('coin');
       track('onboarding_step', { step: 'starter_gift', item: id });
