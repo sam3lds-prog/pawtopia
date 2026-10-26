@@ -38,7 +38,7 @@ Defects confirmed in source and fixed in Sprint 0:
 - [x] **Sprint 5** — scoring + replay verifier, league rules, honest Paw Cup practice, missions, badges, Journal
 - [x] **Sprint 6** — settings/accessibility polish, e2e smoke suite, docs (architecture, design system, privacy, backend plan, release checklist)
 
-Test count: 140 unit tests + 19 browser e2e checks. Bundle: ~68 kB JS gzipped (incl. the level pack), 9 kB CSS.
+Test count: 146 unit tests + 24 browser e2e checks (incl. 7 fixes from an independent review, D20). Bundle: ~68 kB JS gzipped (incl. the level pack), 9 kB CSS.
 
 ## Alpha acceptance (spec §13)
 

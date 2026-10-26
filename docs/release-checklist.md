@@ -1,7 +1,7 @@
 # Pawtopia — Release checklist (TestFlight → App Store)
 
 ## Build health
-- [ ] `npm test` (140+), `npm run gen:check`, `npm run pack:check`, `npm run build` all green
+- [ ] `npm test` (146+), `npm run gen:check`, `npm run pack:check`, `npm run build` all green
 - [ ] `npm run e2e` against `npm run dev` all green
 - [ ] Version bumped in `package.json` and Xcode (marketing + build number)
 
