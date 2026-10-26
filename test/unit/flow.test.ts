@@ -70,6 +70,42 @@ describe('resume after the app is closed', () => {
     for (let i = 0; i < 3; i++) s.place(wrong![0], wrong![1], CAT);
     expect(captureSession(cup, s)).toBeNull();
   });
+
+  it('regression: a lost board is never saved or resumed (it used to come back frozen)', () => {
+    const mode = { kind: 'level' as const, level: 5 };
+    const s = new Session(puzzleFor(mode));
+    const p = s.puzzle;
+    let wrong: [number, number] | null = null;
+    for (let r = 0; r < p.size && !wrong; r++) for (let c = 0; c < p.size && !wrong; c++) if (p.solution[r][c] !== CAT && !s.givenMask[r][c]) wrong = [r, c];
+    const before = captureSession(mode, s)!;
+    for (let i = 0; i < 3; i++) s.place(wrong![0], wrong![1], CAT);
+    expect(s.outcome).toBe('lost');
+    expect(captureSession(mode, s)).toBeNull();
+    // A lost snapshot written by an older build is refused too.
+    const lostSnap = { ...before, snap: { ...s.snapshot(), outcome: 'lost' as const } };
+    expect(resumeSession(lostSnap)).toBeNull();
+  });
+
+  it('regression: a resumed Paw Cup attempt keeps its whole move log', () => {
+    const cup = { kind: 'cup' as const, weekKey: '2026-W44', index: 1 };
+    let t = 0;
+    const s = new Session(puzzleFor(cup), { now: () => t });
+    const p = s.puzzle;
+    for (let r = 0; r < p.size; r++)
+      for (let c = 0; c < p.size; c++)
+        if (p.solution[r][c] !== EMPTY && !s.givenMask[r][c] && s.events.length < 2) {
+          t += 3000;
+          s.place(r, c, p.solution[r][c] as 1 | 2);
+        }
+    const saved = JSON.parse(JSON.stringify(captureSession(cup, s)));
+    expect(saved.snap.events).toHaveLength(2);
+    const back = resumeSession(saved)!;
+    expect(back.session.events.map((e) => e.type)).toEqual(['place', 'place']);
+    // Journey boards don't carry the log (they don't need verification).
+    const lvl = { kind: 'level' as const, level: 3 };
+    const ls = new Session(puzzleFor(lvl));
+    expect(captureSession(lvl, ls)!.snap.events).toBeUndefined();
+  });
 });
 
 describe('ad cadence policy', () => {

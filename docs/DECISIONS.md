@@ -145,3 +145,17 @@ stats during migration so returning players' Journal and badges reflect what the
 Settings states plainly that progress is on-device, no analytics are sent, and (in release) no ads are shown; the store
 row says purchases aren't connected. Board cells announce the resident's name to VoiceOver. The v1 glyph module
 (`src/game/icons.ts`) was removed once every surface used the new rigs; it remains in git history.
+
+## 2026-10-25 · D20 — Fixes from the independent review
+A separate review pass (fresh read of the code, not the author's notes) found seven defects; all are fixed with tests:
+1. **Resumed Paw Cup attempts scored 0** — the event log wasn't saved with the board, so the verifier replayed only
+   post-resume moves. Cup snapshots now carry the full log; a test proves a save-and-resume attempt scores exactly the
+   same as an uninterrupted one.
+2. **An open Cup attempt could be lost** by playing any other board (one shared save slot). Open attempts now live in
+   their own per-board slots (`save.cup.open`), and League resumes from there. Attempts left open in a past week expire.
+3. **A lost board resumed frozen.** Only boards still in play are saved or resumed.
+4. **Rules / Settings stopped the Cup clock with the board visible.** In Paw Cup every pause hides the board.
+5. **An older daily reset the streak.** Earlier dates are recorded but never touch the streak.
+6. **Re-entering a mode wiped its saved board.** Every "play" entry point uses `playMode`, which continues a saved board
+   of that same mode.
+7. **Erase progress granted fresh Cup attempts.** Attempt records survive a reset (purchases and settings already did).

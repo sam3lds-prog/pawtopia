@@ -7,6 +7,8 @@ Pawtopia is a cozy, portrait-first logic puzzle for iPhone. Every row, column an
 Solving boards welcomes residents into the Harmony Sanctuary, a garden you decorate with coins you earn by playing.
 The pets on the board are alive in the smallest way: they blink, glance, smile and frown, but only their faces move.
 
+![Pawtopia screens](docs/screenshots/pawtopia-screens.png)
+
 Built with Vite + TypeScript (no UI framework) and shipped to iOS with Capacitor. It grew out of Cats vs Dogs v1; the
 puzzle engine, its tests and every v1 board are preserved, and v1 saves migrate automatically.
 

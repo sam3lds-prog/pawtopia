@@ -6,6 +6,7 @@ import { balance } from '../../src/meta/ledger';
 import { recordWin } from '../../src/meta/progression';
 import { attemptsLeft, bestAttempt, finishAttempt, startAttempt, weekSummary } from '../../src/competitions/localCup';
 import { puzzleFor } from '../../src/game/puzzles';
+import { captureSession, resumeSession } from '../../src/game/sessionPersistence';
 import { Session } from '../../src/game/session';
 import { EMPTY, type Species } from '../../src/engine/types';
 
@@ -113,6 +114,39 @@ describe('local Paw Cup practice', () => {
     expect(startAttempt(s, mode, NOW)).toBe(false);
     expect(bestAttempt(s, mode.weekKey, 0)?.score).toBe(sc.total);
     expect(weekSummary(s, mode.weekKey)).toMatchObject({ total: sc.total, boardsCleared: 1, attemptsUsed: 2 });
+  });
+
+  it('regression: an attempt saved and resumed midway scores the same as one played straight through', () => {
+    const p = puzzleFor(mode);
+    const moves: Array<[number, number, Species]> = [];
+    for (let r = 0; r < p.size; r++) for (let c = 0; c < p.size; c++) if (p.solution[r][c] !== EMPTY && !p.givens.some((g) => g.r === r && g.c === c)) moves.push([r, c, p.solution[r][c] as Species]);
+
+    const straight = defaultSave(NOW);
+    startAttempt(straight, mode, NOW);
+    const { events, ms } = solve();
+    const expected = finishAttempt(straight, mode, events, ms).total;
+
+    const save = defaultSave(NOW);
+    startAttempt(save, mode, NOW);
+    let t = 0;
+    let s = new Session(p, { now: () => t });
+    const half = Math.floor(moves.length / 2);
+    for (const [r, c, sp] of moves.slice(0, half)) {
+      t += 5000;
+      s.place(r, c, sp);
+    }
+    const saved = JSON.parse(JSON.stringify(captureSession(mode, s))); // app closed here
+    const back = resumeSession(saved)!;
+    s = back.session;
+    s.resume();
+    for (const [r, c, sp] of moves.slice(half)) {
+      // the restored session reads the real clock; drive its log the same way the game would
+      s.place(r, c, sp);
+    }
+    expect(s.outcome).toBe('won');
+    const got = finishAttempt(save, mode, s.events, ms);
+    expect(got.total).toBe(expected);
+    expect(got.total).toBeGreaterThan(550);
   });
 
   it('a hint in the log voids the attempt', () => {

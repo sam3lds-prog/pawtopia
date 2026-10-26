@@ -107,7 +107,11 @@ export interface SaveV2 {
     cozyDays: Record<string, string>; // monthKey → the dateKey a Cozy Day covered
   };
   zen: { solved: number; nextSeed: number };
-  cup: { attempts: Record<string, CupAttemptRecord[]> }; // `C${weekKey}-${index}`
+  cup: {
+    attempts: Record<string, CupAttemptRecord[]>; // `C${weekKey}-${index}`
+    /** Paw Cup attempts in progress, one slot per board, separate from `lastSession` so other play can't discard them. */
+    open: Record<string, SavedSession>;
+  };
   inventory: {
     ledger: LedgerEntry[];
     pets: Record<string, { unlockedAt: string }>;
@@ -177,7 +181,7 @@ export function defaultSave(now = new Date()): SaveV2 {
     journey: { nextLevel: 1, bestTimes: {}, clears: {} },
     daily: { done: {}, bestTimes: {}, streak: 0, bestStreak: 0, lastDate: null, cozyDays: {} },
     zen: { solved: 0, nextSeed: 1 },
-    cup: { attempts: {} },
+    cup: { attempts: {}, open: {} },
     inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {} },
     sanctuary: { hidden: {}, visits: 0 },
     missions: { dayKey: null, weekKey: null, progress: {}, claimed: {} },
@@ -321,6 +325,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
             }))
           : undefined,
       ),
+      open: rec(cup.open, (v) => normSavedSession(v) ?? undefined),
     },
     inventory: {
       ledger: normLedger(inv.ledger),
@@ -474,6 +479,8 @@ export function resetProgress(current: SaveV2, kv: KV = platformKV(), now = new 
   }
   const fresh = defaultSave(now);
   fresh.purchases = JSON.parse(JSON.stringify(current.purchases));
+  // Paw Cup attempt records are competition integrity, not progress: erasing must not hand out fresh attempts.
+  fresh.cup.attempts = JSON.parse(JSON.stringify(current.cup.attempts));
   fresh.settings = { ...current.settings };
   fresh.onboarding.seenRules = true;
   saveSave(fresh, kv);

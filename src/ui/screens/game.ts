@@ -223,9 +223,22 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   }
 
   /** Pauses the clock and the pets' ambient life (blinks, dozing). */
+  /**
+   * Pauses the clock and the pets' ambient life (blinks, dozing). In Paw Cup the board is also hidden whenever the
+   * clock is stopped (pause, rules, settings), so paused time can't be used to think.
+   */
   function pauseBoard(): void {
     s.pause();
     faces.setAmbient(false);
+    if (mode.kind === 'cup' && !finished && !board.el.querySelector('.board-veil')) {
+      board.el.appendChild(h('<div class="board-veil">Board hidden while paused</div>'));
+      el.classList.add('is-paused');
+    }
+  }
+
+  function unveil(): void {
+    board.el.querySelector('.board-veil')?.remove();
+    el.classList.remove('is-paused');
   }
 
   /** Placed pets of a unit (at most `max`), for proud / focused reactions. */
@@ -535,6 +548,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
 
   function resumeIfOnScreen(): void {
     if (!scope.alive || finished || sheet) return;
+    unveil();
     s.resume();
     faces.setAmbient(!document.hidden);
     faces.activity();
@@ -549,8 +563,6 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     if (finished || sheet) return;
     pauseBoard();
     el.classList.add('is-paused');
-    const veil = h(`<div class="board-veil">${mode.kind === 'cup' ? 'Board hidden while paused' : ''}</div>`);
-    if (mode.kind === 'cup') board.el.appendChild(veil);
     sheet = openSheet(scope, {
       title: 'Paused',
       body: `
@@ -563,8 +575,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
         </div>`,
       onClose: () => {
         sheet = null;
-        veil.remove();
-        el.classList.remove('is-paused');
+        if (mode.kind !== 'cup') el.classList.remove('is-paused');
         resumeIfOnScreen();
       },
     });
@@ -630,7 +641,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     const rewards = rewardsForWin(app.save, mode, rec);
     const cupScore = mode.kind === 'cup' ? finishAttempt(app.save, mode, s.events, s.elapsedMs()) : null;
     const news = afterSolve(mode, n, result.mistakes, result.hintsUsed);
-    app.save.lastSession = null;
+    app.clearSaved(mode);
     app.active = null;
     app.persist();
     cadence.boardsSinceLast++;
@@ -782,10 +793,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     recordLoss(app.save);
     if (mode.kind === 'cup') {
       finishAttempt(app.save, mode, s.events, s.elapsedMs());
-      app.save.lastSession = null;
+      app.clearSaved(mode);
       app.active = null;
       app.persist();
     }
+    // A lost board isn't resumable (only a refill brings it back), so this clears its save slot.
     app.saveActive();
     track('puzzle_fail', { mode: mode.kind, size: n });
     haptic('error');
@@ -820,14 +832,14 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
         sheet = null;
         coach('Hearts refilled. Your board is just as you left it.');
         paint();
-        s.resume();
+        resumeIfOnScreen();
         app.saveActive();
       } else if (a.act === 'restart') {
         ls.close();
         restartGame();
       } else {
         ls.close();
-        app.save.lastSession = null;
+        app.clearSaved(mode);
         app.active = null;
         app.persist();
         app.router.go({ screen: mode.kind === 'cup' ? 'league' : 'home' });

@@ -1,7 +1,7 @@
 /** Play: Daily and Zen up top, then the Journey path for the selected chapter. */
 
 import { app } from '../../app/app';
-import { startGame } from '../../app/gameFlow';
+import { playMode, startGame } from '../../app/gameFlow';
 import { dailySpec, levelSpec } from '../../engine/levels';
 import { chapterAt, chapterOf, visibleChapters, type Chapter } from '../../meta/chapters';
 import { toast } from '../components/sheet';
@@ -146,7 +146,7 @@ export const playScreen: ScreenDef = {
       const t = e.target as HTMLElement;
       const lv = t.closest('[data-level]') as HTMLButtonElement | null;
       if (lv && !lv.disabled) {
-        startGame({ kind: 'level', level: Number(lv.dataset.level) });
+        playMode({ kind: 'level', level: Number(lv.dataset.level) });
         return;
       }
       const ch = t.closest('[data-chapter]') as HTMLElement | null;
@@ -167,7 +167,7 @@ export const playScreen: ScreenDef = {
       const a = actionOf(e);
       if (a?.act === 'daily') {
         if (dailyDone) toast(`Today's board is done. A new one arrives tomorrow.`);
-        else startGame({ kind: 'daily', dateKey: daily.dateKey });
+        else playMode({ kind: 'daily', dateKey: daily.dateKey });
       }
     });
   },

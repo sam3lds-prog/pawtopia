@@ -7,15 +7,16 @@ import { GENERATOR_VERSION, puzzleDigest, puzzleFor } from './puzzles';
 import { Session } from './session';
 
 export function captureSession(mode: ModeRef, session: Session, now = new Date()): SavedSession | null {
-  // Finished boards aren't resumable; a lost Paw Cup attempt is final.
-  if (session.outcome === 'won') return null;
-  if (session.outcome === 'lost' && mode.kind === 'cup') return null;
+  // Only boards still in play are resumable. A won board is done; a lost one ended with its loss sheet
+  // (restoring it would bring back a board that ignores every tap).
+  if (session.outcome !== 'playing') return null;
   return {
     mode,
     digest: puzzleDigest(session.puzzle),
     generatorVersion: GENERATOR_VERSION,
     savedAt: now.toISOString(),
-    snap: session.snapshot(),
+    // Paw Cup keeps its full input log so the attempt is scored by replaying every move, across resumes.
+    snap: session.snapshot(mode.kind === 'cup'),
   };
 }
 
@@ -34,7 +35,7 @@ export function resumeSession(saved: SavedSession | null): { mode: ModeRef; sess
   }
   if (puzzleDigest(puzzle) !== saved.digest) return null;
   const session = Session.restore(puzzle, saved.snap, { hearts: rulesFor(saved.mode).hearts });
-  if (!session || session.outcome === 'won') return null;
+  if (!session || session.outcome !== 'playing') return null;
   return { mode: saved.mode, session };
 }
 

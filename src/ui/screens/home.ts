@@ -1,7 +1,7 @@
 /** Home: the sanctuary at the top, one primary action (continue), then the daily and two smaller cards. */
 
 import { app } from '../../app/app';
-import { resumableMode, resumeGame, startGame } from '../../app/gameFlow';
+import { playMode, resumableMode, resumeGame, startGame } from '../../app/gameFlow';
 import { dailySpec } from '../../engine/levels';
 import { localDateKey } from '../../game/dates';
 import { modeTitle, puzzleFor, sizeFor } from '../../game/puzzles';
@@ -205,14 +205,14 @@ export const homeScreen: ScreenDef = {
               toast("That saved board couldn't be restored, so it starts fresh.");
               startGame(resumeMode);
             }
-          } else startGame({ kind: 'level', level });
+          } else playMode({ kind: 'level', level });
           break;
         case 'journey':
-          startGame({ kind: 'level', level });
+          playMode({ kind: 'level', level });
           break;
         case 'daily':
           if (dailyDone) toast(`Today's board is done. A new one arrives tomorrow.`);
-          else startGame({ kind: 'daily', dateKey: daily.dateKey });
+          else playMode({ kind: 'daily', dateKey: daily.dateKey });
           break;
         case 'zen':
           app.router.go({ screen: 'play' });

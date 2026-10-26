@@ -6,7 +6,7 @@
  */
 
 import { app } from '../../app/app';
-import { resumeGame, startGame } from '../../app/gameFlow';
+import { playMode, resumeGame, savedFor, startGame } from '../../app/gameFlow';
 import { featureFlags } from '../../config/featureFlags';
 import { CUP_ATTEMPTS_PER_BOARD, cupWeek, PAR_SECONDS, type CupBoardSpec } from '../../competitions/cup';
 import { attemptsFor, attemptsLeft, bestAttempt, previousWeekKey, weekSummary } from '../../competitions/localCup';
@@ -14,7 +14,6 @@ import { LEAGUE_RULES, TIER_INFO, TIERS, type LeagueTier } from '../../competiti
 import { ACCURACY_POINTS, BASE_POINTS, TIME_POINTS } from '../../competitions/scoring';
 import { dailySpec } from '../../engine/levels';
 import { addDaysKey, fmtClock, formatDuration, localDateKey, utcWeekBounds, utcWeekKey } from '../../game/dates';
-import { modeKey } from '../../game/modes';
 import { liveStreak } from '../../meta/progression';
 import { track } from '../../services/analytics';
 import { openSheet, toast } from '../components/sheet';
@@ -49,12 +48,19 @@ export const leagueScreen: ScreenDef = {
     const el = h(`<div class="league"></div>`);
     root.appendChild(el);
     const tier: LeagueTier = 'seedling';
+    // Attempts left open in an earlier week are over (they keep their used attempt and score 0).
+    const thisWeek = utcWeekKey();
+    const stale = Object.keys(app.save.cup.open).filter((k) => !k.startsWith(`C${thisWeek}-`));
+    if (stale.length) {
+      for (const k of stale) delete app.save.cup.open[k];
+      app.persist();
+    }
 
     function boardRow(b: CupBoardSpec): string {
       const best = bestAttempt(app.save, b.weekKey, b.index);
       const used = attemptsFor(app.save, b.weekKey, b.index).length;
       const left = attemptsLeft(app.save, b.weekKey, b.index);
-      const resumable = app.save.lastSession && modeKey(app.save.lastSession.mode) === modeKey({ kind: 'cup', weekKey: b.weekKey, index: b.index });
+      const resumable = !!savedFor({ kind: 'cup', weekKey: b.weekKey, index: b.index });
       const dots = Array.from({ length: CUP_ATTEMPTS_PER_BOARD }, (_, i) => `<i class="${i < used ? 'is-used' : ''}"></i>`).join('');
       const action = resumable
         ? `<button class="btn btn--small" data-resume="${b.index}">Resume</button>`
@@ -185,7 +191,11 @@ export const leagueScreen: ScreenDef = {
       }
       const res = t.closest('[data-resume]') as HTMLElement | null;
       if (res) {
-        if (!resumeGame()) toast("That attempt couldn't be restored.");
+        const spec = cupWeek()[Number(res.dataset.resume)];
+        if (!resumeGame(savedFor({ kind: 'cup', weekKey: spec.weekKey, index: spec.index }))) {
+          toast("That attempt couldn't be restored, so it counts as used.");
+          render();
+        }
         return;
       }
       const b = t.closest('[data-board]') as HTMLElement | null;
@@ -195,7 +205,7 @@ export const leagueScreen: ScreenDef = {
       }
       const a = actionOf(e);
       if (a?.act === 'how') showScoring(scope);
-      else if (a?.act === 'daily') startGame({ kind: 'daily', dateKey: dailySpec().dateKey });
+      else if (a?.act === 'daily') playMode({ kind: 'daily', dateKey: dailySpec().dateKey });
     });
   },
 };

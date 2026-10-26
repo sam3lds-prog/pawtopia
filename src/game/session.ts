@@ -68,6 +68,8 @@ export interface SessionSnapshot {
   elapsedMs: number;
   outcome: Outcome;
   heartsEnabled: boolean;
+  /** The replayable input log. Kept for Paw Cup boards so a resumed attempt can be verified from its first move. */
+  events?: SessionEvent[];
 }
 
 const MAX_EVENTS = 4000;
@@ -415,8 +417,9 @@ export class Session {
 
   // ------------------------------------------------------------------ persistence
 
-  snapshot(): SessionSnapshot {
+  snapshot(includeEvents = false): SessionSnapshot {
     return {
+      ...(includeEvents ? { events: this.events.map((e) => ({ ...e })) } : {}),
       v: 1,
       cells: this.cells.map((row) => row.slice()),
       history: this.history.map((a) => ({ ...a })),
@@ -464,6 +467,9 @@ export class Session {
     s.startedAt = now - elapsed;
     s.pausedAt = now;
     s.outcome = snap.outcome === 'lost' && s.heartsEnabled ? 'lost' : 'playing';
+    if (Array.isArray(snap.events)) {
+      for (const e of snap.events.slice(0, MAX_EVENTS)) if (isEvent(e)) s.events.push({ ...e });
+    }
     s.checkWin();
     return s;
   }
@@ -471,6 +477,15 @@ export class Session {
   private log(e: SessionEvent): void {
     if (this.events.length < MAX_EVENTS) this.events.push(e);
   }
+}
+
+const EVENT_TYPES = new Set(['place', 'clear', 'mark', 'unmark', 'undo', 'redo', 'hint', 'pause', 'resume', 'revive']);
+
+/** Shape check only. Whether the moves are legal is decided by replaying them (competitions/verify.ts). */
+function isEvent(e: unknown): e is SessionEvent {
+  if (!e || typeof e !== 'object') return false;
+  const x = e as Record<string, unknown>;
+  return typeof x.t === 'number' && Number.isFinite(x.t) && typeof x.type === 'string' && EVENT_TYPES.has(x.type);
 }
 
 function clampInt(v: unknown, lo: number, hi: number, dflt: number): number {

@@ -105,6 +105,8 @@ export function recordWin(save: SaveV2, mode: ModeRef, r: BoardResult, now = new
 export function advanceStreak(save: SaveV2, dateKey: string): { streak: number; usedCozyDay: boolean } {
   const d = save.daily;
   let usedCozyDay = false;
+  // An older daily (clock or time zone moved back, or catching up) is recorded but never touches the streak.
+  if (d.lastDate && daysBetween(d.lastDate, dateKey) < 0) return { streak: d.streak, usedCozyDay };
   if (d.lastDate === prevDateKey(dateKey)) {
     d.streak += 1;
   } else if (d.lastDate && daysBetween(d.lastDate, dateKey) === 2 && d.streak > 0 && !d.cozyDays[monthKey(dateKey)]) {

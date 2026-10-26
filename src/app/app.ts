@@ -8,7 +8,7 @@ import { entitlementCounts } from '../services/iap';
 import { setHapticsEnabled } from '../services/haptics';
 import { setSoundEnabled } from '../services/audio';
 import type { Router } from '../ui/router';
-import type { ModeRef } from '../game/modes';
+import { modeKey, type ModeRef } from '../game/modes';
 import type { Session } from '../game/session';
 import { captureSession } from '../game/sessionPersistence';
 import { reconcileRewards, type RewardSummary } from '../meta/rewards';
@@ -99,8 +99,20 @@ class App {
   /** Saves the in-progress board (called on every move and when the app is backgrounded). */
   saveActive(): void {
     if (!this.active) return;
-    this.save.lastSession = captureSession(this.active.mode, this.active.session);
+    const { mode, session } = this.active;
+    const snap = captureSession(mode, session);
+    if (mode.kind === 'cup') {
+      const k = modeKey(mode);
+      if (snap) this.save.cup.open[k] = snap;
+      else delete this.save.cup.open[k];
+    } else this.save.lastSession = snap;
     saveSave(this.save);
+  }
+
+  /** Forgets the saved board for `mode` (finished, lost, or abandoned), leaving other saved boards alone. */
+  clearSaved(mode: ModeRef): void {
+    if (mode.kind === 'cup') delete this.save.cup.open[modeKey(mode)];
+    else if (this.save.lastSession && modeKey(this.save.lastSession.mode) === modeKey(mode)) this.save.lastSession = null;
   }
 }
 

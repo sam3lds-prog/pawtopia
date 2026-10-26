@@ -38,6 +38,11 @@ const page = await browser.newPage({ viewport: { width: 390, height: 844 }, devi
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 
+async function reload() {
+  await page.reload();
+  await page.waitForFunction(() => !!window.__pt);
+}
+
 const coins = () => page.evaluate(() => window.__pt.app.coins());
 const title = () => page.textContent('.game-title h1').catch(() => null);
 
@@ -62,7 +67,7 @@ try {
     localStorage.clear();
     localStorage.setItem('someone.else', 'keep me');
   });
-  await page.reload();
+  await reload();
   await page.waitForSelector('.welcome');
   check('first run shows the welcome screen', true);
 
@@ -115,7 +120,7 @@ try {
   await page.evaluate(() => window.__pt.start({ kind: 'level', level: 3 }));
   await page.waitForTimeout(200);
   await solveActive({ stopAfter: 1 }).catch(() => {});
-  await page.reload();
+  await reload();
   await page.waitForSelector('.home');
   const cont = await page.textContent('[data-act="continue"]');
   check('home offers to resume the board in progress', /Resume/i.test(cont ?? ''), cont ?? '');
@@ -139,8 +144,48 @@ try {
   const buyAgain = await page.$('[data-act="buy"]');
   check('decor costs exactly its price, once', (await coins()) === c0 - 110 && !buyAgain, `${c0} → ${await coins()}`);
   await page.keyboard.press('Escape');
-  await page.reload();
+  await reload();
   check('purchased decor survives reload', await page.evaluate(() => !!window.__pt.app.save.inventory.decor.rug));
+
+  // Paw Cup: an open attempt survives other play, resumes, and scores from its full move log
+  await page.evaluate(() => window.__pt.go({ screen: 'league' }));
+  await page.click('[data-act="ok"]').catch(() => {});
+  await page.click('[data-board="0"]');
+  await page.click('[data-act="go"]');
+  await page.waitForTimeout(200);
+  await solveActive({ stopAfter: 2 }).catch(() => {});
+  await page.click('[data-act="rules"]');
+  check('Paw Cup hides the board while the rules are open', !!(await page.$('.board-veil')));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(100);
+  check('the board comes back after the rules', !(await page.$('.board-veil')));
+  await page.click('[data-act="leave"]');
+  await page.evaluate(() => window.__pt.start({ kind: 'level', level: 4 }));
+  await page.waitForTimeout(200);
+  await solveActive({ stopAfter: 1 }).catch(() => {});
+  await page.evaluate(() => window.__pt.go({ screen: 'league' }));
+  check('the open Cup attempt is still resumable after playing another board', !!(await page.$('[data-resume="0"]')));
+  await page.click('[data-resume="0"]');
+  await page.waitForTimeout(200);
+  await solveActive();
+  const pts = Number((await page.textContent('.score-card__total .num')) ?? 0);
+  check('a resumed Cup attempt scores from its whole log', pts > 550, String(pts));
+  await page.click('[data-act="next"]');
+
+  // Re-entering a mode resumes its saved board instead of wiping it
+  const dk = await page.evaluate(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  await page.evaluate((k) => window.__pt.start({ kind: 'daily', dateKey: k }), dk);
+  await page.waitForTimeout(200);
+  await solveActive({ stopAfter: 1 }).catch(() => {});
+  await page.evaluate(() => window.__pt.go({ screen: 'home' }));
+  await page.click('[data-act="daily"]');
+  await page.waitForTimeout(200);
+  const dPlaced = await page.evaluate(() => window.__pt.app.active.session.placedCount());
+  const dGivens = await page.evaluate(() => window.__pt.app.active.session.puzzle.givens.length);
+  check('tapping the Daily again continues the saved daily', dPlaced === dGivens + 1, `${dPlaced} vs ${dGivens + 1}`);
 
   // Scoped reset
   await page.evaluate(() => window.__pt.go({ screen: 'home' }));

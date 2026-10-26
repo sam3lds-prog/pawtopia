@@ -61,6 +61,15 @@ describe('daily streak', () => {
     expect(s.daily.lastDate).toBe('2026-10-10');
   });
 
+  it('regression: finishing an older daily keeps the current streak (clock or time zone moved back)', () => {
+    const s = defaultSave();
+    for (const d of ['2026-10-22', '2026-10-23', '2026-10-24', '2026-10-25']) advanceStreak(s, d);
+    expect(s.daily.streak).toBe(4);
+    expect(advanceStreak(s, '2026-10-24').streak).toBe(4);
+    expect(advanceStreak(s, '2026-10-01').streak).toBe(4);
+    expect(advanceStreak(s, '2026-10-26').streak).toBe(5);
+  });
+
   it('live streak lapses only after Cozy Day can no longer help', () => {
     const s = defaultSave();
     advanceStreak(s, '2026-10-10');

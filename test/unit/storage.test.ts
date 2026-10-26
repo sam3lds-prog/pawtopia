@@ -195,3 +195,22 @@ describe('platform storage guard', () => {
     }
   });
 });
+
+describe('regressions from review', () => {
+  it('erasing progress keeps Paw Cup attempt records (no fresh attempts)', () => {
+    const kv = new MemoryKV();
+    const s = defaultSave();
+    s.cup.attempts['C2026-W44-0'] = [{ at: 'x', completed: true, seconds: 90, mistakes: 0, score: 850 }, { at: 'y', completed: false, seconds: 0, mistakes: 0, score: 0 }];
+    const fresh = resetProgress(s, kv);
+    expect(fresh.cup.attempts['C2026-W44-0']).toHaveLength(2);
+    expect(fresh.journey.nextLevel).toBe(1);
+  });
+
+  it('open Paw Cup attempts round-trip in their own slots; junk is dropped', () => {
+    const s = defaultSave();
+    const good = { mode: { kind: 'cup', weekKey: '2026-W44', index: 2 }, digest: 'abc', generatorVersion: 1, savedAt: 'x', snap: { v: 1, cells: [] } };
+    const back = normalizeSave(JSON.parse(JSON.stringify({ ...s, cup: { attempts: {}, open: { 'C2026-W44-2': good, bad: { nope: 1 } } } })));
+    expect(Object.keys(back.cup.open)).toEqual(['C2026-W44-2']);
+    expect(normalizeSave({ progressVersion: 2 }).cup.open).toEqual({});
+  });
+});
