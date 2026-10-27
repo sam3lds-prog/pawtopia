@@ -2,7 +2,8 @@
 
 import { app } from '../../app/app';
 import { resetProgress, type Settings } from '../../services/storage';
-import { grantStarterItems } from '../../meta/items';
+import { ITEM_CAP, grantStarterItems } from '../../meta/items';
+import { setPantry, skipToLevel } from '../../app/qaTools';
 import { iap } from '../../services/iap';
 import { ads } from '../../services/ads';
 import { track } from '../../services/analytics';
@@ -97,12 +98,41 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
         <div class="row"><span class="row__label">Ads<small>${ads.available ? (ads.isStub ? 'Development test ads only, clearly labeled.' : 'At most one short ad after several boards. Never during play, Paw Cup, or before your results.') : 'This version shows no ads.'}</small></span></div>
         <button class="row" data-act="reset"><span class="row__label" style="color:var(--error)">Erase progress<small>Purchases and settings are kept</small></span></button>
       </div>
+      ${
+        featureFlags.qaTools
+          ? `<div class="rows-title">Tester shortcuts</div>
+      <div class="rows">
+        <button class="row" data-qa="skip:31"><span class="row__label">Skip to level 31<small>Marks 1–30 solved: all six residents and Ember the fox</small></span>${ICON.chevron}</button>
+        <button class="row" data-qa="skip:46"><span class="row__label">Skip to level 46<small>Adds Maple the red panda (in the Blossom Tree)</small></span>${ICON.chevron}</button>
+        <button class="row" data-qa="skip:76"><span class="row__label">Skip to level 76<small>The new 5×5–8×8 ladder starts at 71</small></span>${ICON.chevron}</button>
+        <button class="row" data-qa="empty"><span class="row__label">Empty treats and hint tickets<small>See "no tickets" and the loss sheet without treats</small></span>${ICON.chevron}</button>
+        <button class="row" data-qa="fill"><span class="row__label">Fill treats and tickets to 10<small>Earning more turns into coins</small></span>${ICON.chevron}</button>
+      </div>`
+          : ''
+      }
       ${featureFlags.devGallery ? `<div class="rows-title">Developer</div><div class="rows"><button class="row" data-act="gallery"><span class="row__label">Expression gallery<small>Development builds only</small></span></button></div>` : ''}
       <p class="muted settings-foot">Pawtopia ${esc(__APP_VERSION__)} · original art and sounds · fonts: Fredoka and Nunito Sans (SIL Open Font License)</p>`,
   });
 
   sh.scope.on(sh.el, 'click', async (e) => {
     const t = e.target as HTMLElement;
+    const qa = t.closest('[data-qa]') as HTMLElement | null;
+    if (qa && featureFlags.qaTools) {
+      const [what, arg] = (qa.dataset.qa ?? '').split(':');
+      if (what === 'skip') {
+        skipToLevel(app.save, Number(arg));
+        app.save.lastSession = null;
+        app.persist();
+        // Reload so the normal startup catch-up hands out the skipped levels' residents, gifts and points, once.
+        location.reload();
+      } else {
+        setPantry(app.save, 'treat', what === 'fill' ? ITEM_CAP.treat : 0);
+        setPantry(app.save, 'hint', what === 'fill' ? ITEM_CAP.hint : 0);
+        app.persist();
+        toast(what === 'fill' ? 'Treats and tickets: 10 each.' : 'Treats and tickets: 0.');
+      }
+      return;
+    }
     const swEl = t.closest('[data-switch]') as HTMLElement | null;
     if (swEl) {
       const key = swEl.dataset.switch as BoolKey;

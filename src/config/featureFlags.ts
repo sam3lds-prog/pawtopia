@@ -10,4 +10,6 @@ export const featureFlags = {
   friends: false,
   /** Developer gallery for pet expressions (never in release builds). */
   devGallery: import.meta.env.DEV,
+  /** Tester shortcuts in Settings (skip ahead, set the pantry). Dev builds and the tester preview only, never release. */
+  qaTools: import.meta.env.DEV || import.meta.env.VITE_QA === '1',
 } as const;

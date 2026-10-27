@@ -1,8 +1,12 @@
 // Builds a single self-contained HTML file of the release game (fonts, code and icon inlined), for sharing a
 // playable web preview. Usage: npm run artifact  →  artifact/pawtopia.html
+//                              npm run artifact -- --qa  →  artifact/pawtopia-qa.html (adds Tester shortcuts in Settings)
 //
 // It is a release build: no dev hooks, no test store, no test ads. Progress is kept in that browser only.
 import { build } from 'vite';
+
+const qa = process.argv.includes('--qa');
+if (qa) process.env.VITE_QA = '1';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 
 const outDir = 'artifact/dist';
@@ -29,7 +33,8 @@ const body = html.match(/<body>([\s\S]*?)<\/body>/)[1].replace(/<script[^>]*><\/
 
 // The artifact viewer already pads the page by the top safe area; avoid doubling it.
 const hostFix = ':root{--safe-top:0px}';
-const out = `<title>Pawtopia</title>
+const out = `<meta charset="utf-8">
+<title>Pawtopia</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <link rel="icon" href="data:image/svg+xml;base64,${Buffer.from(favicon).toString('base64')}">
 <style>${css}${hostFix}</style>
@@ -37,5 +42,6 @@ ${body}
 <script type="module">${js.replace(/<\/script/g, '<\\/script')}</script>
 `;
 mkdirSync('artifact', { recursive: true });
-writeFileSync('artifact/pawtopia.html', out);
-console.log(`artifact/pawtopia.html ${(out.length / 1024).toFixed(0)} KB`);
+const file = qa ? 'artifact/pawtopia-qa.html' : 'artifact/pawtopia.html';
+writeFileSync(file, out);
+console.log(`${file} ${(out.length / 1024).toFixed(0)} KB`);
