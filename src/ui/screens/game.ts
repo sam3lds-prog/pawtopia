@@ -10,12 +10,14 @@ import { modeShortTitle, modeTitle, type SpecVersion } from '../../game/puzzles'
 import { difficultyReason, profileOf } from '../../game/grading';
 import { MARK, type HintInfo, type MoveResult, type Session, type Tool, type UnitRef } from '../../game/session';
 import { recordLoss, recordWin, type WinRecord } from '../../meta/progression';
-import { rewardsForWin, type RewardSummary } from '../../meta/rewards';
+import { nextArrival, rewardsForWin, type RewardSummary } from '../../meta/rewards';
 import { finishAttempt } from '../../competitions/localCup';
 import type { ScoreBreakdown } from '../../competitions/scoring';
 import { afterSolve, type MetaNews } from '../../app/events';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
-import { PETS, PET_BY_ID } from '../../meta/catalogs/pets';
+import { PET_BY_ID } from '../../meta/catalogs/pets';
+import { COMPANION_BY_ID } from '../../meta/catalogs/companions';
+import { companionSvg } from '../art/companions';
 import { decorIcon } from '../art/sanctuary';
 import { ads, shouldShowInterstitial } from '../../services/ads';
 import { track } from '../../services/analytics';
@@ -773,7 +775,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) order.push(keyOf(r, c));
     faces.celebrate(order);
     winPet = lastPlaced ?? tilePets.values().next().value ?? null;
-    const result = { size: n, seconds: s.elapsedSeconds(), mistakes: s.mistakes, hintsUsed: s.hintsUsed, revives: s.revives, hearts: rules.hearts, spec };
+    const result = { size: n, seconds: s.elapsedSeconds(), mistakes: s.mistakes, hintsUsed: s.hintsUsed, revives: s.revives, hearts: rules.hearts, spec, tier: profile.tier };
     const rec = recordWin(app.save, mode, result);
     const rewards = rewardsForWin(app.save, mode, rec, new Date(), profile.tier);
     const cupScore = mode.kind === 'cup' ? finishAttempt(app.save, mode, s.events, s.elapsedMs()) : null;
@@ -794,7 +796,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   }
 
   function rewardsMarkup(r: RewardSummary): string {
-    if (!r.coins && !r.pets.length && !r.decor.length && !r.treats && !r.hints) return '';
+    if (!r.coins && !r.pets.length && !r.decor.length && !r.treats && !r.hints && !r.companions.length) return '';
+    const friends = r.companions
+      .map((id) => `<div class="reward-item"><span class="reward-item__art">${companionSvg(id, 'happy')}</span><span><b>${esc(COMPANION_BY_ID[id].name)} the ${esc(COMPANION_BY_ID[id].kind.toLowerCase())} moved in!</b><small>${esc(COMPANION_BY_ID[id].trait)}</small></span></div>`)
+      .join('');
     const pantry = [
       r.treats ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.treat}</span><span><b>+${plural(r.treats, 'treat')}</b><small>One heart back on any Journey or Daily board</small></span></div>` : '',
       r.hints ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.ticket}</span><span><b>+${plural(r.hints, 'hint ticket')}</b><small>Pays for one hint, whichever step you need</small></span></div>` : '',
@@ -808,7 +813,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     const decor = r.decor
       .map((id) => `<div class="reward-item"><span class="reward-item__art">${decorIcon(id)}</span><span><b>${esc(DECOR_BY_ID[id].name)}</b><small>${r.chapter ? `Gift for finishing ${esc(r.chapter.name)}` : 'New decoration'}</small></span></div>`)
       .join('');
-    return `<div class="win-rewards">${coins}${pets}${decor}${pantry}</div>`;
+    return `<div class="win-rewards">${coins}${pets}${friends}${decor}${pantry}</div>`;
   }
 
   function newsMarkup(nw: MetaNews): string {
@@ -866,11 +871,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   /** The next thing to look forward to on the Journey. */
   function nextMarkup(): string {
     if (mode.kind !== 'level') return '';
-    const solved = app.save.journey.nextLevel - 1;
-    const next = PETS.filter((p) => p.unlockLevel > solved && !app.save.inventory.pets[p.id]).sort((a, b) => a.unlockLevel - b.unlockLevel)[0];
+    const next = nextArrival(app.save, app.save.journey.nextLevel - 1);
     if (!next) return '';
-    const left = next.unlockLevel - solved;
-    return `<p class="win-next">${ICON.paw}${left === 1 ? 'A new resident arrives after the next level' : `${left} levels until a new resident arrives`}</p>`;
+    const left = next.level - (app.save.journey.nextLevel - 1);
+    return `<p class="win-next">${ICON.paw}${left === 1 ? 'Someone new arrives after the next level' : `${left} levels until someone new arrives`}</p>`;
   }
 
   function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary, news: MetaNews, cupScore: ScoreBreakdown | null): void {

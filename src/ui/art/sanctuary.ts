@@ -1,13 +1,24 @@
 /**
  * The Harmony Sanctuary illustration (original art, drawn in code). A 360×300 garden: sky, hills, the cottage, a brook,
- * then every owned decoration in its fixed spot and the welcomed residents sitting on or beside them. Everything is
- * static: pets outside the puzzle board don't animate. Drawables are painted back to front by their ground line.
+ * then every owned decoration in its fixed spot, the welcomed residents sitting on or beside them, and any wildlife
+ * companions in their habitats. Drawables are painted back to front by their ground line.
+ *
+ * The markup is static; the sanctuary screen brings it to life with `AmbientDirector` (D24) by toggling classes on the
+ * named groups here: `.sanctuary__pet` figures (and their `.sp-tail`), and decor parts `.sp-water`, `.sp-glow`,
+ * `.sp-petals`, `.sp-fireflies`. On the puzzle board pets still animate their faces only (D11).
  */
 
 import { DECOR, type DecorId } from '../../meta/catalogs/decor';
 import { PET_BY_ID, PETS, type PetId } from '../../meta/catalogs/pets';
 import type { FaceMood } from '../animation/faceMachine';
 import { petRigMarkup } from './pets';
+import { COMPANION_BY_ID, COMPANIONS, type CompanionId } from '../../meta/catalogs/companions';
+import { companionFigure, woodlandNook } from './companions';
+
+/** A small heart that floats over a figure when the player pats it (hidden until `.is-love`). */
+function heartAbove(x: number, y: number): string {
+  return `<path class="sp-heart" d="M${x} ${y + 3.2} c-3.6 -2.4 -5.4 -4.2 -5.4 -6.2 c0 -1.6 1.2 -2.8 2.7 -2.8 c1.2 0 2.1 0.7 2.7 1.6 c0.6 -0.9 1.5 -1.6 2.7 -1.6 c1.5 0 2.7 1.2 2.7 2.8 c0 2 -1.8 3.8 -5.4 6.2 z" fill="#E8707A" opacity="0"/>`;
+}
 
 const OUT = 'rgba(40,52,52,0.28)';
 const SHADOW = 'rgba(40,52,52,0.13)';
@@ -139,7 +150,7 @@ const DECOR_ART: Record<DecorId, DecorArt> = {
         <circle cx="34" cy="66" r="15" fill="#f8cfd8"/><circle cx="60" cy="66" r="14" fill="#f6c3cf"/><circle cx="48" cy="100" r="15" fill="#f6c3cf"/>
       </g>
       <g fill="#fbe1e7"><circle cx="38" cy="74" r="2.2"/><circle cx="56" cy="84" r="2"/><circle cx="28" cy="92" r="1.8"/><circle cx="64" cy="98" r="2"/><circle cx="48" cy="62" r="1.8"/></g>
-      <g fill="#f2b2c2"><ellipse cx="74" cy="132" rx="2" ry="1.2" transform="rotate(30 74 132)"/><ellipse cx="20" cy="140" rx="2" ry="1.2" transform="rotate(-20 20 140)"/><ellipse cx="62" cy="148" rx="1.8" ry="1.1"/></g>`,
+      <g class="sp-petals" fill="#f2b2c2"><ellipse cx="74" cy="132" rx="2" ry="1.2" transform="rotate(30 74 132)"/><ellipse cx="20" cy="140" rx="2" ry="1.2" transform="rotate(-20 20 140)"/><ellipse cx="62" cy="148" rx="1.8" ry="1.1"/></g>`,
   },
   windowbox: {
     base: 120,
@@ -155,7 +166,7 @@ const DECOR_ART: Record<DecorId, DecorArt> = {
     box: [312, 112, 34, 90],
     draw: () => `
       <ellipse cx="331" cy="198" rx="8" ry="2.4" fill="${SHADOW}"/>
-      <circle cx="321" cy="140" r="15" fill="#fbe3b0" opacity="0.38"/>
+      <circle class="sp-glow" cx="321" cy="140" r="15" fill="#fbe3b0" opacity="0.38"/>
       <rect x="329" y="122" width="4" height="76" rx="1.6" fill="#7d5a42"/>
       <path d="M331 124 H318" stroke="#7d5a42" stroke-width="2.6" stroke-linecap="round"/>
       <path d="M319 124 V129" stroke="#5b4030" stroke-width="1"/>
@@ -174,7 +185,7 @@ const DECOR_ART: Record<DecorId, DecorArt> = {
       <rect x="145" y="148" width="8" height="18" rx="2" fill="#d4dadd" stroke="${OUT}" stroke-width="0.9"/>
       <ellipse cx="149" cy="148" rx="12" ry="3.6" fill="#e6eaec" stroke="${OUT}" stroke-width="1"/>
       <path d="M149 146 C149 138 149 136 149 134" stroke="#bfe3ea" stroke-width="2.4" stroke-linecap="round"/>
-      <g fill="none" stroke="#a9d8e1" stroke-width="1.6" stroke-linecap="round"><path d="M149 136 C141 138 137 144 135 152"/><path d="M149 136 C157 138 161 144 163 152"/><path d="M139 149 C134 152 131 158 130 163"/><path d="M159 149 C164 152 167 158 168 163"/></g>
+      <g class="sp-water" fill="none" stroke="#a9d8e1" stroke-width="1.6" stroke-linecap="round"><path d="M149 136 C141 138 137 144 135 152"/><path d="M149 136 C157 138 161 144 163 152"/><path d="M139 149 C134 152 131 158 130 163"/><path d="M159 149 C164 152 167 158 168 163"/></g>
       <g fill="#fff" opacity="0.8"><circle cx="141" cy="166" r="1"/><circle cx="157" cy="167" r="1.2"/></g>`,
   },
   perch: {
@@ -314,7 +325,7 @@ function petFigure(id: PetId, x: number, y: number, H: number, mood: FaceMood): 
     : `<path d="M${x + bw * 0.8} ${y - H * 0.16} C${x + H * 0.4} ${y - H * 0.2} ${x + H * 0.42} ${y - H * 0.34} ${x + H * 0.38} ${y - H * 0.38}" stroke="${pal.shade}" stroke-width="${H * 0.085}" stroke-linecap="round" fill="none"/>`;
   const body = `
     <ellipse cx="${x}" cy="${y + 0.5}" rx="${bw * 1.25}" ry="${H * 0.06}" fill="${SHADOW}"/>
-    ${tail}
+    <g class="sp-tail">${tail}</g>
     <ellipse cx="${x}" cy="${by}" rx="${bw}" ry="${bh}" fill="${pal.fur}" stroke="${OUT}" stroke-width="1"/>
     <ellipse cx="${x}" cy="${by + bh * 0.15}" rx="${bw * 0.55}" ry="${bh * 0.7}" fill="${pal.muzzle}" opacity="0.9"/>
     <ellipse cx="${x - bw * 0.42}" cy="${y - H * 0.03}" rx="${H * 0.075}" ry="${H * 0.05}" fill="${pal.fur}" stroke="${OUT}" stroke-width="0.9"/>
@@ -322,7 +333,7 @@ function petFigure(id: PetId, x: number, y: number, H: number, mood: FaceMood): 
   const k = H / 64;
   const headTop = y - bh * 1.55 - H * 0.82;
   const head = petRigMarkup(id, mood, `translate(${x - H / 2} ${headTop}) scale(${k})`);
-  return `<g class="sanctuary__pet" data-pet="${id}">${body}${head}</g>`;
+  return `<g class="sanctuary__pet" data-pet="${id}" data-name="${P.name}">${body}${head}${heartAbove(x, headTop - 2)}</g>`;
 }
 
 // ------------------------------------------------------------------ scene
@@ -330,6 +341,35 @@ function petFigure(id: PetId, x: number, y: number, H: number, mood: FaceMood): 
 export interface SceneState {
   decor: DecorId[];
   pets: PetId[];
+  companions?: CompanionId[];
+  /** Local evening: a dusk wash and fireflies. */
+  evening?: boolean;
+}
+
+interface FriendSpot {
+  x: number;
+  y: number;
+  H: number;
+  mood: 'idle' | 'happy' | 'sleepy';
+  /** Where the companion sits when a decoration is out (Maple naps in the blossom tree). */
+  on?: { decor: DecorId; x: number; y: number; H: number };
+}
+
+const FRIEND_SPOTS: Record<CompanionId, FriendSpot> = {
+  ember: { x: 46, y: 224, H: 40, mood: 'happy' },
+  maple: { x: 196, y: 160, H: 32, mood: 'sleepy', on: { decor: 'tree', x: 58, y: 117, H: 32 } },
+};
+
+function fireflies(): string {
+  const dots: Array<[number, number]> = [
+    [70, 150],
+    [180, 128],
+    [208, 176],
+    [300, 170],
+    [120, 196],
+    [338, 118],
+  ];
+  return `<g class="sp-fireflies">${dots.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4" fill="#fff3b0" opacity="0.25"/><circle cx="${x}" cy="${y}" r="1.4" fill="#fff8d6"/>`).join('')}</g>`;
 }
 
 export function sanctuaryScene(state: SceneState, id = 'sanct'): string {
@@ -345,8 +385,21 @@ export function sanctuaryScene(state: SceneState, id = 'sanct'): string {
     // Pets sit just in front of the thing they sit on.
     items.push({ base: (on ? DECOR_ART[on.decor].base : y) + 0.5, svg: petFigure(p.id, x, y, 46, spot.mood) });
   }
+  const friends = (state.companions ?? []).filter((c) => c in COMPANION_BY_ID);
+  if (friends.some((c) => COMPANION_BY_ID[c].habitat === 'woodland')) items.push({ base: 220, svg: woodlandNook() });
+  for (const c of COMPANIONS) {
+    if (!friends.includes(c.id)) continue;
+    const spot = FRIEND_SPOTS[c.id];
+    const on = spot.on && shown.has(spot.on.decor) ? spot.on : null;
+    const fx = on ? on.x : spot.x;
+    const fy = on ? on.y : spot.y;
+    const H = on ? on.H : spot.H;
+    const fig = companionFigure(c.id, fx, fy, H, spot.mood).replace(/<\/g>$/, `${heartAbove(fx, fy - H * 1.25)}</g>`);
+    items.push({ base: (on ? DECOR_ART[on.decor].base : fy) + 0.6, svg: fig });
+  }
   items.sort((a, b) => a.base - b.base);
-  return backdrop(id) + items.map((i) => i.svg).join('');
+  const dusk = state.evening ? `<rect width="360" height="300" fill="#3b3f6b" opacity="0.16" pointer-events="none"/>${fireflies()}` : '';
+  return backdrop(id) + items.map((i) => i.svg).join('') + dusk;
 }
 
 /** Standalone icon of one decoration (shop cards, reward sheets). */

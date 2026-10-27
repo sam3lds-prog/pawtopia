@@ -13,6 +13,7 @@ import { chapterAt, LEVELS_PER_CHAPTER, type Chapter } from './chapters';
 import { grant, type LedgerSource } from './ledger';
 import type { WinRecord } from './progression';
 import type { Difficulty } from '../engine/types';
+import { COMPANIONS, type CompanionId } from './catalogs/companions';
 import { CLEAR_TREATS, HINT_EVERY, POINTS, grantItem, hasItemEntry, type ItemSource } from './items';
 
 export interface RewardLine {
@@ -32,10 +33,12 @@ export interface RewardSummary {
   hints: number;
   /** Paw Points earned (progress only). */
   points: number;
+  /** Sanctuary companions who moved in. */
+  companions: CompanionId[];
 }
 
 function empty(): RewardSummary {
-  return { coins: 0, lines: [], pets: [], decor: [], chapter: null, treats: 0, hints: 0, points: 0 };
+  return { coins: 0, lines: [], pets: [], decor: [], chapter: null, treats: 0, hints: 0, points: 0, companions: [] };
 }
 
 function addPoints(sum: RewardSummary, save: SaveV2, id: string, n: number, source: ItemSource, now: Date, note: string): void {
@@ -86,6 +89,12 @@ export function applyLevelRewards(save: SaveV2, level: number, clear: LevelClear
   add(sum, save, `clear:L${level}`, ECONOMY.journeyFirstClear, 'First clear', source, now);
   if (clear.clean) add(sum, save, `clean:L${level}`, ECONOMY.journeyCleanBonus, 'Clean solve', source, now);
   unlockPets(save, level, now, sum);
+  for (const c of COMPANIONS) {
+    if (c.unlockLevel === level && !save.inventory.companions[c.id]) {
+      save.inventory.companions[c.id] = { unlockedAt: now.toISOString() };
+      sum.companions.push(c.id);
+    }
+  }
   if (level % LEVELS_PER_CHAPTER === 0) {
     const ch = chapterAt(level / LEVELS_PER_CHAPTER - 1);
     const before = sum.coins;
@@ -141,6 +150,7 @@ export function reconcileRewards(save: SaveV2, now = new Date(), tierOf: (level:
     const s = applyLevelRewards(save, L, clear, now, 'migration', tier);
     total.coins += s.coins;
     total.points += s.points;
+    total.companions.push(...s.companions);
     total.lines.push(...s.lines);
     total.pets.push(...s.pets);
     total.decor.push(...s.decor);
@@ -152,6 +162,26 @@ export function reconcileRewards(save: SaveV2, now = new Date(), tierOf: (level:
 /** Pets the player has welcomed, in unlock order. */
 export function unlockedPets(save: Pick<SaveV2, 'inventory'>): PetId[] {
   return PETS.filter((p) => save.inventory.pets[p.id]).map((p) => p.id);
+}
+
+/** Companions the player has welcomed, in unlock order. */
+export function unlockedCompanions(save: Pick<SaveV2, 'inventory'>): CompanionId[] {
+  return COMPANIONS.filter((c) => save.inventory.companions[c.id]).map((c) => c.id);
+}
+
+/** The next newcomer (resident or companion) after `solved` cleared levels, and when it arrives. */
+export function nextArrival(save: Pick<SaveV2, 'inventory'>, solved: number): { name: string; level: number } | null {
+  const all = [
+    ...PETS.filter((p) => !save.inventory.pets[p.id]).map((p) => ({ name: p.name, level: p.unlockLevel })),
+    ...COMPANIONS.filter((c) => !save.inventory.companions[c.id]).map((c) => ({ name: c.name, level: c.unlockLevel })),
+  ].filter((x) => x.level > solved);
+  all.sort((a, b) => a.level - b.level);
+  return all[0] ?? null;
+}
+
+/** Journey levels whose first clear welcomes someone new (residents and companions). */
+export function arrivalLevels(): Set<number> {
+  return new Set([...PETS.map((p) => p.unlockLevel), ...COMPANIONS.map((c) => c.unlockLevel)]);
 }
 
 /** The next pet still to arrive, and at which level. */

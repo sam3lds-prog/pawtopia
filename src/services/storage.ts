@@ -138,8 +138,17 @@ export interface SaveV2 {
     decor: Record<string, { ownedAt: string }>;
     /** Treats, hint tickets and Paw Points (src/meta/items.ts). */
     items: ItemEntry[];
+    /** Sanctuary-only wildlife friends (src/meta/catalogs/companions.ts). */
+    companions: Record<string, { unlockedAt: string }>;
   };
-  sanctuary: { hidden: Record<string, boolean>; visits: number };
+  sanctuary: {
+    hidden: Record<string, boolean>;
+    visits: number;
+    /** Hearts of affection per resident or companion, from a once-a-day pat. Cosmetic only. */
+    affection: Record<string, number>;
+    /** Resident id → local date of the last pat (one per day each). */
+    patted: Record<string, string>;
+  };
   missions: { dayKey: string | null; weekKey: string | null; progress: Record<string, number>; claimed: Record<string, boolean> };
   achievements: Record<string, string>; // id → unlockedAt
   stats: {
@@ -151,6 +160,8 @@ export interface SaveV2 {
     bestBySize: Record<string, number>; // size → seconds
     sizesThisWeek: Record<string, boolean>;
     playDays: Record<string, boolean>;
+    /** The most recent solved board, so the sanctuary can talk about it honestly. */
+    lastWin: { size: number; tier: 'easy' | 'medium' | 'hard' | 'expert'; mode: string; at: string } | null;
   };
   settings: Settings;
   purchases: {
@@ -206,11 +217,11 @@ export function defaultSave(now = new Date()): SaveV2 {
     daily: { done: {}, bestTimes: {}, streak: 0, bestStreak: 0, lastDate: null, cozyDays: {} },
     zen: { solved: 0, nextSeed: 1 },
     cup: { attempts: {}, open: {} },
-    inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {}, items: [] },
-    sanctuary: { hidden: {}, visits: 0 },
+    inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {}, items: [], companions: {} },
+    sanctuary: { hidden: {}, visits: 0, affection: {}, patted: {} },
     missions: { dayKey: null, weekKey: null, progress: {}, claimed: {} },
     achievements: {},
-    stats: { solved: 0, clean: 0, hintFree: 0, losses: 0, comebacks: 0, bestBySize: {}, sizesThisWeek: {}, playDays: {} },
+    stats: { solved: 0, clean: 0, hintFree: 0, losses: 0, comebacks: 0, bestBySize: {}, sizesThisWeek: {}, playDays: {}, lastWin: null },
     settings: defaultSettings(),
     purchases: { removeAds: { active: false, source: null, verifiedAt: null }, owned: {} },
     onboarding: { seenRules: false, tutorialDone: false, starterDecorChosen: false, seenLeagueIntro: false, sessions: 0, seenPantryIntro: false },
@@ -263,6 +274,16 @@ function normSettings(x: unknown): Settings {
 }
 
 const LEDGER_SOURCES = ['journey', 'daily', 'mission', 'achievement', 'chapter', 'migration', 'shop', 'revive', 'gift'] as const;
+
+function normLastWin(x: unknown): SaveV2['stats']['lastWin'] {
+  if (!isObj(x)) return null;
+  return {
+    size: int(x.size, 5, 5, 9),
+    tier: oneOf(x.tier, ['easy', 'medium', 'hard', 'expert'] as const, 'easy'),
+    mode: str(x.mode, 'level'),
+    at: str(x.at, ''),
+  };
+}
 
 const ITEM_KINDS = ['treat', 'hint', 'points'] as const;
 const ITEM_SOURCES = ['journey', 'daily', 'mission', 'gift', 'use', 'migration', 'ad'] as const;
@@ -386,8 +407,14 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       favorites: rec(inv.favorites, boolItem),
       decor: rec(inv.decor, (v) => (isObj(v) ? { ownedAt: str(v.ownedAt, '') } : undefined)),
       items: normItems(inv.items),
+      companions: rec(inv.companions, (v) => (isObj(v) ? { unlockedAt: str(v.unlockedAt, '') } : undefined)),
     },
-    sanctuary: { hidden: rec(san.hidden, boolItem), visits: int(san.visits, 0, 0) },
+    sanctuary: {
+      hidden: rec(san.hidden, boolItem),
+      visits: int(san.visits, 0, 0),
+      affection: rec(san.affection, numItem),
+      patted: rec(san.patted, strItem),
+    },
     missions: {
       dayKey: strOrNull(mi.dayKey),
       weekKey: strOrNull(mi.weekKey),
@@ -404,6 +431,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       bestBySize: rec(st.bestBySize, numItem),
       sizesThisWeek: rec(st.sizesThisWeek, boolItem),
       playDays: rec(st.playDays, boolItem),
+      lastWin: normLastWin(st.lastWin),
     },
     settings: normSettings(x.settings),
     purchases: {

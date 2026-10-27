@@ -18,6 +18,8 @@ export interface BoardResult {
   hearts: boolean;
   /** Spec of the board that was solved (src/game/specs.ts); missing = 1. */
   spec?: 1 | 2;
+  /** Measured difficulty of the solved board (for the sanctuary's small talk). */
+  tier?: 'easy' | 'medium' | 'hard' | 'expert';
 }
 
 export interface WinRecord {
@@ -93,6 +95,7 @@ export function recordWin(save: SaveV2, mode: ModeRef, r: BoardResult, now = new
 
   // Lifetime stats (all modes).
   save.stats.solved++;
+  if (r.tier) save.stats.lastWin = { size: r.size, tier: r.tier, mode: mode.kind, at };
   if (clean) save.stats.clean++;
   if (hintFree) save.stats.hintFree++;
   if (r.hearts && (r.revives > 0 || r.mistakes >= 2)) save.stats.comebacks++;

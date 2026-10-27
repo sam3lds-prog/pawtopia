@@ -219,3 +219,23 @@ Hearts, treats, tickets, coins and points are kept apart (`src/meta/items.ts`):
   stats, points and rank, rewards and the next resident rise in three stages within ~1.5 s; a tap reveals all, the
   buttons work immediately, reduced motion shows everything at once. Replays show what's left to improve instead of
   rewards.
+
+## 2026-10-26 · D24 — A living sanctuary (revises D11/D15 for the sanctuary only) and the first wildlife friends
+On the puzzle board nothing changes: pets animate their faces only, and the existing CSS guards still enforce it. The
+**sanctuary scene** is now a lightly animated diorama (`ui/animation/ambientDirector.ts`, DOM-free, fake-clock tested):
+every 5–12 s one figure or decoration does something small (blink, glance, yawn, tail wag, stretch, hop; the fountain
+catches the light, the lantern glows, a blossom petal drifts, fireflies twinkle in the evening). At most two move at
+once, each action lasts ≤ 1.8 s, there is one scheduling timer plus one end timer per running action, and everything
+stops when the screen is hidden or left. Reduced motion shows a still scene; a tap still gets a face-only reaction.
+All motion CSS lives in `sanctuary-life.css`, scoped to `.sanctuary__scene.is-live`, and a test fails if a rule
+escapes that scope, loops forever or runs longer than 1.8 s. Home's scene card stays still.
+
+- **Wildlife friends** are a separate model (`meta/catalogs/companions.ts`), never a puzzle species: Ember the fox
+  (level 30, by a woodland log) and Maple the red panda (level 45, napping in the blossom tree when it's out, otherwise
+  on the lawn by the cottage). Deterministic milestones, back-dated like residents. Capybara, otter, axolotl and owl
+  are planned but not listed until their art exists.
+- The Play path's paw marks now sit only on levels where someone really arrives (they used to mark every fifth level,
+  including 25, 35, 40… where nobody came); the win sheet counts down to the next arrival.
+- A once-a-day **pat** on any resident or friend adds a heart of affection (cosmetic only). Tapping a figure in the
+  garden makes it react. One line under the scene comes from a resident and only states real facts (a recent Hard or
+  Expert solve, the streak, a newcomer, today's solve). Evenings (7 pm–6 am local) get a dusk wash and fireflies.

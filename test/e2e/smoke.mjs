@@ -209,6 +209,22 @@ try {
   await reload();
   check('purchased decor survives reload', await page.evaluate(() => !!window.__pt.app.save.inventory.decor.rug));
 
+  // Sanctuary life: a tap on a resident in the garden gets a small reaction; ambient actions come and go on their own
+  await page.evaluate(() => window.__pt.go({ screen: 'sanctuary' }));
+  await page.waitForSelector('.sanctuary__scene.is-live .sanctuary__pet');
+  await page.evaluate(() => {
+    window.__seen = new Set();
+    new MutationObserver((ms) => {
+      for (const m of ms) for (const c of m.target.classList) if (c.startsWith('is-') && c !== 'is-live') window.__seen.add(c);
+    }).observe(document.querySelector('.sanctuary__scene svg'), { subtree: true, attributes: true, attributeFilter: ['class'] });
+  });
+  await page.click('.sanctuary__scene .sanctuary__pet');
+  check('tapping a resident in the garden makes it react', await page.evaluate(() => window.__seen.has('is-love')));
+  await page.waitForTimeout(12_500);
+  const seen = await page.evaluate(() => [...window.__seen]);
+  check('the garden comes alive by itself within 12 seconds', seen.some((c) => c !== 'is-love'), seen.join(','));
+  check('no more than two figures move at once', await page.evaluate(() => document.querySelectorAll('.sanctuary__scene [class*="is-"]:not(.is-live)').length <= 2));
+
   // Paw Cup: an open attempt survives other play, resumes, and scores from its full move log
   await page.evaluate(() => window.__pt.go({ screen: 'league' }));
   await page.click('[data-act="ok"]').catch(() => {});

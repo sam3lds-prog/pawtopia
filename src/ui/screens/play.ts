@@ -7,6 +7,7 @@ import { displayDifficulty } from '../../game/grading';
 import { puzzleFor, sizeFor } from '../../game/puzzles';
 import { MAX_NEW_BOARD_SIZE } from '../../game/specs';
 import { chapterAt, chapterOf, visibleChapters, type Chapter } from '../../meta/chapters';
+import { arrivalLevels } from '../../meta/rewards';
 import { toast } from '../components/sheet';
 import { actionOf, capitalize, esc, h } from '../dom';
 import { ICON } from '../icons';
@@ -22,9 +23,11 @@ const ROW = 84;
 /** Levels that award something on first clear (shown on the path). */
 export function milestoneOf(level: number): 'pet' | 'chapter' | null {
   if (level % 20 === 0) return 'chapter';
-  if (level === 1 || level % 5 === 0) return 'pet';
+  // Only levels where someone really arrives (residents and sanctuary companions), not every fifth level.
+  if (ARRIVALS.has(level)) return 'pet';
   return null;
 }
+const ARRIVALS = arrivalLevels();
 
 function pathMarkup(ch: Chapter): string {
   const save = app.save;
@@ -68,7 +71,7 @@ function pathMarkup(ch: Chapter): string {
           </button>
           ${state === 'done' ? `<span class="node__stars" aria-hidden="true">${[1, 2, 3].map((s) => (s <= stars ? ICON.star : ICON.starOff)).join('')}</span>` : ''}
           ${state === 'current' ? `<span class="node__tag">${size}×${size}${tier ? ` · ${tier}` : ''}</span>` : ''}
-          ${ms ? `<span class="node__ms node__ms--${ms}" title="${ms === 'pet' ? 'A new resident arrives' : 'Chapter reward'}" aria-hidden="true">${ms === 'pet' ? ICON.paw : ICON.gift}</span>` : ''}
+          ${ms ? `<span class="node__ms node__ms--${ms}" title="${ms === 'pet' ? 'Someone new arrives' : 'Chapter reward'}" aria-hidden="true">${ms === 'pet' ? ICON.paw : ICON.gift}</span>` : ''}
         </li>`;
     })
     .join('');

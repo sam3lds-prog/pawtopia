@@ -1,0 +1,206 @@
+/* Sanctuary ambient life (D24).
+   Everything here is scoped to the live sanctuary scene (.sanctuary__scene.is-live) and only runs while
+   AmbientDirector has added an is-* class for a moment (≤ 1.8 s, at most two figures at once). Nothing here
+   ever targets the puzzle board, whose pets animate their faces only (D11, test/unit/faces.test.ts).
+   test/unit/sanctuaryLife.test.ts checks that every rule stays inside the scene and that nothing loops forever. */
+
+.sanctuary__scene.is-live .sanctuary__pet {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  cursor: pointer;
+}
+.sanctuary__scene.is-live .sp-tail {
+  transform-box: fill-box;
+  transform-origin: 0% 100%;
+}
+
+/* Tail wag around its base. */
+.sanctuary__scene.is-live .sanctuary__pet.is-wag .sp-tail {
+  animation: sp-wag 1100ms ease-in-out;
+}
+@keyframes sp-wag {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-9deg);
+  }
+  45% {
+    transform: rotate(8deg);
+  }
+  70% {
+    transform: rotate(-5deg);
+  }
+}
+
+/* A slow stretch: a little wider and lower, then tall again. */
+.sanctuary__scene.is-live .sanctuary__pet.is-stretch {
+  animation: sp-stretch 1300ms ease-in-out;
+}
+@keyframes sp-stretch {
+  0%,
+  100% {
+    transform: none;
+  }
+  35% {
+    transform: scale(1.06, 0.93);
+  }
+  65% {
+    transform: scale(0.98, 1.03);
+  }
+}
+
+/* A small happy hop (dogs and Ember). */
+.sanctuary__scene.is-live .sanctuary__pet.is-hop {
+  animation: sp-hop 650ms ease-out;
+}
+@keyframes sp-hop {
+  0%,
+  100% {
+    transform: none;
+  }
+  40% {
+    transform: translateY(-5px);
+  }
+  75% {
+    transform: scale(1.03, 0.97);
+  }
+}
+
+/* A tapped figure: a heart floats up. */
+.sanctuary__scene .sp-heart {
+  opacity: 0;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.sanctuary__scene.is-live .sanctuary__pet.is-love .sp-heart {
+  animation: sp-heart 1100ms ease-out;
+}
+@keyframes sp-heart {
+  0% {
+    opacity: 0;
+    transform: translateY(4px) scale(0.6);
+  }
+  25% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* Companion faces (residents use their face rig instead). */
+.sanctuary__scene .sanctuary__friend .sp-eyes-open,
+.sanctuary__scene .sanctuary__friend .sp-eyes-closed,
+.sanctuary__scene .sanctuary__friend .sp-mouth--idle,
+.sanctuary__scene .sanctuary__friend .sp-mouth--happy {
+  transition: opacity 120ms ease-out;
+}
+.sanctuary__scene .sanctuary__friend.is-blink .sp-eyes-open {
+  opacity: 0 !important;
+}
+.sanctuary__scene .sanctuary__friend.is-blink .sp-eyes-closed {
+  opacity: 1 !important;
+}
+.sanctuary__scene .sanctuary__friend.is-love .sp-mouth--idle {
+  opacity: 0 !important;
+}
+.sanctuary__scene .sanctuary__friend.is-love .sp-mouth--happy {
+  opacity: 1 !important;
+}
+
+/* Decorations catching the light. */
+.sanctuary__scene.is-live [data-decor].is-sparkle .sp-water {
+  stroke-dasharray: 3 3;
+  animation: sp-sparkle 1600ms linear;
+}
+@keyframes sp-sparkle {
+  0% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+  100% {
+    stroke-dashoffset: -18;
+    opacity: 1;
+  }
+}
+.sanctuary__scene.is-live [data-decor].is-glow .sp-glow {
+  animation: sp-glow 1800ms ease-in-out;
+}
+@keyframes sp-glow {
+  50% {
+    opacity: 0.8;
+  }
+}
+.sanctuary__scene.is-live [data-decor].is-drift .sp-petals {
+  animation: sp-drift 1800ms ease-in;
+}
+@keyframes sp-drift {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  100% {
+    transform: translate(6px, 14px);
+    opacity: 0;
+  }
+}
+.sanctuary__scene.is-live .sp-fireflies.is-twinkle {
+  animation: sp-twinkle 1600ms ease-in-out;
+}
+@keyframes sp-twinkle {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Reduced motion: the scene is still; a tap shows the heart in place instead of floating it. */
+:root[data-motion='reduce'] .sanctuary__scene .sanctuary__pet.is-love .sp-heart {
+  opacity: 1;
+}
+
+/* Below the scene: a line from one of the residents, tied to what actually happened. */
+.sanctuary__chat {
+  margin: calc(-1 * var(--s2)) 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-ink);
+  font-weight: 700;
+  font-size: var(--t-sm);
+}
+.sanctuary__chat .ico {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--coral);
+}
+
+/* Wildlife friends row and card. */
+.friend {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.portrait .friend {
+  width: 100%;
+  height: 100%;
+}
+.affection {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--coral);
+  font-weight: 800;
+}
+.affection .ico {
+  width: 16px;
+  height: 16px;
+}

@@ -8,8 +8,16 @@ import { app } from '../../app/app';
 import { startGame } from '../../app/gameFlow';
 import { DECOR, DECOR_BY_ID, STARTER_DECOR, type DecorId } from '../../meta/catalogs/decor';
 import { PET_BY_ID, PETS, type PetId } from '../../meta/catalogs/pets';
-import { chooseStarter, isShown, owns, setShown } from '../../meta/sanctuary';
-import { unlockedPets } from '../../meta/rewards';
+import { chooseStarter, isShown, owns, patFriend, pattedToday, sanctuaryChat, setShown } from '../../meta/sanctuary';
+import { unlockedCompanions, unlockedPets } from '../../meta/rewards';
+import { COMPANIONS, COMPANION_BY_ID, type CompanionId } from '../../meta/catalogs/companions';
+import { companionSvg } from '../art/companions';
+import { applyFace } from '../art/pets';
+import { AmbientDirector, type AmbientAction } from '../animation/ambientDirector';
+import type { Clock } from '../animation/faceDirector';
+import type { FaceMood } from '../animation/faceMachine';
+import { hashString } from '../../engine/rng';
+import { localDateKey } from '../../game/dates';
 import { track } from '../../services/analytics';
 import { afterDecorChange, afterSanctuaryVisit } from '../../app/events';
 import { sfx } from '../../services/audio';
@@ -25,9 +33,20 @@ export function shownDecor(): DecorId[] {
   return DECOR.filter((d) => isShown(app.save, d.id)).map((d) => d.id);
 }
 
-/** The live sanctuary picture for the current save (used here and on Home). */
+/** Local evening (7 pm to 6 am): a dusk wash and fireflies. */
+export function isEvening(d = new Date()): boolean {
+  const h = d.getHours();
+  return h >= 19 || h < 6;
+}
+
+/** The sanctuary picture for the current save (used here, live, and on Home, still). */
 export function sceneMarkup(id: string): string {
-  return sanctuaryScene({ decor: shownDecor(), pets: unlockedPets(app.save) }, id);
+  return sanctuaryScene({ decor: shownDecor(), pets: unlockedPets(app.save), companions: unlockedCompanions(app.save), evening: isEvening() }, id);
+}
+
+/** Portrait for a wildlife friend, matching resident portraits. */
+export function friendPortrait(id: CompanionId, locked = false): string {
+  return `<span class="portrait${locked ? ' is-locked' : ''}" style="--tint:${COMPANION_BY_ID[id].tint}">${companionSvg(id, locked ? 'idle' : 'happy')}</span>`;
 }
 
 export const sanctuaryScreen: ScreenDef = {
@@ -44,19 +63,88 @@ export const sanctuaryScreen: ScreenDef = {
     const el = h(`<div class="sanctuary"></div>`);
     root.appendChild(el);
 
+    // ---------------------------------------------------------------- ambient life (D24)
+    let ambient: AmbientDirector | null = null;
+    const clock: Clock = { now: () => performance.now(), set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => clearTimeout(id) };
+    scope.onDispose(() => ambient?.dispose());
+    scope.on(document, 'visibilitychange', () => ambient?.setLive(!document.hidden));
+
+    /** Gives every figure and lively decoration in the scene its small repertoire. */
+    function wireLife(): void {
+      ambient?.dispose();
+      const svg = el.querySelector('.sanctuary__scene svg');
+      if (!svg) return;
+      const actors = new Map<string, Element>();
+      const baseMood = new Map<string, FaceMood>();
+      const play = (id: string, action: AmbientAction) => {
+        const node = actors.get(id);
+        if (!node) return;
+        const rig = node.querySelector('g.pet') as SVGElement | null;
+        const petId = (node as HTMLElement).dataset?.pet as PetId | undefined;
+        if (rig && petId && (action === 'blink' || action === 'look' || action === 'yawn' || action === 'love')) {
+          const base = baseMood.get(id) ?? 'idle';
+          const mood: FaceMood = action === 'yawn' ? 'sleepy' : action === 'look' ? 'curious' : action === 'love' ? 'happy' : base;
+          applyFace(rig, petId, { mood, blinking: action === 'blink', look: action === 'look' ? [hashString(id) % 2 ? 1.2 : -1.2, 0] : [0, 0] });
+        }
+        node.classList.add(`is-${action}`);
+      };
+      const end = (id: string, action: AmbientAction) => {
+        const node = actors.get(id);
+        if (!node) return;
+        node.classList.remove(`is-${action}`);
+        const rig = node.querySelector('g.pet') as SVGElement | null;
+        const petId = (node as HTMLElement).dataset?.pet as PetId | undefined;
+        if (rig && petId) applyFace(rig, petId, { mood: baseMood.get(id) ?? 'idle', blinking: false, look: [0, 0] });
+      };
+      ambient = new AmbientDirector({ clock, seed: hashString(`sanct-${localDateKey()}`), reducedMotion: app.reducedMotion, play, end });
+      for (const g of svg.querySelectorAll('.sanctuary__pet[data-pet]')) {
+        const id = (g as HTMLElement).dataset.pet as PetId;
+        actors.set(id, g);
+        baseMood.set(id, ((g.querySelector('g.pet') as HTMLElement | null)?.dataset.mood as FaceMood) ?? 'idle');
+        const dog = PET_BY_ID[id].species === 'dog';
+        ambient.add({ id, actions: dog ? ['blink', 'look', 'wag', 'hop', 'stretch'] : ['blink', 'look', 'yawn', 'wag', 'stretch'] });
+      }
+      for (const g of svg.querySelectorAll('.sanctuary__friend[data-friend]')) {
+        const id = `friend:${(g as HTMLElement).dataset.friend}`;
+        actors.set(id, g);
+        ambient.add({ id, actions: (g as HTMLElement).dataset.friend === 'ember' ? ['blink', 'wag', 'hop', 'stretch'] : ['blink', 'wag', 'stretch'] });
+      }
+      const decorLife: Array<[string, AmbientAction]> = [
+        ['fountain', 'sparkle'],
+        ['lamp', 'glow'],
+        ['tree', 'drift'],
+      ];
+      for (const [d, action] of decorLife) {
+        const g = svg.querySelector(`[data-decor="${d}"]`);
+        if (g) {
+          actors.set(`decor:${d}`, g);
+          ambient.add({ id: `decor:${d}`, actions: [action] });
+        }
+      }
+      const ff = svg.querySelector('.sp-fireflies');
+      if (ff) {
+        actors.set('fireflies', ff);
+        ambient.add({ id: 'fireflies', actions: ['twinkle'] });
+      }
+      ambient.setLive(!document.hidden);
+    }
+
     function render(): void {
       const save = app.save;
       const pets = unlockedPets(save);
+      const friends = unlockedCompanions(save);
       const ownedDecor = DECOR.filter((d) => owns(save, d.id));
+      const chat = sanctuaryChat(save);
       el.innerHTML = `
         <header class="screen-head">
           <button class="icon-btn" data-act="back" aria-label="Back to Home">${ICON.back}</button>
           <h1 data-autofocus>Sanctuary</h1>
           <div class="screen-head__end">${coinPill()}</div>
         </header>
-        <figure class="sanctuary__scene card">
+        <figure class="sanctuary__scene card is-live">
           <svg viewBox="${SCENE_VIEWBOX}" role="img" aria-label="${esc(sceneLabel(pets, ownedDecor.length))}">${sceneMarkup('sanct')}</svg>
         </figure>
+        ${chat ? `<p class="sanctuary__chat">${ICON.heart}<span>${esc(chat)}</span></p>` : ''}
         <section aria-labelledby="res-title">
           <div class="section-head"><h2 id="res-title">Residents</h2><span class="muted num">${pets.length} of ${PETS.length}</span></div>
           <ul class="resident-row">
@@ -65,6 +153,18 @@ export const sanctuaryScreen: ScreenDef = {
               return `<li><button class="resident" data-pet="${p.id}" aria-label="${esc(has ? `${p.name}, ${p.trait}` : `${p.name}, arrives at level ${p.unlockLevel}`)}">
                 ${portrait(p.id, 'idle', !has)}
                 <span class="resident__name">${has ? esc(p.name) : `Lv ${p.unlockLevel}`}</span>
+              </button></li>`;
+            }).join('')}
+          </ul>
+        </section>
+        <section aria-labelledby="friends-title">
+          <div class="section-head"><h2 id="friends-title">Wildlife friends</h2><span class="muted num">${friends.length} of ${COMPANIONS.length}</span></div>
+          <ul class="resident-row resident-row--friends">
+            ${COMPANIONS.map((c) => {
+              const has = friends.includes(c.id);
+              return `<li><button class="resident" data-friend-card="${c.id}" aria-label="${esc(has ? `${c.name} the ${c.kind.toLowerCase()}, ${c.trait}` : `A ${c.kind.toLowerCase()}, arrives at level ${c.unlockLevel}`)}">
+                ${friendPortrait(c.id, !has)}
+                <span class="resident__name">${has ? esc(c.name) : `Lv ${c.unlockLevel}`}</span>
               </button></li>`;
             }).join('')}
           </ul>
@@ -86,11 +186,24 @@ export const sanctuaryScreen: ScreenDef = {
           }
           <button class="btn btn--secondary btn--block" data-act="shop">${ICON.bag}Find decorations in the Shop</button>
         </section>`;
+      wireLife();
     }
     render();
 
     scope.on(el, 'click', (e) => {
       const t = e.target as HTMLElement;
+      // A tap on someone in the garden: a small happy reaction (a heart; face only under reduced motion).
+      const fig = t.closest('.sanctuary__scene .sanctuary__pet') as HTMLElement | null;
+      if (fig) {
+        const id = fig.dataset.pet ?? `friend:${fig.dataset.friend}`;
+        ambient?.trigger(id, 'love');
+        return;
+      }
+      const friendBtn = t.closest('[data-friend-card]') as HTMLElement | null;
+      if (friendBtn) {
+        showFriendSheet(scope, friendBtn.dataset.friendCard as CompanionId);
+        return;
+      }
       const petBtn = t.closest('[data-pet]') as HTMLElement | null;
       if (petBtn) {
         showPetSheet(scope, petBtn.dataset.pet as PetId, { showVisit: false });
@@ -125,6 +238,45 @@ function sceneLabel(pets: PetId[], decorCount: number): string {
   const names = pets.map((p) => PET_BY_ID[p].name);
   const who = names.length ? `${names.join(', ')} ${names.length === 1 ? 'lives' : 'live'} here` : 'No residents yet';
   return `The Harmony Sanctuary garden. ${who}. ${plural(decorCount, 'decoration')}.`;
+}
+
+/** A wildlife friend's card, with the once-a-day pat. */
+export function showFriendSheet(scope: Scope, id: CompanionId): void {
+  const c = COMPANION_BY_ID[id];
+  const owned = !!app.save.inventory.companions[id];
+  const affection = app.save.sanctuary.affection[id] ?? 0;
+  const done = pattedToday(app.save, id);
+  const sh = openSheet(scope, {
+    title: owned ? `${c.name} the ${c.kind.toLowerCase()}` : `A ${c.kind.toLowerCase()} (arriving soon)`,
+    className: 'pet-sheet',
+    body: `
+      <div class="pet-sheet__hero">${friendPortrait(id, !owned)}</div>
+      <p class="pet-sheet__trait">${esc(owned ? c.trait : 'Someone is watching the garden from the hedge.')}</p>
+      <p class="sheet__lead">${owned ? esc(c.bio) : `Arrives when you first clear level ${c.unlockLevel}.`}</p>
+      ${
+        owned
+          ? `<dl class="pet-sheet__facts">
+              <div><dt>Lives</dt><dd>${c.habitat === 'woodland' ? 'By the woodland log' : 'In the blossom tree (when it is out)'}</dd></div>
+              <div><dt>Affection</dt><dd><span class="affection" data-affection>${ICON.heart}<span class="num">${affection}</span></span></dd></div>
+              <div><dt>Kind</dt><dd>${esc(c.kind)} · Wildlife friend</dd></div>
+            </dl>
+            <div class="sheet__actions"><button class="btn btn--secondary btn--block" data-act="pat" ${done ? 'disabled' : ''}>${ICON.heart}${done ? 'Patted today' : `Give ${esc(c.name)} a pat`}</button></div>
+            <p class="muted">A pat a day adds a heart of affection. It's just for fun and changes nothing in your puzzles.</p>`
+          : ''
+      }`,
+  });
+  sh.scope.on(sh.el, 'click', (e) => {
+    const b = (e.target as HTMLElement).closest('[data-act="pat"]') as HTMLButtonElement | null;
+    if (!b || b.disabled) return;
+    if (patFriend(app.save, id)) {
+      app.persist();
+      sfx('coin');
+      b.disabled = true;
+      b.innerHTML = `${ICON.heart}Patted today`;
+      const a = sh.el.querySelector('[data-affection] .num');
+      if (a) a.textContent = String(app.save.sanctuary.affection[id] ?? 0);
+    }
+  });
 }
 
 /** "New residents" sheet. */
