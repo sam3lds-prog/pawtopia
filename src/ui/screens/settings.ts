@@ -23,12 +23,21 @@ function sw(key: BoolKey, label: string, help = ''): string {
 }
 
 function choice<K extends keyof Settings>(key: K, label: string, opts: Array<[Settings[K], string]>, help = ''): string {
-  return `<div class="row">
+  return `<div class="row row--choice">
       <span class="row__label" id="lbl-${String(key)}">${esc(label)}${help ? `<small>${esc(help)}</small>` : ''}</span>
       <span class="choice" role="group" aria-labelledby="lbl-${String(key)}">
         ${opts.map(([v, l]) => `<button data-choice="${String(key)}" data-value="${String(v)}" aria-pressed="${app.settings[key] === v}">${esc(l)}</button>`).join('')}
       </span>
     </div>`;
+}
+
+/** A short picture of what one tap does under each control scheme. */
+function controlsPreview(c: Settings['controls']): string {
+  const step = (icon: string, label: string) => `<span class="cp-step">${icon}<small>${esc(label)}</small></span>`;
+  const arrow = `<span class="cp-arrow" aria-hidden="true">→</span>`;
+  if (c === 'classic')
+    return `<span class="cp-steps" aria-label="Tap cycle: each tap goes empty, then cross, then your pet, then empty">${step(ICON.mark, '1st tap: ✕')}${arrow}${step(ICON.paw, '2nd: pet')}${arrow}${step(ICON.erase, '3rd: clear')}</span>`;
+  return `<span class="cp-steps" aria-label="Quick place: pick Cat, Dog or Empty, then one tap places it">${step(ICON.paw, 'Pick Cat or Dog')}${arrow}${step(ICON.check, 'One tap places')}${arrow}${step(ICON.mark, 'Empty marks ✕')}</span>`;
 }
 
 export interface SettingsOptions {
@@ -53,9 +62,10 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
       <div class="rows">
         <button class="row" data-act="rules"><span class="row__label">How to play<small>The two rules, with pictures</small></span>${ICON.chevron}</button>
         ${choice('controls', 'Controls', [
-          ['tools', 'Tools'],
+          ['tools', 'Quick place'],
           ['classic', 'Tap cycle'],
-        ], 'Tap cycle: tap once for empty, twice for the pet')}
+        ])}
+        <p class="controls-preview" data-controls-preview aria-live="polite">${controlsPreview(app.settings.controls)}</p>
         ${sw('autoMark', 'Dot impossible tiles', 'A small dot shows where no pet can go')}
         ${sw('showTimer', 'Show the clock')}
         ${sw('largeBoard', 'Large board', 'Bigger tiles you can scroll around on small phones')}
@@ -113,6 +123,10 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
       app.applySettings();
       app.persist();
       if (key === 'reducedMotion' && app.reducedMotion) track('animation_reduced_mode', { source: 'setting' });
+      if (key === 'controls') {
+        const pv = sh.el.querySelector('[data-controls-preview]');
+        if (pv) pv.innerHTML = controlsPreview(app.settings.controls);
+      }
       return;
     }
     const a = actionOf(e);

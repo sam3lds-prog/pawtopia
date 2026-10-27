@@ -19,7 +19,8 @@ export function startGame(mode: ModeRef): boolean {
   }
   const puzzle = puzzleFor(mode);
   // The guided first board is forgiving: mistakes are explained, never punished.
-  const session = new Session(puzzle, { hearts: rulesFor(mode).hearts && !isTutorial(mode, app.save) });
+  const rules = rulesFor(mode);
+  const session = new Session(puzzle, { hearts: rules.hearts && !isTutorial(mode, app.save), maxHearts: rules.maxHearts });
   app.active = { mode, session };
   track('puzzle_start', { mode: mode.kind, size: puzzle.size, difficulty: puzzle.difficulty });
   app.router.go({ screen: 'game' });

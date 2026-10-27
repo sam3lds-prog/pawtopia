@@ -34,7 +34,8 @@ export function resumeSession(saved: SavedSession | null): { mode: ModeRef; sess
     return null;
   }
   if (puzzleDigest(puzzle) !== saved.digest) return null;
-  const session = Session.restore(puzzle, saved.snap, { hearts: rulesFor(saved.mode).hearts });
+  const rules = rulesFor(saved.mode);
+  const session = Session.restore(puzzle, saved.snap, { hearts: rules.hearts, maxHearts: rules.maxHearts });
   if (!session || session.outcome !== 'playing') return null;
   return { mode: saved.mode, session };
 }

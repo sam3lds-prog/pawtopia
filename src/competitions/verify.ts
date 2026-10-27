@@ -9,6 +9,7 @@
  */
 
 import type { Puzzle } from '../engine/types';
+import { CUP_HEARTS } from '../game/modes';
 import { Session, type SessionEvent } from '../game/session';
 import { scoreBreakdown, type ScoreBreakdown } from './scoring';
 
@@ -58,7 +59,8 @@ export function verifyAttempt(input: VerifyInput): VerifyResult {
   const problems = new Set<VerifyProblem>();
   const flags: string[] = [];
   let clockMs = 0;
-  const s = new Session(puzzle, { hearts: true, now: () => clockMs });
+  // Competitive boards always use the fixed Paw Cup allowance, whatever casual modes allow.
+  const s = new Session(puzzle, { hearts: true, maxHearts: CUP_HEARTS, now: () => clockMs });
   const inBounds = (r: number, c: number) => Number.isInteger(r) && Number.isInteger(c) && r >= 0 && c >= 0 && r < n && c < n;
 
   if (events.length > MAX_EVENTS) problems.add('too-many-events');

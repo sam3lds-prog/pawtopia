@@ -44,6 +44,11 @@ export type SessionEvent =
 export interface SessionOptions {
   /** When false (Zen), mistakes are counted but never cost hearts or end the game. */
   hearts?: boolean;
+  /**
+   * Hearts the board starts with (and the most it can hold). Defaults to 3, the original rule, so the Paw Cup
+   * verifier and every existing caller behave exactly as before; casual modes pass `CASUAL_HEARTS`.
+   */
+  maxHearts?: number;
   /** Clock source, injectable for tests. */
   now?: () => number;
 }
@@ -68,19 +73,23 @@ export interface SessionSnapshot {
   elapsedMs: number;
   outcome: Outcome;
   heartsEnabled: boolean;
+  /** The heart allowance the board was played with. Missing in saves from before the allowance was configurable (3). */
+  maxHearts?: number;
   /** The replayable input log. Kept for Paw Cup boards so a resumed attempt can be verified from its first move. */
   events?: SessionEvent[];
 }
 
 const MAX_EVENTS = 4000;
+/** The original fixed allowance; still the Paw Cup rule. */
+const LEGACY_MAX_HEARTS = 3;
 
 export class Session {
   readonly puzzle: Puzzle;
   readonly cells: CellState[][];
   readonly givenMask: boolean[][];
   readonly heartsEnabled: boolean;
-  hearts = 3;
-  readonly maxHearts = 3;
+  readonly maxHearts: number;
+  hearts: number;
   mistakes = 0;
   hintsUsed = 0;
   revives = 0;
@@ -98,6 +107,8 @@ export class Session {
   constructor(puzzle: Puzzle, opts: SessionOptions = {}) {
     this.puzzle = puzzle;
     this.heartsEnabled = opts.hearts ?? true;
+    this.maxHearts = Math.max(1, Math.min(9, Math.round(opts.maxHearts ?? LEGACY_MAX_HEARTS)));
+    this.hearts = this.maxHearts;
     this.now = opts.now ?? (() => Date.now());
     this.startedAt = this.now();
     const n = puzzle.size;
@@ -430,6 +441,7 @@ export class Session {
       elapsedMs: this.elapsedMs(),
       outcome: this.outcome,
       heartsEnabled: this.heartsEnabled,
+      maxHearts: this.maxHearts,
     };
   }
 
@@ -459,7 +471,11 @@ export class Session {
     const okAction = (a: Action) => a && Number.isInteger(a.r) && Number.isInteger(a.c) && a.r >= 0 && a.c >= 0 && a.r < n && a.c < n && !s.givenMask[a.r][a.c];
     s.history = Array.isArray(snap.history) ? snap.history.filter(okAction).map((a) => ({ ...a })) : [];
     s.redoStack = Array.isArray(snap.redo) ? snap.redo.filter(okAction).map((a) => ({ ...a })) : [];
-    s.hearts = clampInt(snap.hearts, 0, s.maxHearts, s.maxHearts);
+    // A board saved under a smaller allowance (the old three hearts) keeps the mistakes it already made and gains
+    // the extra hearts of the new rule, e.g. 2 of 3 left becomes 4 of 5. A larger saved allowance is clamped.
+    const savedMax = clampInt(snap.maxHearts, 1, 9, LEGACY_MAX_HEARTS);
+    const bonus = Math.max(0, s.maxHearts - savedMax);
+    s.hearts = Math.min(s.maxHearts, clampInt(snap.hearts, 0, savedMax, savedMax) + bonus);
     s.mistakes = clampInt(snap.mistakes, 0, 1e6, 0);
     s.hintsUsed = clampInt(snap.hintsUsed, 0, 1e6, 0);
     const elapsed = clampInt(snap.elapsedMs, 0, 1e10, 0);

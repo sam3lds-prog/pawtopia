@@ -390,6 +390,11 @@ body[data-nav='on'] .nav {
 }
 
 /* ---------- Settings rows ---------- */
+/* Sheets scroll; their sections must keep their natural height instead of being squeezed (and clipped) to fit. */
+.sheet > *,
+.rows > * {
+  flex-shrink: 0;
+}
 .rows {
   display: flex;
   flex-direction: column;
@@ -410,6 +415,14 @@ body[data-nav='on'] .nav {
 }
 .row:last-child {
   border-bottom: 0;
+}
+/* A label with a segmented choice: on narrow phones the choice drops below instead of squeezing the label. */
+.row--choice {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.row--choice .row__label {
+  min-width: 6.5em;
 }
 .row__label {
   flex: 1;
@@ -587,4 +600,44 @@ body[data-nav='off'] .toast-host {
   opacity: 0.7;
   margin-top: 6px;
   font-size: var(--t-sm);
+}
+
+/* Settings: what one tap does under the chosen controls. */
+.controls-preview {
+  margin: 0;
+  padding: 2px var(--s3) var(--s3);
+}
+.cp-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--canvas-deep);
+  color: var(--ink);
+}
+.cp-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.cp-step .ico {
+  width: 20px;
+  height: 20px;
+  color: var(--brand-dark);
+}
+.cp-step small {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted-ink);
+  line-height: 1.2;
+}
+.cp-arrow {
+  color: var(--faint-ink);
+  font-weight: 800;
 }

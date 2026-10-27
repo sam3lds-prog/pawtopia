@@ -55,6 +55,8 @@ export interface Settings {
   controls: ControlScheme;
   showTimer: boolean;
   largeBoard: boolean;
+  /** The pet tool the player last picked, so the next board opens with it selected. */
+  lastSpecies: 'cat' | 'dog';
 }
 
 export interface LevelClear {
@@ -170,6 +172,7 @@ export function defaultSettings(): Settings {
     controls: 'tools',
     showTimer: true,
     largeBoard: false,
+    lastSpecies: 'cat',
   };
 }
 
@@ -234,6 +237,7 @@ function normSettings(x: unknown): Settings {
     controls: oneOf(x.controls, ['tools', 'classic'] as const, d.controls),
     showTimer: bool(x.showTimer, d.showTimer),
     largeBoard: bool(x.largeBoard, d.largeBoard),
+    lastSpecies: oneOf(x.lastSpecies, ['cat', 'dog'] as const, d.lastSpecies),
   };
 }
 

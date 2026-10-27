@@ -348,6 +348,11 @@
   width: 19px;
   height: 19px;
 }
+/* Five hearts share the same top-bar space three used to. */
+.hearts[data-count='5'] .ico {
+  width: 16px;
+  height: 16px;
+}
 .board-zone {
   flex: 1;
   min-height: 300px;
@@ -446,6 +451,24 @@
   box-shadow:
     0 0 0 2px var(--brand),
     0 3px 8px -2px rgba(40, 52, 52, 0.2);
+}
+/* Not color alone: the chosen tool also gets a small bar under its label. */
+.tool__label {
+  position: relative;
+}
+.tool[aria-checked='true'] .tool__label::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 16px;
+  height: 3px;
+  margin-left: -8px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.tool:not([aria-checked='true']):active {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .actions {

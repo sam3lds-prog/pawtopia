@@ -159,3 +159,20 @@ A separate review pass (fresh read of the code, not the author's notes) found se
 6. **Re-entering a mode wiped its saved board.** Every "play" entry point uses `playMode`, which continues a saved board
    of that same mode.
 7. **Erase progress granted fresh Cup attempts.** Attempt records survive a reset (purchases and settings already did).
+
+## 2026-10-26 · D21 — Five hearts on casual boards; Paw Cup keeps three
+Journey and Daily boards now allow five wrong placements (`CASUAL_HEARTS`); Paw Cup keeps its published three
+(`CUP_HEARTS`), and the replay verifier pins that number explicitly so a casual-rule change can never alter a ranked
+result. Zen and the guided first board stay heart-free. Hearts are per board and never carry over.
+`Session` takes `maxHearts` (default 3, so every existing caller and test behaves as before) and snapshots record it.
+A board saved under the old three-heart rule keeps the mistakes it made and gains the two new hearts (2 of 3 → 4 of 5).
+
+Wrong placements already behaved as the feel review asked (the attempted pet appears as a faint, puzzled ghost; the
+tile keeps whatever it held, empty or the player's ✕; nothing reveals the other species). The ghost now also gets a
+thin strike that fades with it, opacity only. The pet tool picked last is remembered for the next board (Cat/Dog
+only, so a first tap always places), Settings shows a small picture of what one tap does under each control scheme,
+and the loss sheet states the real allowance. Fixed in passing: long sheets (Settings) squeezed their sections to fit
+the screen and clipped rows; sheet children no longer shrink.
+
+Not done, on purpose: an optional long-press action sheet. It conflicts with drag-marking and needs a usability test
+first. At 8×8 on a 320px phone cells are ~36px, below 44pt; "Large board" (≥46px, scrollable) remains the answer.

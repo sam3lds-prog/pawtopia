@@ -12,9 +12,16 @@ export type ModeRef =
 
 export type ModeKind = ModeRef['kind'];
 
+/** Mistakes allowed on a casual board (Journey, Daily) before it ends. Hearts never carry over between boards. */
+export const CASUAL_HEARTS = 5;
+/** Paw Cup keeps its published competitive rule: three wrong placements end an attempt. */
+export const CUP_HEARTS = 3;
+
 export interface ModeRules {
-  /** Hearts and the three-mistake loss. Off in Zen. */
+  /** Hearts and the mistake allowance. Off in Zen. */
   hearts: boolean;
+  /** How many hearts a board of this mode starts with (only meaningful when `hearts` is on). */
+  maxHearts: number;
   /** Show the running clock. */
   timer: boolean;
   /** Hints available. Never in Paw Cup (competitive rules). */
@@ -28,13 +35,13 @@ export interface ModeRules {
 export function rulesFor(mode: ModeRef): ModeRules {
   switch (mode.kind) {
     case 'level':
-      return { hearts: true, timer: true, hints: true, revive: true, rewards: true };
+      return { hearts: true, maxHearts: CASUAL_HEARTS, timer: true, hints: true, revive: true, rewards: true };
     case 'daily':
-      return { hearts: true, timer: true, hints: true, revive: true, rewards: true };
+      return { hearts: true, maxHearts: CASUAL_HEARTS, timer: true, hints: true, revive: true, rewards: true };
     case 'zen':
-      return { hearts: false, timer: false, hints: true, revive: false, rewards: false };
+      return { hearts: false, maxHearts: CASUAL_HEARTS, timer: false, hints: true, revive: false, rewards: false };
     case 'cup':
-      return { hearts: true, timer: true, hints: false, revive: false, rewards: false };
+      return { hearts: true, maxHearts: CUP_HEARTS, timer: true, hints: false, revive: false, rewards: false };
   }
 }
 

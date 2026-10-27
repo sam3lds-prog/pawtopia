@@ -4,7 +4,7 @@ import { app } from '../../app/app';
 import { restartGame, startGame } from '../../app/gameFlow';
 import { CAT, DOG, type Species } from '../../engine/types';
 import { fmtClock } from '../../game/dates';
-import { nextAfterWin, rulesFor, type ModeRef } from '../../game/modes';
+import { CUP_HEARTS, nextAfterWin, rulesFor, type ModeRef } from '../../game/modes';
 import { modeShortTitle, modeTitle } from '../../game/puzzles';
 import { MARK, type HintInfo, type MoveResult, type Session, type Tool, type UnitRef } from '../../game/session';
 import { recordLoss, recordWin, type WinRecord } from '../../meta/progression';
@@ -61,7 +61,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   const total = 2 * n;
   const settings = app.settings;
   const classic = settings.controls === 'classic';
-  let tool: Tool = 'cat';
+  // The board opens with the pet tool the player used last (never Empty/Erase, so a first tap always places).
+  let tool: Tool = settings.lastSpecies;
   let hint: { info: HintInfo; tier: 1 | 2 } | null = null;
   let finished = false;
   let sheet: SheetHandle | null = null;
@@ -163,6 +164,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     board.render({ cells: s.cells, givenMask: s.givenMask, dead: settings.autoMark ? s.deadCells() : null });
     progressEl.textContent = `${s.placedCount()} of ${total} pets placed`;
     if (heartsEl) {
+      heartsEl.dataset.count = String(s.maxHearts);
       heartsEl.innerHTML = Array.from({ length: s.maxHearts }, (_, i) => (i < s.hearts ? ICON.heart : ICON.heartOff)).join('');
       heartsEl.setAttribute('aria-label', `${plural(s.hearts, 'heart')} left`);
     }
@@ -258,7 +260,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   }
 
   function defaultCoach(): string {
-    if (mode.kind === 'cup') return 'Paw Cup rules: no hints, three hearts, your time counts.';
+    if (mode.kind === 'cup') return `Paw Cup rules: no hints, ${numberWord(CUP_HEARTS).toLowerCase()} hearts, your time counts.`;
     const tip = mode.kind === 'level' ? levelTip(mode.level) : null;
     if (tip) return tip;
     if (mode.kind === 'zen') return 'No clock, no hearts. Take all the time you like.';
@@ -498,7 +500,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
   scope.on(el, 'click', (e) => {
     const t = (e.target as HTMLElement).closest('[data-tool]') as HTMLElement | null;
     if (t) {
-      tool = t.dataset.tool as Tool;
+      selectTool(t.dataset.tool as Tool);
       haptic('select');
       faces.activity();
       if (tool === 'cat' || tool === 'dog') faces.curiousOne(tool, [0, 1.3]);
@@ -538,13 +540,19 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     const k = ke.key.toLowerCase();
     const map: Record<string, Tool> = { c: 'cat', d: 'dog', x: 'mark', e: 'erase' };
     if (map[k] && !(classic && (k === 'x' || k === 'e'))) {
-      tool = map[k];
+      selectTool(map[k]);
       paint();
     } else if (k === 'z') doUndo();
     else if (k === 'y') doRedo();
     else if (k === 'h') doHint();
     else if (k === 'p' || k === 'escape') openPause();
   });
+
+  /** Picks a tool. A picked pet becomes the default for the next board (saved with the next move). */
+  function selectTool(t: Tool): void {
+    tool = t;
+    if (t === 'cat' || t === 'dog') settings.lastSpecies = t;
+  }
 
   function resumeIfOnScreen(): void {
     if (!scope.alive || finished || sheet) return;
@@ -802,12 +810,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     track('puzzle_fail', { mode: mode.kind, size: n });
     haptic('error');
     const canRevive = rules.revive && (app.removeAds || ads.available);
+    const wrongs = `${numberWord(s.maxHearts)} wrong placements`;
     sheet = openSheet(scope, {
       title: mode.kind === 'cup' ? 'Attempt ended' : 'Out of hearts',
       center: true,
       dismissible: false,
       body: `
-        <p class="sheet__lead">${mode.kind === 'cup' ? 'Three wrong placements end a Paw Cup attempt.' : canRevive ? 'Three wrong placements. Refill your hearts and keep this board, or start fresh.' : 'Three wrong placements. Start this board again with a fresh line of logic.'}</p>
+        <p class="sheet__lead">${mode.kind === 'cup' ? `${wrongs} end a Paw Cup attempt.` : canRevive ? `${wrongs}. Refill your hearts and keep this board, or start fresh.` : `${wrongs}. Start this board again with a fresh line of logic.`}</p>
         <div class="sheet__actions">
           ${canRevive ? `<button class="btn btn--block" data-act="revive">Refill hearts${app.removeAds ? '' : '<span class="btn__price">Watch ad</span>'}</button>` : ''}
           ${mode.kind === 'cup' ? '' : `<button class="btn ${canRevive ? 'btn--secondary' : ''} btn--block" data-act="restart">${ICON.restart}Try again</button>`}
@@ -874,4 +883,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
       resumeIfOnScreen();
     });
   }
+}
+
+const NUMBER_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+function numberWord(n: number): string {
+  return NUMBER_WORDS[n] ?? String(n);
 }

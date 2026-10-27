@@ -213,13 +213,24 @@ export class Board {
     }, ms);
   }
 
-  /** Shows the attempted (wrong) pet faintly, then fades it. Opacity only — the art never moves. */
+  /**
+   * Shows the attempted (wrong) pet faintly with a brief strike across it, then fades both. Opacity only — the art
+   * never moves, and the cell keeps whatever it held before (empty or the player's ✕): a wrong Cat never becomes an
+   * ✕, and nothing hints at what the tile really holds.
+   */
   ghost(r: number, c: number, petEl: HTMLElement, ms: number): void {
     const el = this.cellEls[r][c];
     petEl.classList.add('cell__ghost');
     petEl.style.setProperty('--miss-ms', `${ms}ms`);
-    el.appendChild(petEl);
-    this.scope.timeout(() => petEl.remove(), ms);
+    const strike = document.createElement('span');
+    strike.className = 'cell__strike';
+    strike.setAttribute('aria-hidden', 'true');
+    strike.style.setProperty('--miss-ms', `${ms}ms`);
+    el.append(petEl, strike);
+    this.scope.timeout(() => {
+      petEl.remove();
+      strike.remove();
+    }, ms);
   }
 
   setHint(focus: Array<[number, number]>, target: [number, number] | null): void {

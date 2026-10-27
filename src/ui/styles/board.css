@@ -100,6 +100,22 @@
   opacity: 0;
   animation: ghost var(--miss-ms, 650ms) linear forwards;
 }
+/* A thin diagonal stroke over the ghost: "not this pet here". Fades with the ghost; never moves. */
+.cell__strike {
+  position: absolute;
+  inset: 14%;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: 4px;
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 1.5px),
+    var(--error) calc(50% - 1.5px),
+    var(--error) calc(50% + 1.5px),
+    transparent calc(50% + 1.5px)
+  );
+  animation: ghost var(--miss-ms, 650ms) linear forwards;
+}
 .cell__ghost > svg {
   width: 100%;
   height: 100%;

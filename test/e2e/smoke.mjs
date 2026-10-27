@@ -33,7 +33,7 @@ function check(name, cond, detail = '') {
   if (!cond) failed++;
 }
 
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {});
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
@@ -129,6 +129,36 @@ try {
   const placedCount = await page.evaluate(() => window.__pt.app.active.session.placedCount());
   const givens = await page.evaluate(() => window.__pt.app.active.session.puzzle.givens.length);
   check('the resumed board keeps its placements', placedCount === givens + 1, `${placedCount} vs ${givens + 1}`);
+
+  // Five hearts on casual boards; a wrong pet is a fading ghost with a strike, never a ✕ or a reveal
+  check('Journey boards show five hearts', (await page.$$('[data-hearts] .ico')).length === 5);
+  const wrongCell = await page.evaluate(() => {
+    const s = window.__pt.app.active.session;
+    for (let r = 0; r < s.size; r++)
+      for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] === 0 && s.puzzle.solution[r][c] === 2) return [r, c];
+    return null;
+  });
+  await page.click('[data-tool="cat"]');
+  await page.click(`.cell[data-r="${wrongCell[0]}"][data-c="${wrongCell[1]}"]`);
+  const afterWrong = await page.evaluate(([r, c]) => {
+    const s = window.__pt.app.active.session;
+    return { hearts: s.hearts, cell: s.cells[r][c] };
+  }, wrongCell);
+  const strike = await page.$(`.cell[data-r="${wrongCell[0]}"][data-c="${wrongCell[1]}"] .cell__strike`);
+  check('a wrong Cat on a Dog tile costs one heart and leaves the tile empty', afterWrong.hearts === 4 && afterWrong.cell === 0, JSON.stringify(afterWrong));
+  check('the mistake shows a fading ghost with a strike', !!strike);
+  await page.waitForTimeout(800);
+  check('the ghost and strike are gone afterwards', !(await page.$('.cell__strike')) && !(await page.$('.cell__ghost')));
+
+  // The pet tool picked last is selected on the next board
+  await page.click('[data-tool="dog"]');
+  await solveActive({ stopAfter: 1 }).catch(() => {});
+  await page.click('[data-tool="dog"]');
+  await page.evaluate(() => window.__pt.app.saveActive());
+  await reload();
+  await page.evaluate(() => window.__pt.start({ kind: 'level', level: 5 }));
+  await page.waitForTimeout(200);
+  check('the next board opens with the last pet tool', (await page.getAttribute('[data-tool="dog"]', 'aria-checked')) === 'true');
 
   // Decor charged exactly once
   await page.evaluate(() => {
