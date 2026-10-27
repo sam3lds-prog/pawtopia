@@ -333,6 +333,11 @@ export class Board {
         this.focusCell(r, e.key === 'Home' ? 0 : this.n - 1);
         return;
       }
+      // A held key acts once: auto-repeat must not place, cycle or spend anything again.
+      if (e.repeat) {
+        e.preventDefault();
+        return;
+      }
       if (this.handlers.onKey?.(r, c, e.key)) e.preventDefault();
     });
   }

@@ -38,7 +38,23 @@ Defects confirmed in source and fixed in Sprint 0:
 - [x] **Sprint 5** — scoring + replay verifier, league rules, honest Paw Cup practice, missions, badges, Journal
 - [x] **Sprint 6** — settings/accessibility polish, e2e smoke suite, docs (architecture, design system, privacy, backend plan, release checklist)
 
-Test count: 146 unit tests + 24 browser e2e checks (incl. 7 fixes from an independent review, D20). Bundle: ~68 kB JS gzipped (incl. the level pack), 9 kB CSS.
+### Feel & progression refinement (2026-10-26, plan: `PAWTOPIA_REFINED_FEEL_AND_PROGRESSION_PLAN.md`)
+
+- [x] **Sprint A** (D21) — five hearts on Journey/Daily, Paw Cup keeps three; mistake ghost + strike, tile unchanged;
+  remembered pet tool; controls preview; legacy saves gain the extra hearts
+- [x] **Sprint B** (D22) — measured difficulty (`docs/DIFFICULTY.md`), versioned specs, Journey 71+ rotates 5×5–8×8,
+  dailies ≤ 8×8 from 2026-10-27, Journey pack 2 (61–150) frozen; old 9×9 saves still resume; Paw Cup unchanged
+- [x] **Sprint C** (D23) — treats (+1 heart) and hint tickets (first look free, one ticket per hint target), starter
+  pantry, Paw Points and Paw Rank, staged win sheet, replay goals
+- [x] **Sprint D** (D24) — living sanctuary (ambient director, ≤ 2 actors), Ember the fox and Maple the red panda,
+  daily pats, honest small talk, evening fireflies; path milestones fixed
+- [ ] **Sprint E** — accounts, online leaderboards, Game Center, rewarded ads, StoreKit: waiting on provider approvals
+  (see "Needs you")
+
+Test count: 222 unit tests + 38 browser e2e checks (incl. 9 fixes from a second independent review, D25). Bundle: ~87 kB JS gzipped (incl. both level packs), 11 kB CSS.
+
+Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
+walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.
 
 ## Alpha acceptance (spec §13)
 
@@ -65,6 +81,11 @@ Test count: 146 unit tests + 24 browser e2e checks (incl. 7 fixes from an indepe
 - **Native haptics** use `@capacitor/haptics` already; needs a device check once `ios/` is generated.
 
 ## Needs you (external)
+
+0. **Feel check on a phone**: five hearts and the treat sheet (tap the hearts), the hint button's Free / ticket badge,
+   a wrong pet on a Dog tile, the win sheet's three-stage reveal, and the sanctuary after a minute (it should move
+   gently, never more than two things at once). Tell me if the economy feels stingy or generous: starter pantry 3
+   treats + 5 tickets, +1 treat per new level, +1 ticket per two new levels (`src/meta/items.ts`).
 
 1. **Run it on a phone**: `npm run build && npx cap add ios && npx cap sync && npx cap open ios`, set your Team in Xcode,
    run on a device. Please check face animation smoothness and 9×9 legibility on your smallest iPhone.

@@ -76,7 +76,7 @@ export interface SessionSnapshot {
   /** The heart allowance the board was played with. Missing in saves from before the allowance was configurable (3). */
   maxHearts?: number;
   /** Hint-ticket bookkeeping for this board (see `hintCost`). */
-  hintState?: { freeNudgeUsed: boolean; paid: string[]; tier: number };
+  hintState?: { freeNudgeUsed: boolean; paid: string[]; tier: number; free?: string };
   revives?: number;
   /** The replayable input log. Kept for Paw Cup boards so a resumed attempt can be verified from its first move. */
   events?: SessionEvent[];
@@ -108,6 +108,8 @@ export class Session {
   private hintTarget: string | null = null;
   /** The board's one free nudge has been shown. */
   private freeNudgeUsed = false;
+  /** The cell the free nudge pointed at: looking at it again stays free. */
+  private freeTarget: string | null = null;
   /** Hint targets already paid for with a ticket (each is paid at most once). */
   private paidTargets = new Set<string>();
   /** Deepest hint tier opened on this board (0 = none, 1 nudge, 2 exact cell + reason, 3 placed). For stars/analytics. */
@@ -321,8 +323,7 @@ export class Session {
    * Returns false when there is nothing to restore.
    */
   addHeart(): boolean {
-    if (!this.heartsEnabled) return false;
-    if (this.outcome === 'won' || this.hearts >= this.maxHearts) return false;
+    if (!this.canAddHeart()) return false;
     this.hearts += 1;
     if (this.outcome === 'lost') {
       this.outcome = 'playing';
@@ -340,16 +341,25 @@ export class Session {
    */
   hintCost(h: HintInfo, tier: 1 | 2 | 3, freeHints: boolean): 0 | 1 {
     if (freeHints) return 0;
-    if (this.paidTargets.has(`${h.r},${h.c}`)) return 0;
-    if (tier === 1 && !this.freeNudgeUsed) return 0;
+    const key = `${h.r},${h.c}`;
+    if (this.paidTargets.has(key)) return 0;
+    if (tier === 1 && (!this.freeNudgeUsed || this.freeTarget === key)) return 0;
     return 1;
   }
 
   /** Records that a hint tier was opened (and whether a ticket paid for it). */
   commitHint(h: HintInfo, tier: 1 | 2 | 3, paid: boolean): void {
-    if (tier === 1 && !paid && !this.paidTargets.has(`${h.r},${h.c}`)) this.freeNudgeUsed = true;
+    if (tier === 1 && !paid && !this.paidTargets.has(`${h.r},${h.c}`) && !this.freeNudgeUsed) {
+      this.freeNudgeUsed = true;
+      this.freeTarget = `${h.r},${h.c}`;
+    }
     if (paid) this.paidTargets.add(`${h.r},${h.c}`);
     this.hintTierReached = Math.max(this.hintTierReached, tier);
+  }
+
+  /** A treat can give a heart back right now (hearts on, board not won, not already full unless lost). */
+  canAddHeart(): boolean {
+    return this.heartsEnabled && this.outcome !== 'won' && (this.outcome === 'lost' || this.hearts < this.maxHearts);
   }
 
   /** Whether the board's free nudge is still available. */
@@ -493,7 +503,7 @@ export class Session {
       outcome: this.outcome,
       heartsEnabled: this.heartsEnabled,
       maxHearts: this.maxHearts,
-      hintState: { freeNudgeUsed: this.freeNudgeUsed, paid: [...this.paidTargets], tier: this.hintTierReached },
+      hintState: { freeNudgeUsed: this.freeNudgeUsed, paid: [...this.paidTargets], tier: this.hintTierReached, ...(this.freeTarget ? { free: this.freeTarget } : {}) },
       revives: this.revives,
     };
   }
@@ -535,6 +545,7 @@ export class Session {
     const hs = snap.hintState;
     if (hs && typeof hs === 'object') {
       s.freeNudgeUsed = hs.freeNudgeUsed === true;
+      if (typeof hs.free === 'string' && /^\d+,\d+$/.test(hs.free)) s.freeTarget = hs.free;
       if (Array.isArray(hs.paid)) for (const k of hs.paid) if (typeof k === 'string' && /^\d+,\d+$/.test(k)) s.paidTargets.add(k);
       s.hintTierReached = clampInt(hs.tier, 0, 3, 0);
     } else if (s.hintsUsed > 0) {

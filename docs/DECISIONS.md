@@ -239,3 +239,21 @@ escapes that scope, loops forever or runs longer than 1.8 s. Home's scene card s
 - A once-a-day **pat** on any resident or friend adds a heart of affection (cosmetic only). Tapping a figure in the
   garden makes it react. One line under the scene comes from a resident and only states real facts (a recent Hard or
   Expert solve, the streak, a newcomer, today's solve). Evenings (7 pm–6 am local) get a dusk wash and fireflies.
+
+## 2026-10-26 · D25 — Fixes from the second independent review
+A fresh review of D21–D24 found no data loss, no double grants and no Paw Cup leak, and nine smaller defects; all are
+fixed with tests where testable:
+1. A board with a spent ticket, a mistake or a treat but no placement was thrown away on re-entry (so a paid hint could
+   be paid again, and lost hearts came back). Such boards are now resumable.
+2. Looking at the free hint again after any move charged a ticket. The free look's cell is remembered (and saved).
+3. Tapping the win sheet could leave the Paw Points count-up frozen mid-count. The final number now always wins.
+4. Under reduced motion the win sheet's later sections still waited out their stage delays. Everything shows at once.
+5. The hint badge said a ticket was needed when the next look was already paid for. It now asks the session.
+6. A held key (H, C, D…) auto-repeated actions and could run through hint tiers and tickets. Repeats are ignored.
+7. An errand claimed with a full treat jar announced "+1 treat" while the treat had become coins. The toast now says
+   exactly what arrived (`claimMissionDetailed`).
+8. Paw Cup boards were labeled by their lineup slot in the League list but by measurement on the board. The list now
+   shows size and par only (measuring five Cup boards on screen open would cost up to a second each on a phone).
+9. The Play path showed the new board's size for a level whose old 9×9 was still in progress. It now uses the saved spec.
+Also: a treat is spent only after checking it will really restore a heart; erasing progress grants the starter pantry
+again; the release checklist now covers setting `DAILY_V2_FROM` to the rollout date and pinning grading changes.

@@ -349,7 +349,7 @@
   height: 19px;
 }
 /* Five hearts share the same top-bar space three used to. */
-.hearts[data-count='5'] .ico {
+.hearts[data-max='5'] .ico {
   width: 16px;
   height: 16px;
 }

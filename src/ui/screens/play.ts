@@ -1,7 +1,8 @@
 /** Play: Daily and Zen up top, then the Journey path for the selected chapter. */
 
 import { app } from '../../app/app';
-import { playMode, startGame } from '../../app/gameFlow';
+import { playMode, savedFor, startGame } from '../../app/gameFlow';
+import { hasMeaningfulProgress } from '../../game/sessionPersistence';
 import { localDateKey } from '../../engine/levels';
 import { displayDifficulty } from '../../game/grading';
 import { puzzleFor, sizeFor } from '../../game/puzzles';
@@ -47,12 +48,15 @@ function pathMarkup(ch: Chapter): string {
       const clear = save.journey.clears[`L${L}`];
       const state = clear || L < next ? 'done' : L === next ? 'current' : 'locked';
       const stars = clear?.stars ?? (state === 'done' ? 1 : 0);
-      const size = sizeFor({ kind: 'level', level: L });
+      // A board already in progress keeps the spec it was issued under (an old 9×9 save resumes as that 9×9).
+      const saved = state === 'current' ? savedFor({ kind: 'level', level: L }) : null;
+      const spec = saved && hasMeaningfulProgress(saved) ? (saved.specVersion ?? 1) : undefined;
+      const size = sizeFor({ kind: 'level', level: L }, spec);
       // The level you play next shows its measured difficulty (one board to grade; the rest only need a size).
       let tier = '';
       if (state === 'current') {
         try {
-          tier = capitalize(displayDifficulty(puzzleFor({ kind: 'level', level: L })));
+          tier = capitalize(displayDifficulty(puzzleFor({ kind: 'level', level: L }, spec)));
         } catch {
           tier = '';
         }

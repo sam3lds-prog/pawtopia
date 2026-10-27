@@ -17,7 +17,7 @@ import { addDaysKey, fmtClock, formatDuration, localDateKey, utcWeekBounds, utcW
 import { liveStreak } from '../../meta/progression';
 import { track } from '../../services/analytics';
 import { openSheet, toast } from '../components/sheet';
-import { actionOf, capitalize, esc, h, plural } from '../dom';
+import { actionOf, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { Scope, ScreenDef } from '../router';
 import { coinPill } from './home';
@@ -71,7 +71,7 @@ export const leagueScreen: ScreenDef = {
         <span class="cup-board__num">${b.index + 1}</span>
         <span class="cup-board__info">
           <b>${esc(b.label)}</b>
-          <span class="muted">${b.size}×${b.size} · ${capitalize(b.difficulty)} · par ${fmtClock(b.parSeconds)}</span>
+          <span class="muted">${b.size}×${b.size} · par ${fmtClock(b.parSeconds)}</span>
           <span class="cup-board__meta"><span class="attempt-dots" aria-label="${plural(left, 'attempt')} left">${dots}</span>${best ? `<span class="cup-board__best num">${best.score} pts${best.mistakes === 0 ? ' · clean' : ''}</span>` : ''}</span>
         </span>
         ${action}

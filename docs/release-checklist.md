@@ -1,13 +1,19 @@
 # Pawtopia — Release checklist (TestFlight → App Store)
 
 ## Build health
-- [ ] `npm test` (146+), `npm run gen:check`, `npm run pack:check`, `npm run build` all green
+- [ ] `npm test` (222+), `npm run gen:check`, `npm run pack:check`, `npm run build` all green
 - [ ] `npm run e2e` against `npm run dev` all green
 - [ ] Version bumped in `package.json` and Xcode (marketing + build number)
+- [ ] Set `DAILY_V2_FROM` in `src/game/specs.ts` to the first day the update is live for everyone (after store
+      review and any staged rollout), so players on the old and new builds share the same Daily board until then.
+      Dailies before that date stay on their original boards. (Currently 2026-10-27, i.e. immediately.)
+- [ ] `npm run grade:report` unchanged since the last release, or `GRADING_VERSION` bumped and D22 updated (a grading
+      change alters which board future dailies and levels 151+ get)
 
 ## Device QA (real iPhones: small/SE, standard, Pro Max)
 - [ ] Portrait at 320 / 375 / 390 / 430 widths; safe areas (notch, home indicator)
-- [ ] 9×9 boards legible at 320; Large board mode scrolls smoothly
+- [ ] 8×8 boards legible at 320 (and old 9×9 saves / Paw Cup Grand Hall); Large board mode scrolls smoothly
+- [ ] Sanctuary: gentle motion, never more than two things at once, still under Reduce Motion; no frame drops
 - [ ] Faces: blinks/reactions smooth (60fps), only faces move, nothing shifts; reduced-motion respected
 - [ ] VoiceOver: board cells announce row, column, region, pet; sheets trap focus; buttons labeled
 - [ ] Dynamic text sizes don't clip win/settings sheets (they scroll)

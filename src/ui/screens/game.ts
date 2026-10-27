@@ -176,7 +176,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     board.render({ cells: s.cells, givenMask: s.givenMask, dead: settings.autoMark ? s.deadCells() : null });
     progressEl.textContent = `${s.placedCount()} of ${total} pets placed`;
     if (heartsEl) {
-      heartsEl.dataset.count = String(s.maxHearts);
+      heartsEl.dataset.max = String(s.maxHearts);
       heartsEl.innerHTML = Array.from({ length: s.maxHearts }, (_, i) => (i < s.hearts ? ICON.heart : ICON.heartOff)).join('');
       heartsEl.setAttribute('aria-label', pantryOn ? `${plural(s.hearts, 'heart')} left. Treats: ${treats()}. Tap to use one.` : `${plural(s.hearts, 'heart')} left`);
     }
@@ -188,7 +188,15 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     const badge = el.querySelector('[data-hint-badge]') as HTMLElement | null;
     if (badge) {
       // What the next tap costs: the board's first look is free; otherwise one ticket per hint target.
-      const nextIsFree = hint ? s.hintCost(hint.info, (hint.tier + 1) as 2 | 3, freeHints) === 0 : s.freeNudgeAvailable;
+      // With no hint open, ask what the next look would cost for the cell it would point at (it may already be paid
+      // for, or be the free look's cell).
+      let nextIsFree: boolean;
+      if (hint) nextIsFree = s.hintCost(hint.info, (hint.tier + 1) as 2 | 3, freeHints) === 0;
+      else if (s.freeNudgeAvailable) nextIsFree = true;
+      else {
+        const next = finished ? null : s.peekHint();
+        nextIsFree = !!next && s.hintCost(next, 1, freeHints) === 0;
+      }
       badge.innerHTML = nextIsFree ? 'Free' : `${ICON.ticket}<span class="num">${tickets()}</span>`;
       badge.classList.toggle('is-free', nextIsFree);
       const hb = badge.closest('button')!;
@@ -551,7 +559,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   /** Spends one treat for one heart. The pantry and the board are saved together. */
   function useTreat(): boolean {
-    if (!pantryOn || (s.outcome !== 'lost' && s.hearts >= s.maxHearts)) return false;
+    // Checked first, so a treat is only ever spent when it will really give a heart back.
+    if (!pantryOn || !s.canAddHeart() || treats() < 1) return false;
     if (useItem(app.save, `use:treat:${modeKey(mode)}:${Date.now()}`, 'treat', new Date(), 'Heart') !== 'ok') return false;
     s.addHeart();
     track('treat_used', { mode: mode.kind });
@@ -668,6 +677,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     const ke = e as KeyboardEvent;
     if (sheet || document.querySelector('.overlay')) return;
     if ((ke.target as HTMLElement)?.closest?.('.cell')) return;
+    if (ke.repeat) return; // a held key acts once (a held H must not run through hint tiers and tickets)
     const k = ke.key.toLowerCase();
     const map: Record<string, Tool> = { c: 'cat', d: 'dog', x: 'mark', e: 'erase' };
     if (map[k] && !(classic && (k === 'x' || k === 'e'))) {
@@ -941,7 +951,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       const t0 = performance.now() + 300;
       counter.textContent = '0';
       const step = () => {
-        if (!ws.scope.alive) return;
+        // A tap may have revealed the final number between frames; never overwrite it.
+        if (!ws.scope.alive || ws.el.classList.contains('is-revealed')) return;
         const k = Math.min(1, Math.max(0, (performance.now() - t0) / 600));
         counter.textContent = String(Math.round(target * (1 - Math.pow(1 - k, 3))));
         if (k < 1 && !ws.el.classList.contains('is-revealed')) ws.scope.frame(step);
@@ -949,6 +960,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       ws.scope.frame(step);
     }
     ws.scope.on(ws.el, 'pointerdown', reveal);
+    // Reduced motion: everything at once, no staged delays.
+    if (app.reducedMotion) reveal();
     ws.scope.on(ws.el, 'click', async (e) => {
       const a = actionOf(e);
       if (!a || leaving) return;

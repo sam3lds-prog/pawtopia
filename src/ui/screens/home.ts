@@ -10,7 +10,7 @@ import { liveStreak } from '../../meta/progression';
 import { sceneMarkup } from './sanctuary';
 import { openSheet } from '../components/sheet';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
-import { claimMission, missionStates, type MissionDef } from '../../meta/missions';
+import { claimMissionDetailed, missionStates, type MissionDef } from '../../meta/missions';
 import { CASUAL_HEARTS } from '../../game/modes';
 import { itemBalance } from '../../meta/items';
 import { nextPetMilestone } from '../../meta/rewards';
@@ -211,16 +211,17 @@ export const homeScreen: ScreenDef = {
     scope.on(el, 'click', (e) => {
       const claim = (e.target as HTMLElement).closest('[data-claim]') as HTMLElement | null;
       if (claim) {
-        const coins = claimMission(app.save, claim.dataset.claim!);
-        if (coins) {
+        const got = claimMissionDetailed(app.save, claim.dataset.claim!);
+        const coins = got.coins + got.overflowCoins;
+        if (got.coins) {
           app.persist();
           sfx('coin');
           track('mission_claimed', { coins });
           renderMissions();
           const pill = el.querySelector('[data-coins]');
           if (pill) pill.outerHTML = coinPill();
-          const def = missionStates(app.save).find((m) => m.key === claim.dataset.claim)?.def;
-          const more = [def?.items?.treat ? `+${plural(def.items.treat, 'treat')}` : '', def?.items?.hint ? `+${plural(def.items.hint, 'hint ticket')}` : ''].filter(Boolean);
+          // Say exactly what arrived (a full treat jar turns a treat into coins).
+          const more = [got.treats ? `+${plural(got.treats, 'treat')}` : '', got.hints ? `+${plural(got.hints, 'hint ticket')}` : ''].filter(Boolean);
           toast([`+${coins} Paw Coins`, ...more].join(' · '));
         }
         return;

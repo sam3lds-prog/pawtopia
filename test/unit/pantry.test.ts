@@ -246,3 +246,63 @@ describe('a treat on a board', () => {
     expect(verifyAttempt({ puzzle: p, events, parSeconds: 150, ranked: true }).problems).toContain('revive-in-ranked');
   });
 });
+
+describe('fixes from the independent review', () => {
+  const p = generatePuzzle({ size: 7, seed: 31 });
+
+  it('looking at the free hint again (after any move) stays free, and survives a resume', () => {
+    const s = new Session(p, { maxHearts: CASUAL_HEARTS });
+    const h = s.peekHint()!;
+    s.commitHint(h, 1, false);
+    // The player marks a tile somewhere (the hint closes), then taps Hint again: same cell.
+    const again = s.peekHint()!;
+    expect(`${again.r},${again.c}`).toBe(`${h.r},${h.c}`);
+    expect(s.hintCost(again, 1, false)).toBe(0);
+    expect(s.hintCost(again, 2, false)).toBe(1); // the exact cell still costs a ticket
+    const t = Session.restore(p, JSON.parse(JSON.stringify(s.snapshot())), { maxHearts: CASUAL_HEARTS })!;
+    expect(t.hintCost(again, 1, false)).toBe(0);
+  });
+
+  it('a board with a paid hint or a mistake but no placement is still resumable', async () => {
+    const { captureSession, hasMeaningfulProgress } = await import('../../src/game/sessionPersistence');
+    const mode = { kind: 'level' as const, level: 14 };
+    const { puzzleFor } = await import('../../src/game/puzzles');
+    const pz = puzzleFor(mode);
+    const fresh = new Session(pz, { maxHearts: CASUAL_HEARTS });
+    expect(hasMeaningfulProgress(captureSession(mode, fresh))).toBe(false);
+    const paid = new Session(pz, { maxHearts: CASUAL_HEARTS });
+    const h = paid.peekHint()!;
+    paid.commitHint(h, 1, false);
+    paid.commitHint(h, 2, true);
+    expect(hasMeaningfulProgress(captureSession(mode, paid))).toBe(true);
+    const oops = new Session(pz, { maxHearts: CASUAL_HEARTS });
+    for (let r = 0; r < pz.size; r++)
+      for (let c = 0; c < pz.size; c++)
+        if (!oops.givenMask[r][c] && pz.solution[r][c] === DOG && oops.mistakes === 0) oops.place(r, c, CAT);
+    expect(hasMeaningfulProgress(captureSession(mode, oops))).toBe(true);
+  });
+
+  it('an errand claimed with a full treat jar reports coins instead of a treat', async () => {
+    const { claimMissionDetailed } = await import('../../src/meta/missions');
+    const { localWeekStart, localDateKey } = await import('../../src/game/dates');
+    const s = defaultSave(NOW);
+    grantItem(s, 'fill', 'treat', ITEM_CAP.treat, 'gift', NOW);
+    // The weekly errand (three sizes) comes with a treat and a ticket.
+    const wk = localWeekStart(localDateKey(NOW));
+    for (const n of [5, 6, 7]) s.stats.sizesThisWeek[`${wk}:${n}`] = true;
+    const weekly = missionStates(s, NOW).find((m) => m.weekly)!;
+    expect(weekly.done).toBe(true);
+    const got = claimMissionDetailed(s, weekly.key, NOW);
+    expect(got.treats).toBe(0);
+    expect(got.hints).toBe(1);
+    expect(got.overflowCoins).toBe(OVERFLOW_COINS);
+    expect(itemBalance(s, 'treat')).toBe(ITEM_CAP.treat);
+    expect(claimMissionDetailed(s, weekly.key, NOW)).toEqual({ coins: 0, treats: 0, hints: 0, overflowCoins: 0 });
+  });
+
+  it('a treat is only offered when it would really give a heart back', () => {
+    const s = new Session(p, { maxHearts: CASUAL_HEARTS });
+    expect(s.canAddHeart()).toBe(false);
+    expect(new Session(p, { hearts: false }).canAddHeart()).toBe(false);
+  });
+});

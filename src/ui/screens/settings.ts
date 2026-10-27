@@ -2,6 +2,7 @@
 
 import { app } from '../../app/app';
 import { resetProgress, type Settings } from '../../services/storage';
+import { grantStarterItems } from '../../meta/items';
 import { iap } from '../../services/iap';
 import { ads } from '../../services/ads';
 import { track } from '../../services/analytics';
@@ -164,6 +165,8 @@ function confirmErase(scope: Scope, done: () => void): void {
     if (!a) return;
     if (a.act === 'erase') {
       const fresh = resetProgress(app.save);
+      // A fresh start gets the starter pantry again, like a new install.
+      grantStarterItems(fresh);
       app.active = null;
       app.replaceSave(fresh);
       cs.close();

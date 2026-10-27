@@ -114,14 +114,42 @@ export function recordMissionEvent(save: SaveV2, e: MissionEvent, now = new Date
   return done;
 }
 
-/** Claims a finished mission's coins, once. */
-export function claimMission(save: SaveV2, key: string, now = new Date()): number {
+export interface MissionClaim {
+  /** The mission's own coins. */
+  coins: number;
+  /** Treats and tickets that went into the pantry, and coins given instead for any that didn't fit. */
+  treats: number;
+  hints: number;
+  overflowCoins: number;
+}
+
+/** Claims a finished mission once, reporting exactly what was granted. */
+export function claimMissionDetailed(save: SaveV2, key: string, now = new Date()): MissionClaim {
+  const out: MissionClaim = { coins: 0, treats: 0, hints: 0, overflowCoins: 0 };
   const st = missionStates(save, now).find((m) => m.key === key);
-  if (!st || !st.done || st.claimed) return 0;
+  if (!st || !st.done || st.claimed) return out;
   save.missions.claimed[key] = true;
-  if (st.def.items?.treat) grantItem(save, `mission:${key}:treat`, 'treat', st.def.items.treat, 'mission', now, st.def.title);
-  if (st.def.items?.hint) grantItem(save, `mission:${key}:hint`, 'hint', st.def.items.hint, 'mission', now, st.def.title);
-  return grant(save, `mission:${key}`, st.def.coins, 'mission', now, st.def.title) ? st.def.coins : 0;
+  if (st.def.items?.treat) {
+    const g = grantItem(save, `mission:${key}:treat`, 'treat', st.def.items.treat, 'mission', now, st.def.title);
+    if (g) {
+      out.treats += g.granted;
+      out.overflowCoins += g.overflowCoins;
+    }
+  }
+  if (st.def.items?.hint) {
+    const g = grantItem(save, `mission:${key}:hint`, 'hint', st.def.items.hint, 'mission', now, st.def.title);
+    if (g) {
+      out.hints += g.granted;
+      out.overflowCoins += g.overflowCoins;
+    }
+  }
+  if (grant(save, `mission:${key}`, st.def.coins, 'mission', now, st.def.title)) out.coins = st.def.coins;
+  return out;
+}
+
+/** Claims a finished mission's coins (and any treat or ticket), once. Returns the mission's coins. */
+export function claimMission(save: SaveV2, key: string, now = new Date()): number {
+  return claimMissionDetailed(save, key, now).coins;
 }
 
 export function unclaimedCount(save: SaveV2, now = new Date()): number {

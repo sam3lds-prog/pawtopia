@@ -1106,7 +1106,8 @@ ul.rows {
 .win-stage-3 {
   animation-delay: 620ms;
 }
-.win-sheet.is-revealed .win-stage {
+.win-sheet.is-revealed .win-stage,
+:root[data-motion='reduce'] .win-stage {
   animation: none;
 }
 @keyframes win-rise {

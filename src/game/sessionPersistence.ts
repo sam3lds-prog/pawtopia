@@ -46,6 +46,10 @@ export function resumeSession(saved: SavedSession | null): { mode: ModeRef; sess
 /** True when the saved board has real progress worth offering to resume. */
 export function hasMeaningfulProgress(saved: SavedSession | null): boolean {
   if (!saved?.snap?.cells) return false;
-  const placed = saved.snap.history?.length ?? 0;
-  return placed > 0 || (saved.snap.elapsedMs ?? 0) > 15_000;
+  const snap = saved.snap;
+  const placed = snap.history?.length ?? 0;
+  // Mistakes, hints and treats change what the board costs or gives back even with no placement yet, so a board that
+  // has any of them is kept: throwing it away would hand back lost hearts or make a paid hint be paid for again.
+  const spent = (snap.mistakes ?? 0) > 0 || (snap.hintsUsed ?? 0) > 0 || (snap.revives ?? 0) > 0 || (snap.hintState?.paid?.length ?? 0) > 0;
+  return placed > 0 || spent || (snap.elapsedMs ?? 0) > 15_000;
 }

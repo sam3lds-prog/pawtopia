@@ -15,30 +15,32 @@ unchanged.
                      │
    ┌─────────────────┼──────────────────────┬─────────────────────┐
  game/ (session,  meta/ (progression,     competitions/        services/
- modes, puzzles,  rewards, ledger,        (scoring, verify,    (storage+migration,
- persistence)     missions, achievements, leagueRules, cup,    kv guard, ads, iap,
-   │              sanctuary, catalogs)    localCup)            analytics, audio, haptics)
+ modes, puzzles,  rewards, ledger, items, (scoring, verify,    (storage+migration,
+ specs, grading,  missions, achievements, leagueRules, cup,    kv guard, ads, iap,
+ persistence)     sanctuary, catalogs)    localCup)            analytics, audio, haptics)
  engine/ (solver, deduce, generator, levels, rng)  ← unchanged from v1
- data/ (levelPack: frozen, verified levels 1–60)
+ data/ (levelPack: frozen levels 1–60; journeyPack2: frozen levels 61–150)
 ```
 
 ## Key flows
 
-**Starting a board.** `gameFlow.startGame(mode)` → `puzzles.puzzleFor(mode)` (pack for levels 1–60, deterministic
-generator otherwise) → `new Session` → router shows `screens/game`. Paw Cup boards first open an attempt
+**Starting a board.** `gameFlow.startGame(mode)` → `puzzles.currentSpec(mode)` → `puzzles.puzzleFor(mode, spec)`
+(frozen packs for levels 1–150; spec 2 picks boards by measured difficulty via `specs.pickBoard`; spec 1 uses the
+original generator ladder) → `new Session({ maxHearts })` → router shows `screens/game`. Paw Cup boards first open an attempt
 (`localCup.startAttempt`), which fails when both attempts are used.
 
 **Playing.** Board input → `Session.apply/tap/place` → `MoveResult` → feedback (sound, haptic, tile overlay, face
 reaction) → `paint()` updates only changed cells → `app.saveActive()` snapshots the board (also on background /
 pagehide) → `session.claimOutcome()` returns win/loss exactly once.
 
-**Winning.** `progression.recordWin` (journey, daily streak, stats) → `rewards.rewardsForWin` (ledger grants, pet
-unlocks, chapter gifts) → `localCup.finishAttempt` (Paw Cup: replay-verified practice score) → `events.afterSolve`
+**Winning.** `progression.recordWin` (journey, daily streak, stats, best times per spec) → `rewards.rewardsForWin`
+(coin ledger grants, Paw Points, first-clear treats and tickets, pet and companion unlocks, chapter gifts) → `localCup.finishAttempt` (Paw Cup: replay-verified practice score) → `events.afterSolve`
 (missions, badges) → persist → face celebration (≤1.5 s) → win sheet → only after the player taps through, an
 interstitial *may* be considered by `shouldShowInterstitial` (never in release today: no ad network).
 
 **Startup.** `storage.loadSave` (v2, or migrate v1 with backup + round-trip check) → `rewards.reconcileRewards`
-(idempotent catch-up for v1 progress) → `catchUpAchievements` → route to Welcome (fresh install) or Home.
+(idempotent catch-up for v1 progress and back-dated Paw Points) → `items.grantStarterItems` (once) →
+`catchUpAchievements` → route to Welcome (fresh install) or Home.
 
 ## Screen lifecycle
 
@@ -60,6 +62,23 @@ Puzzles are a pure function of (size, seed). `GENERATOR_VERSION` is stored with 
 a saved board resumes only if the regenerated layout digest matches. Levels 1–60 are frozen in `data/levelPack.ts`
 and the test suite regenerates them to prove the generator still agrees.
 
+## Difficulty and specs
+
+`game/grading.ts` measures a board by replaying the deduction engine (breakthroughs, chain length, neighbor logic,
+openings, givens) and gives the label players see. `game/specs.ts` decides which board a Journey level or Daily date
+gets, by spec version; saved boards remember theirs. See `docs/DIFFICULTY.md` and D22.
+
+## Pantry and points
+
+`meta/items.ts` keeps treats, hint tickets and Paw Points on an append-only, idempotent item ledger (like coins).
+Hearts stay in the `Session`; hint costs are decided by `Session.hintCost` and recorded with `commitHint`. D23.
+
+## Sanctuary life
+
+`ui/animation/ambientDirector.ts` (DOM-free, fake-clock tested) schedules small actions on sanctuary figures and
+decorations, at most two at once; `styles/sanctuary-life.css` holds all sanctuary motion, scoped to the live scene.
+Wildlife friends (`meta/catalogs/companions.ts`, `ui/art/companions.ts`) are separate from the cat/dog residents. D24.
+
 ## Faces
 
 `ui/art/pets.ts` builds layered SVG rigs; `ui/animation/faceMachine.ts` is the per-pet state machine;
@@ -78,6 +97,11 @@ backend or a store stays off until integrated, tested and approved.
 | `test/engine.test.ts` | v1 engine: unique, valid, logic-only puzzles |
 | `test/unit/session.test.ts` | outcome claimed once, tools, undo/redo, zen, clock, hints, snapshots |
 | `test/unit/storage.test.ts` | v1 → v2 migration, backups, corruption, scoped reset, storage that throws |
+| `test/unit/hearts.test.ts` | five casual hearts, Cup's three, wrong Cat/Dog semantics, legacy save upgrade |
+| `test/unit/difficulty.test.ts` | grading, pack 2 frozen and reproducible, spec routing, old 9×9 saves resume |
+| `test/unit/pantry.test.ts` | item ledger caps/overflow, earning rules, hint-ticket costs, treats, Paw Rank |
+| `test/unit/sanctuaryLife.test.ts` | ambient budget, reduced motion, CSS scope, companions, pats, small talk |
+| `test/unit/feel.test.ts` | mistake strike is fade-only, remembered tool |
 | `test/unit/flow.test.ts` | next level advances, resume digests, ad cadence, IAP stubs, dates/DST/UTC weeks |
 | `test/unit/progression.test.ts` | stars, replays, streaks + Cozy Day, chapters, onboarding |
 | `test/unit/levelPack.test.ts` | 60 shipped boards verified and identical to the generator |
