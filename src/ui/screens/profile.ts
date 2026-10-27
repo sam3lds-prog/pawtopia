@@ -4,6 +4,7 @@ import { app } from '../../app/app';
 import { ACHIEVEMENTS } from '../../meta/achievements';
 import { fmtClock } from '../../game/dates';
 import { liveStreak } from '../../meta/progression';
+import { ITEM_CAP, itemBalance, pawPoints, rankFor } from '../../meta/items';
 import { esc, h } from '../dom';
 import { ICON } from '../icons';
 import type { ScreenDef } from '../router';
@@ -15,12 +16,29 @@ export const profileScreen: ScreenDef = {
     const s = app.save;
     const unlocked = ACHIEVEMENTS.filter((a) => s.achievements[a.id]).length;
     const sizes = [5, 6, 7, 8, 9];
+    const pts = pawPoints(s);
+    const rank = rankFor(pts);
+    const nextName = rank.next !== null ? rankFor(rank.next).name : null;
+    const pct = rank.next !== null ? Math.round(((pts - rank.from) / (rank.next - rank.from)) * 100) : 100;
     const el = h(`
       <div class="journal">
         <header class="screen-head">
           <button class="icon-btn" data-act="back" aria-label="Back to Home">${ICON.back}</button>
           <h1 data-autofocus>Journal</h1>
         </header>
+        <section class="card rank-card" aria-labelledby="rank-h">
+          <div class="rank-card__head">
+            <h3 id="rank-h">Paw Rank</h3>
+            <span class="muted num">${pts.toLocaleString()} Paw Points</span>
+          </div>
+          <span class="rank-card__name">${esc(rank.name)}</span>
+          <span class="rank-bar" role="progressbar" aria-label="Progress to the next Paw Rank" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span style="width:${pct}%"></span></span>
+          <p class="muted">${nextName ? `${(rank.next! - pts).toLocaleString()} points to ${esc(nextName)}. ` : ''}Points come from first clears (more for harder boards) and clean or hint-free solves. They only measure your own progress.</p>
+          <div class="pantry-row">
+            <span class="pantry-chip">${ICON.treat}<b class="num">${itemBalance(s, 'treat')}</b><small>of ${ITEM_CAP.treat} treats<br>+1 heart each</small></span>
+            <span class="pantry-chip">${ICON.ticket}<b class="num">${itemBalance(s, 'hint')}</b><small>of ${ITEM_CAP.hint} hint tickets</small></span>
+          </div>
+        </section>
         <section class="card">
           <h3>Your puzzles</h3>
           <div class="stats stats--grid">

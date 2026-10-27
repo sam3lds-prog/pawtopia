@@ -85,6 +85,19 @@ export interface LedgerEntry {
   note?: string;
 }
 
+/**
+ * Item ledger entry: treats (one heart each), hint tickets, and Paw Points. Append-only and idempotent like the coin
+ * ledger: an id is applied at most once, and a balance is the sum of its entries.
+ */
+export interface ItemEntry {
+  id: string;
+  item: 'treat' | 'hint' | 'points';
+  delta: number;
+  at: string;
+  source: 'journey' | 'daily' | 'mission' | 'gift' | 'use' | 'migration' | 'ad';
+  note?: string;
+}
+
 export interface CupAttemptRecord {
   at: string;
   completed: boolean;
@@ -123,6 +136,8 @@ export interface SaveV2 {
     equippedAccent: Record<string, string>; // petId → accentId
     favorites: Record<string, boolean>;
     decor: Record<string, { ownedAt: string }>;
+    /** Treats, hint tickets and Paw Points (src/meta/items.ts). */
+    items: ItemEntry[];
   };
   sanctuary: { hidden: Record<string, boolean>; visits: number };
   missions: { dayKey: string | null; weekKey: string | null; progress: Record<string, number>; claimed: Record<string, boolean> };
@@ -148,6 +163,8 @@ export interface SaveV2 {
     starterDecorChosen: boolean;
     seenLeagueIntro: boolean;
     sessions: number;
+    /** The one-time Home card explaining hearts, treats and hint tickets has been dismissed. */
+    seenPantryIntro: boolean;
   };
   lastSession: SavedSession | null;
 }
@@ -189,14 +206,14 @@ export function defaultSave(now = new Date()): SaveV2 {
     daily: { done: {}, bestTimes: {}, streak: 0, bestStreak: 0, lastDate: null, cozyDays: {} },
     zen: { solved: 0, nextSeed: 1 },
     cup: { attempts: {}, open: {} },
-    inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {} },
+    inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {}, items: [] },
     sanctuary: { hidden: {}, visits: 0 },
     missions: { dayKey: null, weekKey: null, progress: {}, claimed: {} },
     achievements: {},
     stats: { solved: 0, clean: 0, hintFree: 0, losses: 0, comebacks: 0, bestBySize: {}, sizesThisWeek: {}, playDays: {} },
     settings: defaultSettings(),
     purchases: { removeAds: { active: false, source: null, verifiedAt: null }, owned: {} },
-    onboarding: { seenRules: false, tutorialDone: false, starterDecorChosen: false, seenLeagueIntro: false, sessions: 0 },
+    onboarding: { seenRules: false, tutorialDone: false, starterDecorChosen: false, seenLeagueIntro: false, sessions: 0, seenPantryIntro: false },
     lastSession: null,
   };
 }
@@ -246,6 +263,30 @@ function normSettings(x: unknown): Settings {
 }
 
 const LEDGER_SOURCES = ['journey', 'daily', 'mission', 'achievement', 'chapter', 'migration', 'shop', 'revive', 'gift'] as const;
+
+const ITEM_KINDS = ['treat', 'hint', 'points'] as const;
+const ITEM_SOURCES = ['journey', 'daily', 'mission', 'gift', 'use', 'migration', 'ad'] as const;
+
+function normItems(x: unknown): ItemEntry[] {
+  if (!Array.isArray(x)) return [];
+  const seen = new Set<string>();
+  const out: ItemEntry[] = [];
+  for (const e of x) {
+    if (!isObj(e) || typeof e.id !== 'string' || seen.has(e.id)) continue;
+    if (typeof e.delta !== 'number' || !Number.isFinite(e.delta)) continue;
+    if (!(ITEM_KINDS as readonly unknown[]).includes(e.item)) continue;
+    seen.add(e.id);
+    out.push({
+      id: e.id,
+      item: e.item as ItemEntry['item'],
+      delta: Math.round(e.delta),
+      at: str(e.at, ''),
+      source: oneOf(e.source, ITEM_SOURCES, 'gift'),
+      ...(typeof e.note === 'string' ? { note: e.note } : {}),
+    });
+  }
+  return out;
+}
 
 function normLedger(x: unknown): LedgerEntry[] {
   if (!Array.isArray(x)) return [];
@@ -344,6 +385,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       equippedAccent: rec(inv.equippedAccent, strItem),
       favorites: rec(inv.favorites, boolItem),
       decor: rec(inv.decor, (v) => (isObj(v) ? { ownedAt: str(v.ownedAt, '') } : undefined)),
+      items: normItems(inv.items),
     },
     sanctuary: { hidden: rec(san.hidden, boolItem), visits: int(san.visits, 0, 0) },
     missions: {
@@ -378,6 +420,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       starterDecorChosen: bool(ob.starterDecorChosen, false),
       seenLeagueIntro: bool(ob.seenLeagueIntro, false),
       sessions: int(ob.sessions, 0, 0),
+      seenPantryIntro: bool(ob.seenPantryIntro, false),
     },
     lastSession: normSavedSession(x.lastSession),
   };

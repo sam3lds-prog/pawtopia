@@ -10,7 +10,9 @@ import { liveStreak } from '../../meta/progression';
 import { sceneMarkup } from './sanctuary';
 import { openSheet } from '../components/sheet';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
-import { claimMission, missionStates } from '../../meta/missions';
+import { claimMission, missionStates, type MissionDef } from '../../meta/missions';
+import { CASUAL_HEARTS } from '../../game/modes';
+import { itemBalance } from '../../meta/items';
 import { nextPetMilestone } from '../../meta/rewards';
 import { addDaysKey, localWeekStart } from '../../game/dates';
 import { sfx } from '../../services/audio';
@@ -106,6 +108,20 @@ export const homeScreen: ScreenDef = {
           ${weekStrip()}
         </div>
 
+        ${
+          !save.onboarding.seenPantryIntro && save.onboarding.tutorialDone
+            ? `<section class="card pantry-intro" data-pantry-intro aria-labelledby="pantry-title">
+          <h2 id="pantry-title">New: treats and hint tickets</h2>
+          <p class="muted">Journey and Daily boards now give you ${CASUAL_HEARTS} hearts. They start fresh on every board.</p>
+          <div class="pantry-row">
+            <span class="pantry-chip">${ICON.treat}<b class="num">${itemBalance(save, 'treat')}</b><small>treats: one heart back each</small></span>
+            <span class="pantry-chip">${ICON.ticket}<b class="num">${itemBalance(save, 'hint')}</b><small>hint tickets: one hint each</small></span>
+          </div>
+          <p class="muted">Each board's first hint is free. Earn more by clearing new levels and finishing errands. Zen hints are always free.</p>
+          <button class="btn btn--secondary btn--block" data-act="pantry-ok">Got it</button>
+        </section>`
+            : ''
+        }
         <section class="missions card" aria-labelledby="missions-title" data-missions></section>
 
         <div class="duo">
@@ -152,10 +168,10 @@ export const homeScreen: ScreenDef = {
                 ${m.def.target > 1 && !m.done ? `<span class="muted num">${m.progress} of ${m.def.target}</span>` : ''}</span>
                 ${
                   m.claimed
-                    ? `<span class="mission__reward is-claimed">${ICON.coin}<span class="num">${m.def.coins}</span></span>`
+                    ? `<span class="mission__reward is-claimed">${ICON.coin}<span class="num">${m.def.coins}</span>${extras(m.def)}</span>`
                     : m.done
-                      ? `<button class="btn btn--small" data-claim="${esc(m.key)}">Claim ${ICON.coin}<span class="num">${m.def.coins}</span></button>`
-                      : `<span class="mission__reward">${ICON.coin}<span class="num">${m.def.coins}</span></span>`
+                      ? `<button class="btn btn--small" data-claim="${esc(m.key)}">Claim ${ICON.coin}<span class="num">${m.def.coins}</span>${extras(m.def)}</button>`
+                      : `<span class="mission__reward">${ICON.coin}<span class="num">${m.def.coins}</span>${extras(m.def)}</span>`
                 }
               </li>`,
             )
@@ -163,6 +179,11 @@ export const homeScreen: ScreenDef = {
         </ul>`;
     }
     renderMissions();
+
+    /** A treat or ticket that comes with an errand's coins. */
+    function extras(d: MissionDef): string {
+      return `${d.items?.treat ? ICON.treat : ''}${d.items?.hint ? ICON.ticket : ''}`;
+    }
 
     // Players coming from v1: say what their earlier progress turned into, once.
     const gift = app.upgradeGift;
@@ -198,13 +219,20 @@ export const homeScreen: ScreenDef = {
           renderMissions();
           const pill = el.querySelector('[data-coins]');
           if (pill) pill.outerHTML = coinPill();
-          toast(`+${coins} Paw Coins`);
+          const def = missionStates(app.save).find((m) => m.key === claim.dataset.claim)?.def;
+          const more = [def?.items?.treat ? `+${plural(def.items.treat, 'treat')}` : '', def?.items?.hint ? `+${plural(def.items.hint, 'hint ticket')}` : ''].filter(Boolean);
+          toast([`+${coins} Paw Coins`, ...more].join(' · '));
         }
         return;
       }
       const a = actionOf(e);
       if (!a) return;
       switch (a.act) {
+        case 'pantry-ok':
+          app.save.onboarding.seenPantryIntro = true;
+          app.persist();
+          el.querySelector('[data-pantry-intro]')?.remove();
+          break;
         case 'continue':
           if (resumeMode) {
             if (!resumeGame()) {

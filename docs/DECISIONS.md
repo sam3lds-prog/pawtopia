@@ -198,3 +198,24 @@ Which board a level or day gets is now versioned (`src/game/specs.ts`):
 
 Performance: picking a board takes ~70 ms on a laptop on average, ~0.6 s worst case over a year of dailies; only
 dailies and levels beyond 150 pick on device.
+
+## 2026-10-26 · D23 — A small pantry (treats, hint tickets) and Paw Points; a staged win moment
+Hearts, treats, tickets, coins and points are kept apart (`src/meta/items.ts`):
+- **Hearts** are per board (D21). **Treats** (one heart back on a Journey or Daily board, mid-board or to continue
+  after a loss with every placement kept) and **hint tickets** persist between boards, capped at 10 each; anything
+  earned past a cap arrives as 10 coins per item instead of vanishing. Neither works in Paw Cup; a treat is logged as a
+  revive, so the verifier voids a ranked attempt that used one.
+- **Hints** (owner decision): each board's first look (tier 1) is free; after that one ticket pays for one hint target,
+  whichever tiers are opened for it (the exact cell, then placing it). Zen and the guided first board stay free. The
+  "no hints" star still means no hint of any kind. The ticket and the board's record of it are saved in one write.
+- **Earning**: a first clear gives a treat, every even-numbered new level a ticket, some errands add one; replays
+  earn none. Everyone gets a one-time starter pantry (3 treats, 5 tickets) instead of back-dated items for old clears
+  (owner decision), explained once on Home. With no ad network live, the "watch a video for a ticket" option exists
+  only in development builds (D6 unchanged).
+- **Paw Points / Paw Rank**: first clear 100 + difficulty bonus by measured label (0/25/50/100), +25 for the first
+  clean and +25 for the first hint-free solve of a level; dailies 60 + bonus. Back-dated for old clears (they buy
+  nothing). Eight named ranks, shown on the win sheet and in the Journal, never as a competitive score.
+- **Win moment**: the sheet opens 0.5 s after the last pet (faces finish their wave behind it), then stars and
+  stats, points and rank, rewards and the next resident rise in three stages within ~1.5 s; a tap reveals all, the
+  buttons work immediately, reduced motion shows everything at once. Replays show what's left to improve instead of
+  rewards.

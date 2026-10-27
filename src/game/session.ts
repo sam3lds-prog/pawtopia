@@ -75,6 +75,9 @@ export interface SessionSnapshot {
   heartsEnabled: boolean;
   /** The heart allowance the board was played with. Missing in saves from before the allowance was configurable (3). */
   maxHearts?: number;
+  /** Hint-ticket bookkeeping for this board (see `hintCost`). */
+  hintState?: { freeNudgeUsed: boolean; paid: string[]; tier: number };
+  revives?: number;
   /** The replayable input log. Kept for Paw Cup boards so a resumed attempt can be verified from its first move. */
   events?: SessionEvent[];
 }
@@ -103,6 +106,12 @@ export class Session {
   private pausedTotal = 0;
   private claimed: Outcome = 'playing';
   private hintTarget: string | null = null;
+  /** The board's one free nudge has been shown. */
+  private freeNudgeUsed = false;
+  /** Hint targets already paid for with a ticket (each is paid at most once). */
+  private paidTargets = new Set<string>();
+  /** Deepest hint tier opened on this board (0 = none, 1 nudge, 2 exact cell + reason, 3 placed). For stars/analytics. */
+  hintTierReached = 0;
 
   constructor(puzzle: Puzzle, opts: SessionOptions = {}) {
     this.puzzle = puzzle;
@@ -307,6 +316,48 @@ export class Session {
   }
 
   /**
+   * One heart back (a treat). Works mid-board (up to the allowance) and after a loss, where it brings the board back
+   * with one heart and every placement intact. Logged as a revive, so a Paw Cup attempt that used one is void.
+   * Returns false when there is nothing to restore.
+   */
+  addHeart(): boolean {
+    if (!this.heartsEnabled) return false;
+    if (this.outcome === 'won' || this.hearts >= this.maxHearts) return false;
+    this.hearts += 1;
+    if (this.outcome === 'lost') {
+      this.outcome = 'playing';
+      this.claimed = 'playing';
+    }
+    this.revives++;
+    this.log({ t: this.elapsedMs(), type: 'revive' });
+    return true;
+  }
+
+  /**
+   * What opening this hint tier costs, in tickets (0 or 1). One ticket pays for one hint target, whatever tiers the
+   * player opens for it; the board's very first nudge (tier 1) is free; boards with free hints (Zen, the guided first
+   * board) never charge. Pure: call `commitHint` once the ticket (if any) has been spent.
+   */
+  hintCost(h: HintInfo, tier: 1 | 2 | 3, freeHints: boolean): 0 | 1 {
+    if (freeHints) return 0;
+    if (this.paidTargets.has(`${h.r},${h.c}`)) return 0;
+    if (tier === 1 && !this.freeNudgeUsed) return 0;
+    return 1;
+  }
+
+  /** Records that a hint tier was opened (and whether a ticket paid for it). */
+  commitHint(h: HintInfo, tier: 1 | 2 | 3, paid: boolean): void {
+    if (tier === 1 && !paid && !this.paidTargets.has(`${h.r},${h.c}`)) this.freeNudgeUsed = true;
+    if (paid) this.paidTargets.add(`${h.r},${h.c}`);
+    this.hintTierReached = Math.max(this.hintTierReached, tier);
+  }
+
+  /** Whether the board's free nudge is still available. */
+  get freeNudgeAvailable(): boolean {
+    return !this.freeNudgeUsed;
+  }
+
+  /**
    * Returns the outcome exactly once per transition (won / lost), then null. The UI calls this
    * after every input so a win or loss is processed a single time even if events fire twice.
    */
@@ -442,6 +493,8 @@ export class Session {
       outcome: this.outcome,
       heartsEnabled: this.heartsEnabled,
       maxHearts: this.maxHearts,
+      hintState: { freeNudgeUsed: this.freeNudgeUsed, paid: [...this.paidTargets], tier: this.hintTierReached },
+      revives: this.revives,
     };
   }
 
@@ -478,6 +531,16 @@ export class Session {
     s.hearts = Math.min(s.maxHearts, clampInt(snap.hearts, 0, savedMax, savedMax) + bonus);
     s.mistakes = clampInt(snap.mistakes, 0, 1e6, 0);
     s.hintsUsed = clampInt(snap.hintsUsed, 0, 1e6, 0);
+    s.revives = clampInt(snap.revives, 0, 1e6, 0);
+    const hs = snap.hintState;
+    if (hs && typeof hs === 'object') {
+      s.freeNudgeUsed = hs.freeNudgeUsed === true;
+      if (Array.isArray(hs.paid)) for (const k of hs.paid) if (typeof k === 'string' && /^\d+,\d+$/.test(k)) s.paidTargets.add(k);
+      s.hintTierReached = clampInt(hs.tier, 0, 3, 0);
+    } else if (s.hintsUsed > 0) {
+      // A board saved before tickets existed: its hints were free, so its free nudge counts as used.
+      s.freeNudgeUsed = true;
+    }
     const elapsed = clampInt(snap.elapsedMs, 0, 1e10, 0);
     const now = s.now();
     s.startedAt = now - elapsed;

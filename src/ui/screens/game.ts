@@ -4,7 +4,8 @@ import { app } from '../../app/app';
 import { restartGame, startGame } from '../../app/gameFlow';
 import { CAT, DOG, type Species } from '../../engine/types';
 import { fmtClock } from '../../game/dates';
-import { CUP_HEARTS, nextAfterWin, rulesFor, type ModeRef } from '../../game/modes';
+import { CUP_HEARTS, modeKey, nextAfterWin, rulesFor, type ModeRef } from '../../game/modes';
+import { ITEM_CAP, grantItem, itemBalance, pawPoints, rankFor, useItem } from '../../meta/items';
 import { modeShortTitle, modeTitle, type SpecVersion } from '../../game/puzzles';
 import { difficultyReason, profileOf } from '../../game/grading';
 import { MARK, type HintInfo, type MoveResult, type Session, type Tool, type UnitRef } from '../../game/session';
@@ -14,7 +15,7 @@ import { finishAttempt } from '../../competitions/localCup';
 import type { ScoreBreakdown } from '../../competitions/scoring';
 import { afterSolve, type MetaNews } from '../../app/events';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
-import { PET_BY_ID } from '../../meta/catalogs/pets';
+import { PETS, PET_BY_ID } from '../../meta/catalogs/pets';
 import { decorIcon } from '../art/sanctuary';
 import { ads, shouldShowInterstitial } from '../../services/ads';
 import { track } from '../../services/analytics';
@@ -28,7 +29,7 @@ import type { PetId } from '../../meta/catalogs/pets';
 import { isTutorial, levelTip, TUTORIAL_STEPS } from '../../meta/onboarding';
 import { EMPTY } from '../../engine/types';
 import { Board } from '../components/board';
-import { openSheet, type SheetHandle } from '../components/sheet';
+import { openSheet, toast, type SheetHandle } from '../components/sheet';
 import { actionOf, capitalize, esc, h, plural, qs } from '../dom';
 import { ICON } from '../icons';
 import type { Scope, ScreenDef } from '../router';
@@ -74,6 +75,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   /** Tutorial: the placement the coach is pointing at. */
   let guide: { step: number; r: number; c: number; species: Species; unit: UnitRef | null; text: string } | null = null;
   let winPet: PetId | null = null;
+  // Zen and the guided first board never charge for hints. Treats work on casual boards with hearts (not Paw Cup).
+  const freeHints = mode.kind === 'zen' || tutorial;
+  const pantryOn = rules.revive && rules.hearts && !tutorial;
+  const tickets = () => itemBalance(app.save, 'hint');
+  const treats = () => itemBalance(app.save, 'treat');
 
   const el = h(`
     <div class="game" data-mode="${mode.kind}">
@@ -84,7 +90,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
           <div class="game-sub"><span class="chip chip--board" title="${esc(`${tierName}: ${difficultyReason(profile)}`)}" aria-label="${esc(`${n} by ${n}, ${tierName}. ${difficultyReason(profile)}`)}">${n}×${n} · ${tierName}</span></div>
         </div>
         <div class="game-top__end">
-          ${rules.hearts ? '<div class="hearts" data-hearts role="img"></div>' : tutorial ? '<span class="chip chip--guide">Practice</span>' : `<span class="zen-mark" aria-label="No hearts in Zen">${ICON.leaf}</span>`}
+          ${rules.hearts ? (pantryOn ? '<button class="hearts hearts--btn" data-hearts data-act="hearts"></button>' : '<div class="hearts" data-hearts role="img"></div>') : tutorial ? '<span class="chip chip--guide">Practice</span>' : `<span class="zen-mark" aria-label="No hearts in Zen">${ICON.leaf}</span>`}
           <button class="icon-btn" data-act="pause" aria-label="Pause">${ICON.pause}</button>
         </div>
       </header>
@@ -107,7 +113,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       <div class="actions">
         <button class="act" data-act="undo">${ICON.undo}<span>Undo</span></button>
         <button class="act" data-act="redo">${ICON.redo}<span>Redo</span></button>
-        <button class="act" data-act="hint" ${rules.hints ? '' : 'disabled aria-describedby="no-hints"'}>${ICON.hint}<span data-hint-label>Hint</span></button>
+        <button class="act" data-act="hint" ${rules.hints ? '' : 'disabled aria-describedby="no-hints"'}>${ICON.hint}<span data-hint-label>Hint</span>${rules.hints && !freeHints ? '<span class="act__badge" data-hint-badge></span>' : ''}</button>
         <button class="act" data-act="rules">${ICON.help}<span>Rules</span></button>
       </div>
       ${rules.hints ? '' : '<p id="no-hints" class="sr-only">Hints are off in Paw Cup so every player has the same rules.</p>'}
@@ -170,13 +176,22 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     if (heartsEl) {
       heartsEl.dataset.count = String(s.maxHearts);
       heartsEl.innerHTML = Array.from({ length: s.maxHearts }, (_, i) => (i < s.hearts ? ICON.heart : ICON.heartOff)).join('');
-      heartsEl.setAttribute('aria-label', `${plural(s.hearts, 'heart')} left`);
+      heartsEl.setAttribute('aria-label', pantryOn ? `${plural(s.hearts, 'heart')} left. Treats: ${treats()}. Tap to use one.` : `${plural(s.hearts, 'heart')} left`);
     }
     for (const b of el.querySelectorAll<HTMLButtonElement>('[data-tool]')) b.setAttribute('aria-checked', String(b.dataset.tool === tool));
     (qs(el, '[data-act="undo"]') as HTMLButtonElement).disabled = !s.canUndo() || finished;
     (qs(el, '[data-act="redo"]') as HTMLButtonElement).disabled = !s.canRedo() || finished;
     const hintLabel = el.querySelector('[data-hint-label]');
     if (hintLabel) hintLabel.textContent = !hint ? 'Hint' : hint.tier === 1 ? 'Closer' : 'Show me';
+    const badge = el.querySelector('[data-hint-badge]') as HTMLElement | null;
+    if (badge) {
+      // What the next tap costs: the board's first look is free; otherwise one ticket per hint target.
+      const nextIsFree = hint ? s.hintCost(hint.info, (hint.tier + 1) as 2 | 3, freeHints) === 0 : s.freeNudgeAvailable;
+      badge.innerHTML = nextIsFree ? 'Free' : `${ICON.ticket}<span class="num">${tickets()}</span>`;
+      badge.classList.toggle('is-free', nextIsFree);
+      const hb = badge.closest('button')!;
+      hb.setAttribute('aria-label', nextIsFree ? `${hintLabel?.textContent ?? 'Hint'}, free` : `${hintLabel?.textContent ?? 'Hint'}, uses a hint ticket. ${plural(tickets(), 'ticket')} left`);
+    }
     tick();
     syncGuide();
   }
@@ -440,11 +455,116 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     }
   }
 
+  /**
+   * Pays for a hint tier if it costs anything: one ticket per hint target, the board's first look free. The ticket and
+   * the session's record of it are saved in one write, so a crash can't charge without the hint or the reverse.
+   */
+  function payFor(info: HintInfo, tier: 1 | 2 | 3): boolean {
+    if (s.hintCost(info, tier, freeHints) === 0) {
+      s.commitHint(info, tier, false);
+      return true;
+    }
+    const r = useItem(app.save, `use:hint:${modeKey(mode)}:${info.r},${info.c}:${Date.now()}`, 'hint', new Date(), 'Hint');
+    if (r !== 'ok') {
+      showNoTickets();
+      return false;
+    }
+    s.commitHint(info, tier, true);
+    app.saveActive();
+    toast(`Hint ticket used · ${tickets()} left`, ICON.ticket);
+    return true;
+  }
+
+  function showNoTickets(): void {
+    if (sheet) return;
+    pauseBoard();
+    const canWatch = ads.available && !app.removeAds;
+    const ns = openSheet(scope, {
+      title: 'No hint tickets left',
+      body: `
+        <p class="sheet__lead">This board's free look is used. You earn a ticket for every second new Journey level and from some of the day's errands. Zen Garden hints are always free.</p>
+        <div class="sheet__actions">
+          ${canWatch ? `<button class="btn btn--block" data-act="watch">${ICON.ticket}Watch a short video for 1 ticket</button>` : ''}
+          <button class="btn ${canWatch ? 'btn--quiet' : 'btn--block'}" data-act="close" data-autofocus>Keep thinking</button>
+        </div>`,
+      onClose: () => {
+        sheet = null;
+        resumeIfOnScreen();
+      },
+    });
+    sheet = ns;
+    let busy = false;
+    ns.scope.on(ns.el, 'click', async (e) => {
+      const a = actionOf(e);
+      if (!a || busy) return;
+      if (a.act === 'watch') {
+        busy = true;
+        track('rewarded_ad_offer', { placement: 'hint' });
+        const ok = await ads.showRewarded('hint');
+        busy = false;
+        if (!scope.alive || !ns.scope.alive) return;
+        if (ok) {
+          track('rewarded_ad_complete', { placement: 'hint' });
+          grantItem(app.save, `ad:hint:${Date.now()}`, 'hint', 1, 'ad', new Date(), 'Rewarded video');
+          app.persist();
+          toast('+1 hint ticket', ICON.ticket);
+        }
+        ns.close();
+        paint();
+      } else ns.close();
+    });
+  }
+
+  /** Hearts sheet: how many are left on this board, the treat pantry, and using one treat for one heart. */
+  function openHearts(): void {
+    if (finished || sheet || !pantryOn) return;
+    pauseBoard();
+    const have = treats();
+    const full = s.hearts >= s.maxHearts;
+    const hs = openSheet(scope, {
+      title: 'Hearts and treats',
+      body: `
+        <p class="sheet__lead">${plural(s.hearts, 'heart')} of ${s.maxHearts} left on this board. Hearts start fresh on every board; treats keep between boards.</p>
+        <div class="pantry-row"><span class="pantry-chip">${ICON.treat}<b class="num">${have}</b><small>of ${ITEM_CAP.treat} treats</small></span><span class="pantry-chip">${ICON.ticket}<b class="num">${tickets()}</b><small>hint tickets</small></span></div>
+        <div class="sheet__actions">
+          <button class="btn btn--block" data-act="treat" ${have < 1 || full ? 'disabled' : ''}>${ICON.treat}${full ? 'Hearts are full' : have < 1 ? 'No treats yet' : 'Use a treat: +1 heart'}</button>
+          <button class="btn btn--quiet" data-act="close" data-autofocus>Back to the board</button>
+        </div>
+        <p class="muted">Treats come from clearing new Journey levels and some errands.</p>`,
+      onClose: () => {
+        sheet = null;
+        resumeIfOnScreen();
+      },
+    });
+    sheet = hs;
+    hs.scope.on(hs.el, 'click', (e) => {
+      const a = actionOf(e);
+      if (!a) return;
+      if (a.act === 'treat') {
+        if (useTreat()) coach(`A treat! ${plural(s.hearts, 'heart')} left.`);
+      }
+      hs.close();
+    });
+  }
+
+  /** Spends one treat for one heart. The pantry and the board are saved together. */
+  function useTreat(): boolean {
+    if (!pantryOn || (s.outcome !== 'lost' && s.hearts >= s.maxHearts)) return false;
+    if (useItem(app.save, `use:treat:${modeKey(mode)}:${Date.now()}`, 'treat', new Date(), 'Heart') !== 'ok') return false;
+    s.addHeart();
+    track('treat_used', { mode: mode.kind });
+    haptic('success');
+    paint();
+    app.saveActive();
+    return true;
+  }
+
   function doHint(): void {
     if (finished || !rules.hints || s.paused) return;
     if (!hint) {
       const info = s.peekHint();
       if (!info) return;
+      if (!payFor(info, 1)) return;
       s.noteHint(info);
       track('hint_used', { mode: mode.kind, tier: 1 });
       hint = { info, tier: 1 };
@@ -458,12 +578,14 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         coach('Look at the highlighted tile.');
       }
     } else if (hint.tier === 1) {
+      if (!payFor(hint.info, 2)) return;
       hint.tier = 2;
       track('hint_used', { mode: mode.kind, tier: 2 });
       board.setHint(hint.info.unit ? s.unitCells(hint.info.unit) : [], [hint.info.r, hint.info.c]);
       if (hint.info.unit) focusFaces(s.unitCells(hint.info.unit));
       coach(friendlyReason(hint.info.reason));
     } else {
+      if (!payFor(hint.info, 3)) return;
       track('hint_used', { mode: mode.kind, tier: 3 });
       const info = s.hint();
       hint = null;
@@ -528,6 +650,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         break;
       case 'hint':
         doHint();
+        break;
+      case 'hearts':
+        openHearts();
         break;
       case 'rules':
         pauseBoard();
@@ -650,7 +775,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     winPet = lastPlaced ?? tilePets.values().next().value ?? null;
     const result = { size: n, seconds: s.elapsedSeconds(), mistakes: s.mistakes, hintsUsed: s.hintsUsed, revives: s.revives, hearts: rules.hearts, spec };
     const rec = recordWin(app.save, mode, result);
-    const rewards = rewardsForWin(app.save, mode, rec);
+    const rewards = rewardsForWin(app.save, mode, rec, new Date(), profile.tier);
     const cupScore = mode.kind === 'cup' ? finishAttempt(app.save, mode, s.events, s.elapsedMs()) : null;
     const news = afterSolve(mode, n, result.mistakes, result.hintsUsed);
     app.clearSaved(mode);
@@ -663,11 +788,17 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     sfx('win');
     haptic('success');
     coach('Harmony restored.');
-    scope.timeout(() => showWin(rec, result.seconds, rewards, news, cupScore), app.reducedMotion ? 150 : 1000);
+    // The board locks and glows for a beat (faces smile in a wave), then the results rise in stages. Nothing waits on
+    // the animation: the sheet's buttons work the moment it opens, and a tap reveals everything at once.
+    scope.timeout(() => showWin(rec, result.seconds, rewards, news, cupScore), app.reducedMotion ? 150 : 500);
   }
 
   function rewardsMarkup(r: RewardSummary): string {
-    if (!r.coins && !r.pets.length && !r.decor.length) return '';
+    if (!r.coins && !r.pets.length && !r.decor.length && !r.treats && !r.hints) return '';
+    const pantry = [
+      r.treats ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.treat}</span><span><b>+${plural(r.treats, 'treat')}</b><small>One heart back on any Journey or Daily board</small></span></div>` : '',
+      r.hints ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.ticket}</span><span><b>+${plural(r.hints, 'hint ticket')}</b><small>Pays for one hint, whichever step you need</small></span></div>` : '',
+    ].join('');
     const coins = r.coins
       ? `<div class="reward-coins"><span class="reward-coins__amt">${ICON.coin}<b class="num">+${r.coins}</b></span><span class="muted">${esc(r.lines.map((l) => l.label).join(' · '))}</span></div>`
       : '';
@@ -677,7 +808,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     const decor = r.decor
       .map((id) => `<div class="reward-item"><span class="reward-item__art">${decorIcon(id)}</span><span><b>${esc(DECOR_BY_ID[id].name)}</b><small>${r.chapter ? `Gift for finishing ${esc(r.chapter.name)}` : 'New decoration'}</small></span></div>`)
       .join('');
-    return `<div class="win-rewards">${coins}${pets}${decor}</div>`;
+    return `<div class="win-rewards">${coins}${pets}${decor}${pantry}</div>`;
   }
 
   function newsMarkup(nw: MetaNews): string {
@@ -700,6 +831,46 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       </dl>
       <p class="score-card__note">${ICON.info}Practice score, kept on this device. Not ranked against anyone.</p>
     </div>`;
+  }
+
+  /** Paw Points earned and how far the player is along their Paw Rank (progress only, never a ranking). */
+  function pointsMarkup(r: RewardSummary): string {
+    if (!r.points) return '';
+    const total = pawPoints(app.save);
+    const rank = rankFor(total);
+    const rankUp = rank.index > rankFor(total - r.points).index;
+    const nextName = rank.next !== null ? rankFor(rank.next).name : null;
+    const pct = rank.next !== null ? Math.round(((total - rank.from) / (rank.next - rank.from)) * 100) : 100;
+    const line = rankUp ? `New Paw Rank: <b>${esc(rank.name)}</b>!` : nextName ? `${esc(rank.name)} · ${rank.next! - total} to ${esc(nextName)}` : esc(rank.name);
+    return `<div class="win-points">
+      <span class="win-points__amt">${ICON.sparkle}<b class="num">+<span data-count="${r.points}">${r.points}</span></b> Paw Points</span>
+      <span class="rank-bar" role="progressbar" aria-label="Paw Rank progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span style="width:${pct}%"></span></span>
+      <small class="win-points__rank ${rankUp ? 'is-up' : ''}">${line}</small>
+    </div>`;
+  }
+
+  /** On a replay: what's still there to improve, instead of rewards that were already paid. */
+  function replayMarkup(rec: WinRecord, seconds: number): string {
+    if (mode.kind !== 'level' || rec.firstClear) return '';
+    const clear = app.save.journey.clears[`L${mode.level}`];
+    const missing: string[] = [];
+    if (clear && !clear.clean) missing.push('with no mistakes');
+    if (clear && !clear.hintFree) missing.push('without hints');
+    const text = rec.isBest && rec.prevBest !== null
+      ? `${fmtClock(rec.prevBest - seconds)} faster than your best.`
+      : missing.length
+        ? `${missing.length === 2 ? 'Two stars' : 'One star'} still to earn: solve it ${missing.join(' and ')}.`
+        : `All three stars here. Best time ${fmtClock(app.save.journey.bestTimes[`L${mode.level}`] ?? 0)}.`;
+    return `<p class="win-replay">${ICON.target}${esc(text)}</p>`;
+  }
+  /** The next thing to look forward to on the Journey. */
+  function nextMarkup(): string {
+    if (mode.kind !== 'level') return '';
+    const solved = app.save.journey.nextLevel - 1;
+    const next = PETS.filter((p) => p.unlockLevel > solved && !app.save.inventory.pets[p.id]).sort((a, b) => a.unlockLevel - b.unlockLevel)[0];
+    if (!next) return '';
+    const left = next.unlockLevel - solved;
+    return `<p class="win-next">${ICON.paw}${left === 1 ? 'A new resident arrives after the next level' : `${left} levels until a new resident arrives`}</p>`;
   }
 
   function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary, news: MetaNews, cupScore: ScoreBreakdown | null): void {
@@ -726,16 +897,25 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       className: 'win-sheet',
       body: `
         ${winPet ? `<div class="win-pet">${petSvg(winPet, { mood: 'proud' })}</div>` : ''}
-        ${stars}
-        <div class="stats">
-          <div class="stat"><div class="stat__v">${fmtClock(seconds)}</div><div class="stat__k">${rules.timer ? 'time' : 'time (untimed)'}</div></div>
-          <div class="stat"><div class="stat__v">${s.mistakes}</div><div class="stat__k">${s.mistakes === 1 ? 'mistake' : 'mistakes'}</div></div>
-          <div class="stat"><div class="stat__v">${s.hintsUsed}</div><div class="stat__k">${s.hintsUsed === 1 ? 'hint' : 'hints'}</div></div>
+        <div class="win-stage win-stage-1">
+          ${stars}
+          <div class="stats">
+            <div class="stat"><div class="stat__v">${fmtClock(seconds)}</div><div class="stat__k">${rules.timer ? 'time' : 'time (untimed)'}</div></div>
+            <div class="stat"><div class="stat__v">${s.mistakes}</div><div class="stat__k">${s.mistakes === 1 ? 'mistake' : 'mistakes'}</div></div>
+            <div class="stat"><div class="stat__v">${s.hintsUsed}</div><div class="stat__k">${s.hintsUsed === 1 ? 'hint' : 'hints'}</div></div>
+          </div>
         </div>
-        ${badges.length ? `<div class="win-badges">${badges.join('')}</div>` : ''}
-        ${cupMarkup(cupScore)}
-        ${rewardsMarkup(rewards)}
-        ${newsMarkup(news)}
+        <div class="win-stage win-stage-2">
+          ${badges.length ? `<div class="win-badges">${badges.join('')}</div>` : ''}
+          ${cupMarkup(cupScore)}
+          ${pointsMarkup(rewards)}
+          ${replayMarkup(rec, seconds)}
+        </div>
+        <div class="win-stage win-stage-3">
+          ${rewardsMarkup(rewards)}
+          ${newsMarkup(news)}
+          ${nextMarkup()}
+        </div>
         <div class="sheet__actions">
           <button class="btn btn--block" data-act="${firstBoard ? 'meet' : 'next'}" data-autofocus>${esc(primaryLabel)}</button>
           <div class="win-secondary">
@@ -746,6 +926,25 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     });
     const ws = sheet;
     let leaving = false;
+    // Paw Points count up while the results rise (skipped with reduced motion or a tap).
+    const counter = ws.el.querySelector('[data-count]') as HTMLElement | null;
+    const reveal = () => {
+      ws.el.classList.add('is-revealed');
+      if (counter) counter.textContent = counter.dataset.count ?? counter.textContent;
+    };
+    if (counter && !app.reducedMotion) {
+      const target = Number(counter.dataset.count);
+      const t0 = performance.now() + 300;
+      counter.textContent = '0';
+      const step = () => {
+        if (!ws.scope.alive) return;
+        const k = Math.min(1, Math.max(0, (performance.now() - t0) / 600));
+        counter.textContent = String(Math.round(target * (1 - Math.pow(1 - k, 3))));
+        if (k < 1 && !ws.el.classList.contains('is-revealed')) ws.scope.frame(step);
+      };
+      ws.scope.frame(step);
+    }
+    ws.scope.on(ws.el, 'pointerdown', reveal);
     ws.scope.on(ws.el, 'click', async (e) => {
       const a = actionOf(e);
       if (!a || leaving) return;
@@ -814,16 +1013,18 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     track('puzzle_fail', { mode: mode.kind, size: n });
     haptic('error');
     const canRevive = rules.revive && (app.removeAds || ads.available);
+    const canTreat = pantryOn && treats() > 0;
     const wrongs = `${numberWord(s.maxHearts)} wrong placements`;
     sheet = openSheet(scope, {
       title: mode.kind === 'cup' ? 'Attempt ended' : 'Out of hearts',
       center: true,
       dismissible: false,
       body: `
-        <p class="sheet__lead">${mode.kind === 'cup' ? `${wrongs} end a Paw Cup attempt.` : canRevive ? `${wrongs}. Refill your hearts and keep this board, or start fresh.` : `${wrongs}. Start this board again with a fresh line of logic.`}</p>
+        <p class="sheet__lead">${mode.kind === 'cup' ? `${wrongs} end a Paw Cup attempt.` : canTreat || canRevive ? `${wrongs}. Keep this board with a heart back, or start fresh.` : `${wrongs}. Start this board again with a fresh line of logic.`}</p>
         <div class="sheet__actions">
-          ${canRevive ? `<button class="btn btn--block" data-act="revive">Refill hearts${app.removeAds ? '' : '<span class="btn__price">Watch ad</span>'}</button>` : ''}
-          ${mode.kind === 'cup' ? '' : `<button class="btn ${canRevive ? 'btn--secondary' : ''} btn--block" data-act="restart">${ICON.restart}Try again</button>`}
+          ${canTreat ? `<button class="btn btn--block" data-act="treat">${ICON.treat}Use a treat: +1 heart<span class="btn__price">${treats()} left</span></button>` : ''}
+          ${canRevive ? `<button class="btn ${canTreat ? 'btn--secondary' : ''} btn--block" data-act="revive">Refill hearts${app.removeAds ? '' : '<span class="btn__price">Watch ad</span>'}</button>` : ''}
+          ${mode.kind === 'cup' ? '' : `<button class="btn ${canRevive || canTreat ? 'btn--secondary' : ''} btn--block" data-act="restart">${ICON.restart}Try again</button>`}
           <button class="btn btn--quiet" data-act="leave">${mode.kind === 'cup' ? 'Back to Paw Cup' : 'Back home'}</button>
         </div>`,
     });
@@ -832,6 +1033,17 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     ls.scope.on(ls.el, 'click', async (e) => {
       const a = actionOf(e);
       if (!a || busy) return;
+      if (a.act === 'treat') {
+        busy = true;
+        const ok = useTreat();
+        busy = false;
+        if (!ok) return;
+        ls.close();
+        sheet = null;
+        coach('A treat! One heart back, and your board is just as you left it.');
+        resumeIfOnScreen();
+        return;
+      }
       if (a.act === 'revive') {
         busy = true;
         track('rewarded_ad_offer', { placement: 'revive' });

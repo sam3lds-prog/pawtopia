@@ -1041,3 +1041,181 @@ ul.rows {
   width: 15px;
   height: 15px;
 }
+
+/* ---------- Pantry: treats and hint tickets ---------- */
+.ico--treat,
+.ico--ticket {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+.pantry-row {
+  display: flex;
+  gap: var(--s2);
+}
+.pantry-chip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--canvas-deep);
+  border: 1px solid var(--line);
+}
+.pantry-chip b {
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+.pantry-chip small {
+  color: var(--muted-ink);
+  font-weight: 700;
+  font-size: var(--t-xs);
+  line-height: 1.2;
+}
+.pantry-chip .ico {
+  width: 26px;
+  height: 26px;
+}
+.reward-item__art--pantry {
+  display: grid;
+  place-items: center;
+}
+.reward-item__art--pantry .ico {
+  width: 30px;
+  height: 30px;
+}
+
+/* ---------- Win sheet: staged reveal, points and rank ---------- */
+.win-stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+.win-stage:empty {
+  display: none;
+}
+.win-stage-1,
+.win-stage-2,
+.win-stage-3 {
+  animation: win-rise 380ms var(--ease) both;
+}
+.win-stage-2 {
+  animation-delay: 280ms;
+}
+.win-stage-3 {
+  animation-delay: 620ms;
+}
+.win-sheet.is-revealed .win-stage {
+  animation: none;
+}
+@keyframes win-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.win-points {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px var(--s3) 12px;
+  border-radius: 16px;
+  background: var(--brand-tint);
+}
+.win-points__amt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  color: var(--brand-dark);
+}
+.win-points__amt .ico {
+  width: 18px;
+  height: 18px;
+  color: var(--gold);
+}
+.win-points__amt b {
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+.rank-bar {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(40, 123, 112, 0.16);
+  overflow: hidden;
+}
+.rank-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+}
+.win-points__rank {
+  color: var(--muted-ink);
+  font-weight: 700;
+}
+.win-points__rank.is-up {
+  color: var(--gold-ink);
+}
+.win-replay,
+.win-next {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: var(--t-sm);
+  color: var(--muted-ink);
+}
+.win-replay .ico,
+.win-next .ico {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--brand);
+}
+
+/* ---------- Paw Rank card (Journal) ---------- */
+.rank-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.rank-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+.rank-card__name {
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--brand-dark);
+}
+.rank-card .rank-bar {
+  max-width: none;
+}
+
+/* ---------- Home: one-time pantry card ---------- */
+.pantry-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+.pantry-intro h2 {
+  font-size: var(--t-md);
+  margin: 0;
+}
+.pantry-intro p {
+  margin: 0;
+}

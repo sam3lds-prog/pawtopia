@@ -14,6 +14,8 @@ import type { SpecVersion } from '../game/specs';
 import { captureSession } from '../game/sessionPersistence';
 import { reconcileRewards, type RewardSummary } from '../meta/rewards';
 import { balance } from '../meta/ledger';
+import { grantStarterItems } from '../meta/items';
+import { packedLevelTier } from '../game/puzzles';
 
 type Listener = () => void;
 
@@ -31,12 +33,13 @@ class App {
 
   constructor() {
     this.save = loadSave().save;
-    // Grant anything already earned but not yet recorded (v1 levels). Idempotent, so it is a no-op after the first run.
-    const gift = reconcileRewards(this.save);
-    if (gift.coins > 0 || gift.pets.length || gift.decor.length) {
-      this.upgradeGift = gift;
-      saveSave(this.save);
-    }
+    // Grant anything already earned but not yet recorded (v1 levels, Paw Points for clears made before points
+    // existed). Idempotent, so it is a no-op after the first run.
+    const gift = reconcileRewards(this.save, new Date(), (level, clear) => packedLevelTier(level, clear.spec ?? 1));
+    // Everyone, new or returning, gets the starter pantry once (rewards are not back-dated in treats or tickets).
+    const pantry = grantStarterItems(this.save);
+    if (gift.coins > 0 || gift.pets.length || gift.decor.length) this.upgradeGift = gift;
+    if (gift.coins > 0 || gift.pets.length || gift.decor.length || gift.points > 0 || pantry) saveSave(this.save);
     try {
       const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
       this.systemReduced = mq.matches;

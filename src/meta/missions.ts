@@ -9,6 +9,7 @@ import type { ModeRef } from '../game/modes';
 import { localDateKey, localWeekStart } from '../game/dates';
 import type { SaveV2 } from '../services/storage';
 import { grant } from './ledger';
+import { grantItem } from './items';
 
 export type MissionEvent =
   | { kind: 'solved'; mode: ModeRef['kind']; size: number; mistakes: number; hints: number }
@@ -20,6 +21,8 @@ export interface MissionDef {
   title: string;
   target: number;
   coins: number;
+  /** A treat or hint ticket that comes with the coins (never asks for an ad). */
+  items?: { treat?: number; hint?: number };
   /** How much an event advances it. */
   step(e: MissionEvent): number;
 }
@@ -28,9 +31,9 @@ const solved = (e: MissionEvent) => (e.kind === 'solved' ? 1 : 0);
 
 export const DAILY_POOL: readonly MissionDef[] = [
   { id: 'solve1', title: 'Solve any board', target: 1, coins: 20, step: solved },
-  { id: 'clean1', title: 'Solve a board with no mistakes', target: 1, coins: 25, step: (e) => (e.kind === 'solved' && e.mistakes === 0 ? 1 : 0) },
+  { id: 'clean1', title: 'Solve a board with no mistakes', target: 1, coins: 25, items: { treat: 1 }, step: (e) => (e.kind === 'solved' && e.mistakes === 0 ? 1 : 0) },
   { id: 'daily', title: "Finish today's Daily Cozy Puzzle", target: 1, coins: 25, step: (e) => (e.kind === 'solved' && e.mode === 'daily' ? 1 : 0) },
-  { id: 'nohint7', title: 'Solve a 7×7 or larger without hints', target: 1, coins: 30, step: (e) => (e.kind === 'solved' && e.size >= 7 && e.hints === 0 ? 1 : 0) },
+  { id: 'nohint7', title: 'Solve a 7×7 or larger without hints', target: 1, coins: 30, items: { hint: 1 }, step: (e) => (e.kind === 'solved' && e.size >= 7 && e.hints === 0 ? 1 : 0) },
   { id: 'zen1', title: 'Solve a board in the Zen Garden', target: 1, coins: 20, step: (e) => (e.kind === 'solved' && e.mode === 'zen' ? 1 : 0) },
   { id: 'visit', title: 'Visit the sanctuary', target: 1, coins: 15, step: (e) => (e.kind === 'sanctuary' ? 1 : 0) },
   { id: 'solve3', title: 'Solve three boards', target: 3, coins: 30, step: solved },
@@ -41,6 +44,7 @@ export const WEEKLY: MissionDef = {
   title: 'Solve boards of three different sizes',
   target: 3,
   coins: 60,
+  items: { treat: 1, hint: 1 },
   step: () => 0, // computed from stats.sizesThisWeek
 };
 
@@ -115,6 +119,8 @@ export function claimMission(save: SaveV2, key: string, now = new Date()): numbe
   const st = missionStates(save, now).find((m) => m.key === key);
   if (!st || !st.done || st.claimed) return 0;
   save.missions.claimed[key] = true;
+  if (st.def.items?.treat) grantItem(save, `mission:${key}:treat`, 'treat', st.def.items.treat, 'mission', now, st.def.title);
+  if (st.def.items?.hint) grantItem(save, `mission:${key}:hint`, 'hint', st.def.items.hint, 'mission', now, st.def.title);
   return grant(save, `mission:${key}`, st.def.coins, 'mission', now, st.def.title) ? st.def.coins : 0;
 }
 

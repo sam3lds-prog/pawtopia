@@ -5,7 +5,8 @@
 
 import { generatePuzzle } from '../engine/generator';
 import { dailySpec, levelSpec } from '../engine/levels';
-import type { Puzzle } from '../engine/types';
+import type { Difficulty, Puzzle } from '../engine/types';
+import { profileOf } from './grading';
 import { cupBoardSpec } from '../competitions/cup';
 import { dateFromKey } from './dates';
 import type { ModeRef } from './modes';
@@ -49,6 +50,17 @@ export const levelPackSource: PuzzleSource = (mode, spec) => {
   const second = PACK_2.get(mode.level);
   return second && second.meta.spec === spec ? second.puzzle : null;
 };
+
+/**
+ * Measured difficulty of a shipped Journey board without generating anything (packs only), or undefined when the
+ * board isn't in a pack (beyond 150, or an old spec-1 board at 71+).
+ */
+export function packedLevelTier(level: number, spec: SpecVersion): Difficulty | undefined {
+  const first = PACK.get(level);
+  if (first) return profileOf(first.puzzle).tier;
+  const second = PACK_2.get(level);
+  return second && second.meta.spec === spec ? second.meta.tier : undefined;
+}
 
 /** Pack-2 metadata (spec, measured tier) for a level, or null outside 61–150. */
 export function journeyMeta(level: number): PackLevel2 | null {
