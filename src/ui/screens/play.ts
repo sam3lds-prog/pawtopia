@@ -2,15 +2,19 @@
 
 import { app } from '../../app/app';
 import { playMode, startGame } from '../../app/gameFlow';
-import { dailySpec, levelSpec } from '../../engine/levels';
+import { localDateKey } from '../../engine/levels';
+import { displayDifficulty } from '../../game/grading';
+import { puzzleFor, sizeFor } from '../../game/puzzles';
+import { MAX_NEW_BOARD_SIZE } from '../../game/specs';
 import { chapterAt, chapterOf, visibleChapters, type Chapter } from '../../meta/chapters';
 import { toast } from '../components/sheet';
-import { actionOf, esc, h } from '../dom';
+import { actionOf, capitalize, esc, h } from '../dom';
 import { ICON } from '../icons';
 import type { Route, ScreenDef } from '../router';
 import { coinPill } from './home';
 
-const ZEN_SIZES = [5, 6, 7, 8, 9];
+/** Zen offers every size up to the 8×8 cap. */
+const ZEN_SIZES = Array.from({ length: MAX_NEW_BOARD_SIZE - 4 }, (_, i) => i + 5);
 /** Node x positions along the path (percent of width): a gentle S-curve. */
 const XS = [50, 70, 78, 66, 46, 28, 22, 34];
 const ROW = 84;
@@ -40,13 +44,22 @@ function pathMarkup(ch: Chapter): string {
       const clear = save.journey.clears[`L${L}`];
       const state = clear || L < next ? 'done' : L === next ? 'current' : 'locked';
       const stars = clear?.stars ?? (state === 'done' ? 1 : 0);
-      const size = levelSpec(L).size;
+      const size = sizeFor({ kind: 'level', level: L });
+      // The level you play next shows its measured difficulty (one board to grade; the rest only need a size).
+      let tier = '';
+      if (state === 'current') {
+        try {
+          tier = capitalize(displayDifficulty(puzzleFor({ kind: 'level', level: L })));
+        } catch {
+          tier = '';
+        }
+      }
       const ms = milestoneOf(L);
       const label =
         state === 'locked'
           ? `Level ${L}, locked`
           : state === 'current'
-            ? `Level ${L}, ${size} by ${size}, play next`
+            ? `Level ${L}, ${size} by ${size}${tier ? `, ${tier}` : ''}, play next`
             : `Level ${L}, solved, ${stars} of 3 stars`;
       return `
         <li class="node node--${state}" style="left:${p.x}%;top:${p.y}px">
@@ -54,7 +67,7 @@ function pathMarkup(ch: Chapter): string {
             ${state === 'locked' ? ICON.lock : `<span class="node__num">${L}</span>`}
           </button>
           ${state === 'done' ? `<span class="node__stars" aria-hidden="true">${[1, 2, 3].map((s) => (s <= stars ? ICON.star : ICON.starOff)).join('')}</span>` : ''}
-          ${state === 'current' ? `<span class="node__tag">${size}×${size}</span>` : ''}
+          ${state === 'current' ? `<span class="node__tag">${size}×${size}${tier ? ` · ${tier}` : ''}</span>` : ''}
           ${ms ? `<span class="node__ms node__ms--${ms}" title="${ms === 'pet' ? 'A new resident arrives' : 'Chapter reward'}" aria-hidden="true">${ms === 'pet' ? ICON.paw : ICON.gift}</span>` : ''}
         </li>`;
     })
@@ -76,7 +89,8 @@ export const playScreen: ScreenDef = {
     const next = save.journey.nextLevel;
     const chapters = visibleChapters(next);
     let current = route.screen === 'play' && route.chapter !== undefined ? route.chapter : chapterOf(next).index;
-    const daily = dailySpec();
+    const dailyKey = localDateKey();
+    const daily = { dateKey: dailyKey, size: sizeFor({ kind: 'daily', dateKey: dailyKey }) };
     const dailyDone = !!save.daily.done[daily.dateKey];
 
     const el = h(`

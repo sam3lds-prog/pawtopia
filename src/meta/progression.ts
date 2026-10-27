@@ -16,6 +16,8 @@ export interface BoardResult {
   revives: number;
   /** Whether hearts were in play (Journey, Daily, Cup). Zen mistakes don't make a comeback. */
   hearts: boolean;
+  /** Spec of the board that was solved (src/game/specs.ts); missing = 1. */
+  spec?: 1 | 2;
 }
 
 export interface WinRecord {
@@ -45,7 +47,11 @@ export function recordWin(save: SaveV2, mode: ModeRef, r: BoardResult, now = new
   if (mode.kind === 'level') {
     const key = `L${mode.level}`;
     const prev = save.journey.clears[key];
-    const prevBest = save.journey.bestTimes[key];
+    const spec = r.spec ?? 1;
+    // Times only compare on the same board: a level number that moved to a new spec starts its records fresh
+    // (the clear itself, its stars and its one-time rewards are kept).
+    const sameBoard = !prev || (prev.spec ?? 1) === spec;
+    const prevBest = sameBoard ? save.journey.bestTimes[key] : undefined;
     out.prevBest = prevBest ?? null;
     out.isBest = prevBest === undefined || r.seconds < prevBest;
     if (out.isBest) save.journey.bestTimes[key] = r.seconds;
@@ -53,13 +59,16 @@ export function recordWin(save: SaveV2, mode: ModeRef, r: BoardResult, now = new
     save.journey.clears[key] = prev
       ? {
           ...prev,
-          bestSeconds: prev.bestSeconds > 0 ? Math.min(prev.bestSeconds, r.seconds) : r.seconds,
-          bestMistakes: Math.min(prev.bestMistakes, r.mistakes),
+          bestSeconds: sameBoard && prev.bestSeconds > 0 ? Math.min(prev.bestSeconds, r.seconds) : r.seconds,
+          bestMistakes: sameBoard ? Math.min(prev.bestMistakes, r.mistakes) : r.mistakes,
           clean: prev.clean || clean,
           hintFree: prev.hintFree || hintFree,
           stars: Math.max(prev.stars, stars),
         }
       : { firstClearAt: at, bestSeconds: r.seconds, bestMistakes: r.mistakes, clean, hintFree, stars };
+    const cl = save.journey.clears[key];
+    if (spec === 2) cl.spec = 2;
+    else delete cl.spec;
     if (mode.level >= save.journey.nextLevel) save.journey.nextLevel = mode.level + 1;
     if (mode.level === 1) save.onboarding.tutorialDone = true;
   } else if (mode.kind === 'daily') {

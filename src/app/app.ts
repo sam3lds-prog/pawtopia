@@ -10,6 +10,7 @@ import { setSoundEnabled } from '../services/audio';
 import type { Router } from '../ui/router';
 import { modeKey, type ModeRef } from '../game/modes';
 import type { Session } from '../game/session';
+import type { SpecVersion } from '../game/specs';
 import { captureSession } from '../game/sessionPersistence';
 import { reconcileRewards, type RewardSummary } from '../meta/rewards';
 import { balance } from '../meta/ledger';
@@ -20,7 +21,7 @@ class App {
   save: SaveV2;
   router!: Router;
   /** The board on screen (or last on screen), for saving on background. */
-  active: { mode: ModeRef; session: Session } | null = null;
+  active: { mode: ModeRef; session: Session; spec?: SpecVersion } | null = null;
   readonly isDev = import.meta.env.DEV;
   private listeners = new Set<Listener>();
   private systemReduced = false;
@@ -99,8 +100,8 @@ class App {
   /** Saves the in-progress board (called on every move and when the app is backgrounded). */
   saveActive(): void {
     if (!this.active) return;
-    const { mode, session } = this.active;
-    const snap = captureSession(mode, session);
+    const { mode, session, spec } = this.active;
+    const snap = captureSession(mode, session, new Date(), spec);
     if (mode.kind === 'cup') {
       const k = modeKey(mode);
       if (snap) this.save.cup.open[k] = snap;

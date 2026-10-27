@@ -5,14 +5,17 @@
 
 import { generatePuzzle } from '../engine/generator';
 import { dailySpec, levelSpec } from '../engine/levels';
-import { hashString } from '../engine/rng';
 import type { Puzzle } from '../engine/types';
 import { cupBoardSpec } from '../competitions/cup';
 import { dateFromKey } from './dates';
 import type { ModeRef } from './modes';
 import { modeKey } from './modes';
 import { LEVEL_PACK } from '../data/levelPack';
-import { decodePack, type PackLevel } from '../data/packFormat';
+import { JOURNEY_PACK_2 } from '../data/journeyPack2';
+import { decodePack, type PackLevel, type PackLevel2 } from '../data/packFormat';
+import { DAILY_V2_FROM, JOURNEY_V2_FROM, dailyTargetV2, journeyTargetV2, pickBoard, type SpecVersion } from './specs';
+
+export type { SpecVersion } from './specs';
 
 /**
  * Bump when the generator's output for an existing (size, seed, difficulty) changes. Saved sessions and
@@ -20,12 +23,37 @@ import { decodePack, type PackLevel } from '../data/packFormat';
  */
 export const GENERATOR_VERSION = 1;
 
-export type PuzzleSource = (mode: ModeRef) => Puzzle | null;
+export type PuzzleSource = (mode: ModeRef, spec: SpecVersion) => Puzzle | null;
 
 const PACK = new Map(decodePack(LEVEL_PACK).map((e) => [e.level, e]));
+const PACK_2 = new Map(decodePack(JOURNEY_PACK_2).map((e) => [e.level, e]));
 
-/** The frozen, verified Journey launch pack (levels 1–60). Identical to what the generator made for v1. */
-export const levelPackSource: PuzzleSource = (mode) => (mode.kind === 'level' ? (PACK.get(mode.level)?.puzzle ?? null) : null);
+/**
+ * The spec a mode's board is issued under today. Journey levels from JOURNEY_V2_FROM and dailies from DAILY_V2_FROM
+ * use spec 2 (5×5–8×8, measured difficulty); everything else, including Zen and Paw Cup, stays on spec 1.
+ */
+export function currentSpec(mode: ModeRef): SpecVersion {
+  if (mode.kind === 'level') return mode.level >= JOURNEY_V2_FROM ? 2 : 1;
+  if (mode.kind === 'daily') return mode.dateKey >= DAILY_V2_FROM ? 2 : 1;
+  return 1;
+}
+
+/**
+ * The frozen, verified Journey packs: levels 1–60 (launch pack, identical to v1) and 61–150 (pack 2). A pack board is
+ * used only for the spec it was issued under, so a board saved under spec 1 at level 75 still finds its 9×9.
+ */
+export const levelPackSource: PuzzleSource = (mode, spec) => {
+  if (mode.kind !== 'level') return null;
+  const first = PACK.get(mode.level);
+  if (first) return first.puzzle;
+  const second = PACK_2.get(mode.level);
+  return second && second.meta.spec === spec ? second.puzzle : null;
+};
+
+/** Pack-2 metadata (spec, measured tier) for a level, or null outside 61–150. */
+export function journeyMeta(level: number): PackLevel2 | null {
+  return PACK_2.get(level)?.meta ?? null;
+}
 
 /** Grading metadata for a shipped level (null beyond the pack). */
 export function levelMeta(level: number): PackLevel | null {
@@ -42,23 +70,26 @@ export function setPuzzlePack(src: PuzzleSource | null): void {
 const cache = new Map<string, Puzzle>();
 const CACHE_MAX = 12;
 
-export function puzzleFor(mode: ModeRef): Puzzle {
-  const key = modeKey(mode);
+/** The board for a mode. `spec` defaults to the one the mode is issued under now; saved boards pass their own. */
+export function puzzleFor(mode: ModeRef, spec: SpecVersion = currentSpec(mode)): Puzzle {
+  const key = `${modeKey(mode)}@${spec}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const p = packSource?.(mode) ?? generateFor(mode);
+  const p = packSource?.(mode, spec) ?? generateFor(mode, spec);
   cache.set(key, p);
   if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string);
   return p;
 }
 
-function generateFor(mode: ModeRef): Puzzle {
+function generateFor(mode: ModeRef, version: SpecVersion): Puzzle {
   switch (mode.kind) {
     case 'level': {
+      if (version === 2) return pickBoard(journeyTargetV2(mode.level));
       const spec = levelSpec(mode.level);
       return generatePuzzle({ size: spec.size, seed: spec.seed, difficulty: spec.difficulty });
     }
     case 'daily': {
+      if (version === 2) return pickBoard(dailyTargetV2(mode.dateKey));
       const spec = dailySpec(dateFromKey(mode.dateKey));
       return generatePuzzle({ size: spec.size, seed: spec.seed, difficulty: spec.difficulty });
     }
@@ -72,12 +103,12 @@ function generateFor(mode: ModeRef): Puzzle {
 }
 
 /** Size of the board a mode will produce, without generating it. */
-export function sizeFor(mode: ModeRef): number {
+export function sizeFor(mode: ModeRef, spec: SpecVersion = currentSpec(mode)): number {
   switch (mode.kind) {
     case 'level':
-      return levelSpec(mode.level).size;
+      return spec === 2 ? journeyTargetV2(mode.level).size : levelSpec(mode.level).size;
     case 'daily':
-      return dailySpec(dateFromKey(mode.dateKey)).size;
+      return spec === 2 ? dailyTargetV2(mode.dateKey).size : dailySpec(dateFromKey(mode.dateKey)).size;
     case 'zen':
       return mode.size;
     case 'cup':
@@ -85,11 +116,7 @@ export function sizeFor(mode: ModeRef): number {
   }
 }
 
-/** Short fingerprint of the board layout (not the solution). */
-export function puzzleDigest(p: Pick<Puzzle, 'size' | 'regions' | 'givens'>): string {
-  const givens = [...p.givens].sort((a, b) => a.r - b.r || a.c - b.c).map((g) => `${g.r}.${g.c}.${g.kind}`);
-  return hashString(`${p.size}|${p.regions.map((row) => row.join(',')).join(';')}|${givens.join(';')}`).toString(16).padStart(8, '0');
-}
+export { puzzleDigest } from './puzzleDigest';
 
 export function modeTitle(mode: ModeRef): string {
   switch (mode.kind) {

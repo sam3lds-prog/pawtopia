@@ -66,6 +66,8 @@ export interface LevelClear {
   clean: boolean; // ever solved with zero mistakes
   hintFree: boolean; // ever solved without hints
   stars: number; // 1–3, cosmetic only
+  /** Spec of the board these times belong to (missing = 1). A level number that got a new board starts fresh times. */
+  spec?: 1 | 2;
 }
 
 export interface DailyClear {
@@ -155,6 +157,8 @@ export interface SavedSession {
   /** Digest of (size, regions, givens) so a regenerated board that differs is never resumed. */
   digest: string;
   generatorVersion: number;
+  /** Puzzle spec the board was issued under (src/game/specs.ts). Missing in older saves, which were all spec 1. */
+  specVersion?: 1 | 2;
   savedAt: string;
   snap: SessionSnapshot;
 }
@@ -268,6 +272,7 @@ function normSavedSession(x: unknown): SavedSession | null {
     mode: x.mode,
     digest: x.digest,
     generatorVersion: int(x.generatorVersion, 1),
+    ...(x.specVersion === 2 ? { specVersion: 2 as const } : x.specVersion === 1 ? { specVersion: 1 as const } : {}),
     savedAt: str(x.savedAt, ''),
     snap: x.snap as unknown as SessionSnapshot,
   };
@@ -305,6 +310,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
           clean: bool(v.clean, false),
           hintFree: bool(v.hintFree, false),
           stars: int(v.stars, 1, 1, 3),
+          ...(v.spec === 2 ? { spec: 2 as const } : {}),
         };
       }),
     },

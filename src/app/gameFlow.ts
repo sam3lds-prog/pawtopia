@@ -3,7 +3,8 @@
 import { app } from './app';
 import { modeKey, type ModeRef } from '../game/modes';
 import { rulesFor } from '../game/modes';
-import { puzzleFor } from '../game/puzzles';
+import { currentSpec, puzzleFor } from '../game/puzzles';
+import { displayDifficulty } from '../game/grading';
 import { Session } from '../game/session';
 import { hasMeaningfulProgress, resumeSession } from '../game/sessionPersistence';
 import { track } from '../services/analytics';
@@ -17,12 +18,13 @@ export function startGame(mode: ModeRef): boolean {
     if (!startAttempt(app.save, mode)) return false;
     app.persist();
   }
-  const puzzle = puzzleFor(mode);
+  const spec = currentSpec(mode);
+  const puzzle = puzzleFor(mode, spec);
   // The guided first board is forgiving: mistakes are explained, never punished.
   const rules = rulesFor(mode);
   const session = new Session(puzzle, { hearts: rules.hearts && !isTutorial(mode, app.save), maxHearts: rules.maxHearts });
-  app.active = { mode, session };
-  track('puzzle_start', { mode: mode.kind, size: puzzle.size, difficulty: puzzle.difficulty });
+  app.active = { mode, session, spec };
+  track('puzzle_start', { mode: mode.kind, size: puzzle.size, difficulty: displayDifficulty(puzzle) });
   app.router.go({ screen: 'game' });
   return true;
 }

@@ -176,3 +176,25 @@ the screen and clipped rows; sheet children no longer shrink.
 
 Not done, on purpose: an optional long-press action sheet. It conflicts with drag-marking and needs a usability test
 first. At 8×8 on a 320px phone cells are ~36px, below 44pt; "Large board" (≥46px, scrollable) remains the answer.
+
+## 2026-10-26 · D22 — Measured difficulty, versioned specs, 8×8 cap for new boards (D1 kept)
+Labels now come from measuring each board (`src/game/grading.ts`, method and calibration in `docs/DIFFICULTY.md`):
+the grader replays the unchanged deduction engine step by step and scores breakthroughs, chain length, neighbor
+logic, easy openings and sparse givens. Easy = singles only; Expert additionally requires neighbor logic. It lives
+outside `src/engine/`, so D1 stands: no engine file changed and every original test passes unmodified.
+
+Which board a level or day gets is now versioned (`src/game/specs.ts`):
+- **Spec 1** (unchanged): Journey 1–70, every daily before 2026-10-27, Zen, and Paw Cup.
+- **Spec 2**: Journey 71+ rotates 5×5–8×8 in ten-level blocks (a small board can be Expert, a big one Medium) and
+  dailies from 2026-10-27 follow a ≤8×8 weekday ladder. Each board is *picked* by its measured label from a fixed
+  sequence of candidate seeds, so every device gets the same board.
+- Journey 61–150 are frozen in `src/data/journeyPack2.ts` (61–70 exactly as players already saw them). `pack:check`
+  regenerates and fails if any committed board would change. Beyond 150, boards are picked on device by the same rule.
+- Saved boards record `specVersion` and resume on it; older saves are spec 1, so an in-progress 9×9 at level 75 still
+  resumes as that 9×9. A cleared level that moved to a new board keeps its clear, stars and one-time rewards; only its
+  best time starts fresh (`LevelClear.spec`).
+- Zen offers 5–8. Paw Cup keeps its published five boards including the 9×9 Grand Hall (owner decision), so the
+  Grand Thinker badge stays reachable there.
+
+Performance: picking a board takes ~70 ms on a laptop on average, ~0.6 s worst case over a year of dailies; only
+dailies and levels beyond 150 pick on device.

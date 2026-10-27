@@ -393,6 +393,21 @@
   font-size: var(--t-sm);
   padding: 0 2px;
 }
+.status-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* Short phones hide the header chip; the size and difficulty move down beside the progress count. */
+.status-board {
+  display: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--canvas-deep);
+  color: var(--ink);
+  white-space: nowrap;
+}
 .game-timer {
   display: inline-flex;
   align-items: center;
@@ -521,6 +536,9 @@
   }
   .game-sub {
     display: none;
+  }
+  .status-board {
+    display: inline-block;
   }
 }
 

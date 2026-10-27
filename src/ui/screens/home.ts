@@ -2,9 +2,9 @@
 
 import { app } from '../../app/app';
 import { playMode, resumableMode, resumeGame, startGame } from '../../app/gameFlow';
-import { dailySpec } from '../../engine/levels';
 import { localDateKey } from '../../game/dates';
 import { modeTitle, puzzleFor, sizeFor } from '../../game/puzzles';
+import { displayDifficulty } from '../../game/grading';
 import { chapterOf } from '../../meta/chapters';
 import { liveStreak } from '../../meta/progression';
 import { sceneMarkup } from './sanctuary';
@@ -53,7 +53,8 @@ export const homeScreen: ScreenDef = {
     const level = save.journey.nextLevel;
     const chapter = chapterOf(level);
     const resumeMode = resumableMode();
-    const daily = dailySpec();
+    const todayKey = localDateKey();
+    const daily = { dateKey: todayKey, size: sizeFor({ kind: 'daily', dateKey: todayKey }) };
     const dailyDone = !!save.daily.done[daily.dateKey];
     const streak = liveStreak(save, localDateKey());
     const weekday = WEEKDAY[new Date().getDay()];
@@ -61,7 +62,9 @@ export const homeScreen: ScreenDef = {
 
     const continueTitle = resumeMode ? `Resume ${modeTitle(resumeMode).toLowerCase().replace(/^level/, 'level')}` : `Play level ${level}`;
     const thumbMode = resumeMode ?? { kind: 'level' as const, level };
-    const thumbSize = sizeFor(thumbMode);
+    // A resumable board keeps the spec it was issued under (an old 9×9 save still shows as 9×9).
+    const thumbSpec = resumeMode ? (save.lastSession?.specVersion ?? 1) : undefined;
+    const thumbSize = sizeFor(thumbMode, thumbSpec);
 
     const el = h(`
       <div class="home">
@@ -83,7 +86,7 @@ export const homeScreen: ScreenDef = {
           <div class="continue__info">
             <p class="continue__eyebrow">${resumeMode ? 'Board in progress' : esc(`Chapter ${chapter.index + 1}: ${chapter.name}`)}</p>
             <h2 id="continue-title">${esc(resumeMode ? modeTitle(resumeMode) : `Level ${level}`)}</h2>
-            <p class="muted">${thumbSize}×${thumbSize} board${resumeMode ? ', saved where you left it' : ''}</p>
+            <p class="muted" data-board-desc>${thumbSize}×${thumbSize} board${resumeMode ? ', saved where you left it' : ''}</p>
             ${nextPet && !resumeMode ? `<p class="continue__next">${ICON.paw}${nextPet.level === level ? 'A new resident arrives when you solve this one' : `Next resident at level ${nextPet.level}`}</p>` : ''}
           </div>
           <div class="continue__thumb" data-thumb style="--n:${thumbSize}"></div>
@@ -123,9 +126,12 @@ export const homeScreen: ScreenDef = {
     // The thumbnail needs the board's regions; build it after first paint so the screen appears instantly.
     scope.timeout(() => {
       try {
-        const p = puzzleFor(thumbMode);
+        const p = puzzleFor(thumbMode, thumbSpec);
         const slot = el.querySelector('[data-thumb]');
         if (slot) slot.innerHTML = miniBoard(p.regions);
+        const desc = el.querySelector('[data-board-desc]');
+        const tier = displayDifficulty(p);
+        if (desc) desc.textContent = `${thumbSize}×${thumbSize} · ${tier.charAt(0).toUpperCase()}${tier.slice(1)}${resumeMode ? ', saved where you left it' : ''}`;
       } catch {
         /* thumbnail is decorative */
       }

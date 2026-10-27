@@ -12,8 +12,8 @@ const NAMES: Array<[string, string]> = [
   ['Meadow Gate', 'Learn the rules on small boards and welcome the first residents.'],
   ['Willow Lane', 'Six-by-six and seven-by-seven boards with trickier regions.'],
   ['Lantern Hill', 'Eight-by-eight boards for patient, careful thinkers.'],
-  ['Starlit Orchard', 'Bigger boards with fewer pets already home.'],
-  ['Moonpond Glade', 'Nine-by-nine boards and the hardest deductions.'],
+  ['Starlit Orchard', 'Eight-by-eight boards, then every size mixed: small can be hard, big can be gentle.'],
+  ['Moonpond Glade', 'Every size from 5×5 to 8×8, with longer chains of reasoning.'],
 ];
 
 export const LEVELS_PER_CHAPTER = 20;

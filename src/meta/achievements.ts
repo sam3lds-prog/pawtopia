@@ -33,7 +33,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'comeback_kid', name: 'Comeback Kid', description: 'Finish a board after two mistakes, or after refilling your hearts.', icon: 'restart', coins: 20, progress: (s) => [Math.min(1, s.stats.comebacks), 1] },
   { id: 'master_regions', name: 'Master of Regions', description: 'Finish the first chapter, Meadow Gate.', icon: 'star', coins: 40, progress: (s) => [Math.min(20, s.journey.nextLevel - 1), 20] },
   { id: 'zen_gardener', name: 'Zen Gardener', description: 'Solve five Zen boards.', icon: 'leaf', coins: 20, progress: (s) => [Math.min(5, s.zen.solved), 5] },
-  { id: 'grand_thinker', name: 'Grand Thinker', description: 'Solve a 9×9 board.', icon: 'sparkle', coins: 40, progress: (s) => [solvedSize(s, 9) ? 1 : 0, 1] },
+  { id: 'grand_thinker', name: 'Grand Thinker', description: 'Solve a 9×9 board (Paw Cup\'s Grand Hall).', icon: 'sparkle', coins: 40, progress: (s) => [solvedSize(s, 9) ? 1 : 0, 1] },
   { id: 'full_garden', name: 'In Full Bloom', description: `Own all ${DECOR.length} decorations.`, icon: 'trophy', coins: 100, progress: (s) => [Math.min(DECOR.length, count(s.inventory.decor)), DECOR.length] },
 ];
 

@@ -5,7 +5,8 @@ import { restartGame, startGame } from '../../app/gameFlow';
 import { CAT, DOG, type Species } from '../../engine/types';
 import { fmtClock } from '../../game/dates';
 import { CUP_HEARTS, nextAfterWin, rulesFor, type ModeRef } from '../../game/modes';
-import { modeShortTitle, modeTitle } from '../../game/puzzles';
+import { modeShortTitle, modeTitle, type SpecVersion } from '../../game/puzzles';
+import { difficultyReason, profileOf } from '../../game/grading';
 import { MARK, type HintInfo, type MoveResult, type Session, type Tool, type UnitRef } from '../../game/session';
 import { recordLoss, recordWin, type WinRecord } from '../../meta/progression';
 import { rewardsForWin, type RewardSummary } from '../../meta/rewards';
@@ -49,16 +50,19 @@ export const gameScreen: ScreenDef = {
       app.router.go({ screen: 'home' });
       return;
     }
-    mountGame(root, scope, active.mode, active.session);
+    mountGame(root, scope, active.mode, active.session, active.spec);
   },
 };
 
-function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): void {
+function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, spec: SpecVersion = 1): void {
   const tutorial = isTutorial(mode, app.save);
   // Hearts follow the session (the guided first board has none to lose).
   const rules = { ...rulesFor(mode), hearts: s.heartsEnabled };
   const n = s.size;
   const total = 2 * n;
+  // The label comes from measuring this exact board, never from what the level or day asked for.
+  const profile = profileOf(s.puzzle);
+  const tierName = capitalize(profile.tier);
   const settings = app.settings;
   const classic = settings.controls === 'classic';
   // The board opens with the pet tool the player used last (never Empty/Erase, so a first tap always places).
@@ -77,7 +81,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
         <button class="icon-btn" data-act="leave" aria-label="Leave board">${ICON.back}</button>
         <div class="game-title">
           <h1 data-autofocus aria-label="${esc(modeTitle(mode))}">${esc(modeShortTitle(mode))}</h1>
-          <div class="game-sub"><span class="chip">${n}×${n}</span><span class="chip">${capitalize(s.puzzle.difficulty)}</span></div>
+          <div class="game-sub"><span class="chip chip--board" title="${esc(`${tierName}: ${difficultyReason(profile)}`)}" aria-label="${esc(`${n} by ${n}, ${tierName}. ${difficultyReason(profile)}`)}">${n}×${n} · ${tierName}</span></div>
         </div>
         <div class="game-top__end">
           ${rules.hearts ? '<div class="hearts" data-hearts role="img"></div>' : tutorial ? '<span class="chip chip--guide">Practice</span>' : `<span class="zen-mark" aria-label="No hearts in Zen">${ICON.leaf}</span>`}
@@ -89,7 +93,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
         <div class="board-foot" data-foot>
           <p class="coach" data-coach aria-live="polite"></p>
           <div class="game-status">
-            <span data-progress class="num"></span>
+            <span class="status-left"><span data-progress class="num"></span><span class="status-board" aria-hidden="true">${n}×${n} · ${tierName}</span></span>
             ${rules.timer && settings.showTimer ? `<span class="game-timer num" data-timer aria-label="Time">${ICON.clock}<span>0:00</span></span>` : ''}
           </div>
         </div>
@@ -644,7 +648,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session): 
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) order.push(keyOf(r, c));
     faces.celebrate(order);
     winPet = lastPlaced ?? tilePets.values().next().value ?? null;
-    const result = { size: n, seconds: s.elapsedSeconds(), mistakes: s.mistakes, hintsUsed: s.hintsUsed, revives: s.revives, hearts: rules.hearts };
+    const result = { size: n, seconds: s.elapsedSeconds(), mistakes: s.mistakes, hintsUsed: s.hintsUsed, revives: s.revives, hearts: rules.hearts, spec };
     const rec = recordWin(app.save, mode, result);
     const rewards = rewardsForWin(app.save, mode, rec);
     const cupScore = mode.kind === 'cup' ? finishAttempt(app.save, mode, s.events, s.elapsedMs()) : null;

@@ -1,0 +1,63 @@
+# Difficulty: how Pawtopia measures and labels boards
+
+Labels players see ("7×7 · Expert") come from measuring the board, never from what a level or a day asked for.
+Code: `src/game/grading.ts` (measurement, `GRADING_VERSION = 1`), `src/game/specs.ts` (which board a level or day gets).
+Run `npm run grade:report` to reproduce the numbers below.
+
+## What is measured
+
+The grader replays the same human deduction engine the hints use (`src/engine/deduce.ts`, unchanged) one step at a
+time and records:
+
+| Metric | Meaning |
+| --- | --- |
+| `openingSingles` | placements forced by a single before any thinking (how many easy ways in) |
+| `breakthroughs` | times the board went quiet (no single anywhere) and needed a pointing / neighbor-lock idea |
+| `longestChain` | the longest run of eliminations before the next placement appears |
+| `pointing`, `neighborLock` | elimination steps by technique (placements always come from singles) |
+| `givens` | pets home at the start |
+
+Score = (3 × breakthroughs + 2 × (longestChain − 1) + 2 × neighborLock + min(pointing, 12) / 2 +
+2 × max(0, 3 − openingSingles) + 2 × max(0, round(n/3) − givens)) × (0.8 + 0.07 × (n − 5)).
+
+The size factor reflects that the same chain is harder to spot on a bigger board.
+
+## Labels
+
+- **Easy**: singles only. Every placement is "the one spot left in a line", however big the board.
+- **Medium**: needs at least one idea beyond singles, score < 18.
+- **Hard**: score ≥ 18.
+- **Expert**: score ≥ 34 *and* needs neighbor logic (the least obvious technique).
+
+## Calibration (300 generated boards per size, fixed seeds)
+
+| Size | Score p50 / p75 / p90 | Measured mix (easy / medium / hard / expert) |
+| --- | --- | --- |
+| 5×5 | 20.4 / 28.8 / 37.6 | 63 / 61 / 127 / 49 |
+| 6×6 | 13.1 / 26.5 / 38.3 | 115 / 57 / 86 / 42 |
+| 7×7 | 12.2 / 25.9 / 35.7 | 123 / 67 / 72 / 38 |
+| 8×8 | 13.6 / 30.3 / 49.5 | 109 / 69 / 60 / 62 |
+| 9×9 | 10.8 / 29.7 / 43.2 | 123 / 57 / 63 / 57 |
+
+The engine's own coarse grade lumps very different boards together: of the 237 5×5 boards it calls "hard", the
+measurement splits 61 Medium / 127 Hard / 49 Expert. It also called almost nothing "medium" at 6×6 (11 of 300), which
+is why a level that asked for Medium could silently get something else under the old ladder.
+
+## Where each label is used
+
+- Board header chip, the Play path's next level, and Home's continue card show the measured label.
+- Journey 71+ and dailies from 2026-10-27 are *chosen* by it: `pickBoard` tries candidate seeds in a fixed order and
+  takes the first board whose measured label matches the slot (80 tries; every slot through level 150 and a year of
+  dailies matched). If nothing matched it would take the closest and label it truthfully.
+- Paw Cup keeps its published lineup and par times (owner decision, 2026-10-26); its in-game chip still shows the
+  measured label.
+
+## Changing the formula
+
+Changing a weight or threshold changes labels and which boards future slots pick. Bump `GRADING_VERSION`, re-run
+`npm run grade:report`, and note it in `DECISIONS.md`. Shipped Journey levels are frozen in `src/data/journeyPack2.ts`
+and `npm run pack:check` fails if regenerating them would give a different board, so a formula change can never
+silently swap a level a player has seen. Levels beyond 150 and future dailies would change; that needs a spec bump.
+
+Calibration data collected from real players (solve time, mistakes and hint use by size) would sharpen these weights,
+but only with a reviewed privacy plan; nothing is collected today.

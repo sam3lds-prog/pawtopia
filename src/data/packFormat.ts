@@ -26,6 +26,26 @@ export interface PackFile {
   levels: PackLevel[];
 }
 
+/**
+ * Journey pack 2 (levels 61+). Same board encoding, plus the spec the level belongs to and its measured difficulty
+ * (src/game/grading.ts) so the label shown to players is the one the board was verified with.
+ */
+export interface PackLevel2 extends PackLevel {
+  spec: 1 | 2;
+  /** What the spec asked for (spec 2 only). */
+  target?: Difficulty;
+  /** Measured label and score under `gradingVersion`. */
+  tier: Difficulty;
+  score: number;
+}
+
+export interface PackFile2 {
+  v: 2;
+  generatorVersion: number;
+  gradingVersion: number;
+  levels: PackLevel2[];
+}
+
 export function encodeBoard(level: number, p: Puzzle): PackLevel {
   const d = deduce(p.size, p.regions, p.givens);
   return {
@@ -52,8 +72,10 @@ export function decodeLevel(l: PackLevel): Puzzle {
   };
 }
 
-export function decodePack(f: PackFile): Array<{ level: number; puzzle: Puzzle; meta: PackLevel }> {
-  return f.levels.map((l) => ({ level: l.level, puzzle: decodeLevel(l), meta: l }));
+export function decodePack(f: PackFile): Array<{ level: number; puzzle: Puzzle; meta: PackLevel }>;
+export function decodePack(f: PackFile2): Array<{ level: number; puzzle: Puzzle; meta: PackLevel2 }>;
+export function decodePack(f: PackFile | PackFile2): Array<{ level: number; puzzle: Puzzle; meta: PackLevel | PackLevel2 }> {
+  return (f.levels as PackLevel[]).map((l) => ({ level: l.level, puzzle: decodeLevel(l), meta: l }));
 }
 
 /** Returns a list of problems (empty = board is shippable). */

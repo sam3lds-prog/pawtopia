@@ -3,10 +3,10 @@
 import type { SavedSession } from '../services/storage';
 import type { ModeRef } from './modes';
 import { rulesFor } from './modes';
-import { GENERATOR_VERSION, puzzleDigest, puzzleFor } from './puzzles';
+import { GENERATOR_VERSION, currentSpec, puzzleDigest, puzzleFor, type SpecVersion } from './puzzles';
 import { Session } from './session';
 
-export function captureSession(mode: ModeRef, session: Session, now = new Date()): SavedSession | null {
+export function captureSession(mode: ModeRef, session: Session, now = new Date(), spec: SpecVersion = currentSpec(mode)): SavedSession | null {
   // Only boards still in play are resumable. A won board is done; a lost one ended with its loss sheet
   // (restoring it would bring back a board that ignores every tap).
   if (session.outcome !== 'playing') return null;
@@ -14,6 +14,7 @@ export function captureSession(mode: ModeRef, session: Session, now = new Date()
     mode,
     digest: puzzleDigest(session.puzzle),
     generatorVersion: GENERATOR_VERSION,
+    specVersion: spec,
     savedAt: now.toISOString(),
     // Paw Cup keeps its full input log so the attempt is scored by replaying every move, across resumes.
     snap: session.snapshot(mode.kind === 'cup'),
@@ -24,12 +25,14 @@ export function captureSession(mode: ModeRef, session: Session, now = new Date()
  * Rebuilds a saved board. Returns null (and the caller should drop the save) when the generator
  * version changed, the regenerated layout differs, or the snapshot doesn't fit the board.
  */
-export function resumeSession(saved: SavedSession | null): { mode: ModeRef; session: Session } | null {
+export function resumeSession(saved: SavedSession | null): { mode: ModeRef; session: Session; spec: SpecVersion } | null {
   if (!saved) return null;
   if (saved.generatorVersion !== GENERATOR_VERSION) return null;
+  // Saves from before specs were versioned were all made under spec 1, so they get their original board back.
+  const spec: SpecVersion = saved.specVersion ?? 1;
   let puzzle;
   try {
-    puzzle = puzzleFor(saved.mode);
+    puzzle = puzzleFor(saved.mode, spec);
   } catch {
     return null;
   }
@@ -37,7 +40,7 @@ export function resumeSession(saved: SavedSession | null): { mode: ModeRef; sess
   const rules = rulesFor(saved.mode);
   const session = Session.restore(puzzle, saved.snap, { hearts: rules.hearts, maxHearts: rules.maxHearts });
   if (!session || session.outcome !== 'playing') return null;
-  return { mode: saved.mode, session };
+  return { mode: saved.mode, session, spec };
 }
 
 /** True when the saved board has real progress worth offering to resume. */
