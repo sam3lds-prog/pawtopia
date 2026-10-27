@@ -34,7 +34,7 @@ const body = html.match(/<body>([\s\S]*?)<\/body>/)[1].replace(/<script[^>]*><\/
 // The artifact viewer already pads the page by the top safe area; avoid doubling it.
 const hostFix = ':root{--safe-top:0px}';
 const out = `<meta charset="utf-8">
-<title>Pawtopia</title>
+<title>${qa ? 'Pawtopia Tester Preview' : 'Pawtopia'}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <link rel="icon" href="data:image/svg+xml;base64,${Buffer.from(favicon).toString('base64')}">
 <style>${css}${hostFix}</style>
