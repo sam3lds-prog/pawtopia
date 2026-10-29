@@ -23,6 +23,8 @@ import { actionOf, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { ScreenDef } from '../router';
 import { showSettings } from './settings';
+import { SANCTUARY_BY_ID, type RegionId } from '../../meta/catalogs/sanctuaries';
+import { activeRegion, nextStage, nextToOpen } from '../../meta/world';
 
 const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -45,6 +47,37 @@ function weekStrip(): string {
     return `<li class="${cls}" aria-label="${label}"><span aria-hidden="true">${n}</span></li>`;
   });
   return `<ol class="week-strip" aria-label="This week's daily puzzles">${days.join('')}</ol>`;
+}
+
+/** The sanctuary being built on the world map, and how close its next stage is (or when the first one opens). */
+function worldStrip(): string {
+  const save = app.save;
+  const id = activeRegion(save);
+  if (id) {
+    const def = SANCTUARY_BY_ID[id];
+    const next = nextStage(save, id)!;
+    const pct = Math.round(((next.have - next.from) / (next.need - next.from)) * 100);
+    const left = next.need - next.have;
+    return `<button class="card card--tap world-strip" data-act="region" data-region="${id}" style="--accent:${def.accent}">
+      <span class="card__icon world-strip__icon">${ICON.globe}</span>
+      <span class="card__body">
+        <span class="card__title">${esc(def.name)}</span>
+        <span class="card__sub">${left === 1 ? 'One more puzzle' : `${left} more puzzles`} to ${esc(next.stage.name.toLowerCase())}</span>
+        <span class="progress world-strip__bar" aria-hidden="true"><span style="width:${pct}%"></span></span>
+      </span>
+      ${ICON.chevron}
+    </button>`;
+  }
+  const up = nextToOpen(save);
+  if (!up) return '';
+  return `<button class="card card--tap world-strip" data-act="world" style="--accent:${up.def.accent}">
+    <span class="card__icon world-strip__icon">${ICON.globe}</span>
+    <span class="card__body">
+      <span class="card__title">World map</span>
+      <span class="card__sub">The ${esc(up.def.name)} opens after level ${up.def.opensAfterLevel} (${plural(up.left, 'level')} to go)</span>
+    </span>
+    ${ICON.chevron}
+  </button>`;
 }
 
 export const homeScreen: ScreenDef = {
@@ -95,6 +128,8 @@ export const homeScreen: ScreenDef = {
           <button class="btn btn--block continue__go" data-act="continue">${esc(continueTitle)}</button>
           ${resumeMode && resumeMode.kind !== 'level' ? `<button class="btn btn--quiet" data-act="journey">Play level ${level} instead</button>` : ''}
         </section>
+
+        ${worldStrip()}
 
         <div class="daily-block">
         <button class="card card--tap daily-card ${dailyDone ? 'is-done' : ''}" data-act="daily">
@@ -257,6 +292,14 @@ export const homeScreen: ScreenDef = {
           break;
         case 'sanctuary':
           app.router.go({ screen: 'sanctuary' });
+          break;
+        case 'region': {
+          const r = (e.target as HTMLElement).closest('[data-region]') as HTMLElement | null;
+          if (r) app.router.go({ screen: 'region', id: r.dataset.region as RegionId });
+          break;
+        }
+        case 'world':
+          app.router.go({ screen: 'world' });
           break;
         case 'settings':
           showSettings(scope, { onClose: () => app.router.refresh() });

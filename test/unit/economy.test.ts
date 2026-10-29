@@ -4,7 +4,7 @@ import { balance, grant, spend } from '../../src/meta/ledger';
 import { nextPetMilestone, reconcileRewards, rewardsForWin, unlockedPets } from '../../src/meta/rewards';
 import { recordWin, type BoardResult } from '../../src/meta/progression';
 import { buyDecor, chooseStarter, isShown, setShown } from '../../src/meta/sanctuary';
-import { DECOR, STARTER_DECOR } from '../../src/meta/catalogs/decor';
+import { DECOR, STARTER_DECOR, decorHome, decorTier } from '../../src/meta/catalogs/decor';
 import { PETS } from '../../src/meta/catalogs/pets';
 import { ECONOMY } from '../../src/config/economy';
 
@@ -102,8 +102,13 @@ describe('v1 players', () => {
 
 describe('sanctuary decor', () => {
   it('prices each item in exactly one currency, coin prices stay sensible, and there are three chapter gifts', () => {
-    // 15 original coin / gift items, plus special (video-token) and premium (gem) items from D27.
-    expect(DECOR.filter((d) => !d.tokens && !d.gems)).toHaveLength(15);
+    // Harmony: 15 original coin / gift items, plus special (video-token) and premium (gem) items from D27.
+    expect(DECOR.filter((d) => decorHome(d) === 'harmony' && !d.tokens && !d.gems)).toHaveLength(15);
+    // Each region: two coin items, one video-token item, one gem item (D28).
+    for (const r of ['outback', 'savanna', 'arctic', 'amazon'] as const) {
+      const here = DECOR.filter((d) => decorHome(d) === r);
+      expect(here.map(decorTier).sort(), r).toEqual(['coins', 'coins', 'premium', 'video']);
+    }
     for (const d of DECOR) {
       const currencies = [d.cost !== null, !!d.tokens, !!d.gems].filter(Boolean).length;
       if (d.unlock.kind === 'shop') {

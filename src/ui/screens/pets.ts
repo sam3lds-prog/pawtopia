@@ -1,4 +1,7 @@
-/** Pets: the resident collection. Portraits, personalities, who's still on the way, favorites and filters. */
+/**
+ * Animal album: the resident cats and dogs (portraits, personalities, who's still on the way, favorites and filters),
+ * then every wildlife friend, sanctuary by sanctuary. Reached from the World map.
+ */
 
 import { app } from '../../app/app';
 import { PETS, type PetId } from '../../meta/catalogs/pets';
@@ -8,13 +11,16 @@ import { esc, h } from '../dom';
 import { ICON } from '../icons';
 import type { ScreenDef } from '../router';
 import { coinPill } from './home';
+import { COMPANIONS, type CompanionId } from '../../meta/catalogs/companions';
+import { SANCTUARIES } from '../../meta/catalogs/sanctuaries';
+import { friendPortrait, showFriendSheet } from './sanctuary';
 
 type Filter = 'all' | 'cat' | 'dog' | 'fav';
 let lastFilter: Filter = 'all';
 
 export const petsScreen: ScreenDef = {
-  tab: 'pets',
-  title: 'Pets',
+  tab: 'world',
+  title: 'Animals',
   mount(root, scope) {
     const el = h(`<div class="pets"></div>`);
     root.appendChild(el);
@@ -33,9 +39,11 @@ export const petsScreen: ScreenDef = {
       ];
       el.innerHTML = `
         <header class="screen-head">
-          <h1 data-autofocus>Residents</h1>
+          <button class="icon-btn" data-act="back" aria-label="Back to the World map">${ICON.back}</button>
+          <h1 data-autofocus>Animal album</h1>
           <div class="screen-head__end">${coinPill()}</div>
         </header>
+        <h2 class="album__title">Residents</h2>
         <p class="muted pets__count">${have.length} of ${PETS.length} welcomed${next ? ` · next arrival at level ${next.level}` : ' · the whole family is home'}</p>
         ${
           next
@@ -68,7 +76,28 @@ export const petsScreen: ScreenDef = {
                 })
                 .join('')}</ul>`
             : `<p class="empty">${lastFilter === 'fav' ? 'Tap a resident and add them to your favorites.' : 'No residents here yet.'}</p>`
-        }`;
+        }
+        <h2 class="album__title">Wildlife friends</h2>
+        ${SANCTUARIES.map((sd) => {
+          const list = COMPANIONS.filter((c) => c.sanctuary === sd.id);
+          if (!list.length) return '';
+          const n = list.filter((c) => save.inventory.companions[c.id]).length;
+          return `<section class="album__group" aria-label="${esc(sd.name)}">
+            <div class="section-head"><h3>${esc(sd.name)}</h3><span class="muted num">${n} of ${list.length}</span></div>
+            <ul class="pet-grid">${list
+              .map((c) => {
+                const ownsIt = !!save.inventory.companions[c.id];
+                const when = c.unlockLevel !== undefined ? `Arrives at level ${c.unlockLevel}` : `Arrives at stage ${c.stage}`;
+                return `<li><button class="pet-card card card--tap ${ownsIt ? '' : 'is-locked'}" data-friend="${c.id}" aria-label="${esc(ownsIt ? `${c.name} the ${c.kind.toLowerCase()}, ${c.trait}` : `A ${c.kind.toLowerCase()}. ${when}`)}">
+                  ${friendPortrait(c.id, !ownsIt)}
+                  <span class="pet-card__name">${ownsIt ? esc(c.name) : '???'}</span>
+                  <span class="pet-card__trait">${ownsIt ? esc(c.trait) : esc(when)}</span>
+                  <span class="chip">${esc(c.kind)}</span>
+                </button></li>`;
+              })
+              .join('')}</ul>
+          </section>`;
+        }).join('')}`;
     }
     render();
 
@@ -79,6 +108,15 @@ export const petsScreen: ScreenDef = {
         lastFilter = f.dataset.filter as Filter;
         render();
         (el.querySelector(`[data-filter="${lastFilter}"]`) as HTMLElement | null)?.focus();
+        return;
+      }
+      if (t.closest('[data-act="back"]')) {
+        app.router.go({ screen: 'world' });
+        return;
+      }
+      const friend = t.closest('[data-friend]') as HTMLElement | null;
+      if (friend) {
+        showFriendSheet(scope, friend.dataset.friend as CompanionId);
         return;
       }
       const card = t.closest('[data-pet]') as HTMLElement | null;

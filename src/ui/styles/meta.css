@@ -20,8 +20,13 @@
 .portrait.is-locked {
   background: var(--canvas-deep);
 }
-.portrait.is-locked > .pet {
+.portrait.is-locked > .pet,
+.portrait.is-locked > .friend {
   filter: brightness(0) opacity(0.14);
+}
+.portrait > .friend {
+  width: 86%;
+  height: 86%;
 }
 
 /* ---------- Sanctuary ---------- */

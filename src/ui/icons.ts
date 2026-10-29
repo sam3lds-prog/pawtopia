@@ -65,6 +65,9 @@ export const ICON = {
   /** A bone-shaped biscuit: one treat = one heart back on a casual board. Colored, like the coin. */
   treat: `<svg class="ico ico--treat" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.2 8.6a2.6 2.6 0 1 1 3.1-3.3l5.4 5.4a2.6 2.6 0 1 1 3.3 3.1 2.6 2.6 0 1 1-3.1 3.3l-5.4-5.4a2.6 2.6 0 1 1-3.3-3.1Z" fill="#E7B98A" stroke="#A9733F" stroke-width="1.4" stroke-linejoin="round"/><path d="M10.4 9.3l4.3 4.3" stroke="#F4D8B8" stroke-width="1.3" stroke-linecap="round"/></svg>`,
   /** A hint ticket. */
+  globe: wrap('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.3 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.3-3.5-8.5s1.1-6.1 3.5-8.5Z"/>'),
+  pin: wrap('<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/>'),
+  sprout: wrap('<path d="M12 20v-7"/><path d="M12 13c0-3.5-2.6-6-6.5-6 0 3.6 2.6 6 6.5 6Z"/><path d="M12 11c0-3.2 2.3-5.5 6-5.5 0 3.3-2.3 5.5-6 5.5Z"/>'),
   ticket: `<svg class="ico ico--ticket" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 8a1.5 1.5 0 0 1 1.5-1.5h14A1.5 1.5 0 0 1 20.5 8v2a2 2 0 0 0 0 4v2a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 16v-2a2 2 0 0 0 0-4V8Z" fill="#9FD3C7" stroke="#287B70" stroke-width="1.4" stroke-linejoin="round"/><path d="M15 7v10" stroke="#287B70" stroke-width="1.2" stroke-dasharray="1.6 1.6"/><path d="M9.2 9.6a1.9 1.9 0 0 1 3.4 1.1c0 .9-.9 1.2-1.3 1.6-.2.2-.3.4-.3.8" stroke="#1D5C54" stroke-width="1.4" fill="none" stroke-linecap="round"/><circle cx="11" cy="14.6" r=".8" fill="#1D5C54"/></svg>`,
 } as const;
 

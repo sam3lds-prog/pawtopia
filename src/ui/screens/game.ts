@@ -17,6 +17,8 @@ import { afterSolve, type MetaNews } from '../../app/events';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
 import { PET_BY_ID } from '../../meta/catalogs/pets';
 import { COMPANION_BY_ID } from '../../meta/catalogs/companions';
+import { SANCTUARY_BY_ID } from '../../meta/catalogs/sanctuaries';
+import { countsForGrowth, growOnSolve, nextStage, openRegions, stageOf, type GrowthNews } from '../../meta/world';
 import { companionSvg } from '../art/companions';
 import { decorIcon } from '../art/sanctuary';
 import { ads, INTERSTITIALS_ENABLED, shouldShowInterstitial } from '../../services/ads';
@@ -796,8 +798,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     faces.celebrate(order);
     winPet = lastPlaced ?? tilePets.values().next().value ?? null;
     const result = { size: n, seconds: s.elapsedSeconds(), mistakes: s.mistakes, hintsUsed: s.hintsUsed, revives: s.revives, hearts: rules.hearts, spec, tier: profile.tier };
+    const openedBefore = openRegions(app.save);
     const rec = recordWin(app.save, mode, result);
     const rewards = rewardsForWin(app.save, mode, rec, new Date(), profile.tier);
+    // Every solved puzzle (not Paw Cup, not the guided first board) grows the sanctuary being built.
+    const growth = countsForGrowth(mode, tutorial) ? growOnSolve(app.save, openedBefore) : null;
     const cupScore = mode.kind === 'cup' ? finishAttempt(app.save, mode, s.events, s.elapsedMs()) : null;
     const news = afterSolve(mode, n, result.mistakes, result.hintsUsed);
     app.clearSaved(mode);
@@ -807,12 +812,14 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     track('puzzle_complete', { mode: mode.kind, size: n, seconds: result.seconds, mistakes: result.mistakes, hints: result.hintsUsed });
     if (mode.kind === 'daily' && rec.newDaily) track('daily_complete', { streak: rec.streak ?? 0 });
     for (const p of rewards.pets) track('pet_unlocked', { pet: p });
+    if (growth?.stageUp) track('region_stage', { region: growth.sanctuary, stage: stageOf(app.save, growth.sanctuary) });
+    for (const c of growth?.arrived ?? []) track('companion_unlocked', { companion: c });
     sfx('win');
     haptic('success');
     coach('Harmony restored.');
     // The board locks and glows for a beat (faces smile in a wave), then the results rise in stages. Nothing waits on
     // the animation: the sheet's buttons work the moment it opens, and a tap reveals everything at once.
-    scope.timeout(() => showWin(rec, result.seconds, rewards, news, cupScore), app.reducedMotion ? 150 : 500);
+    scope.timeout(() => showWin(rec, result.seconds, rewards, news, cupScore, growth), app.reducedMotion ? 150 : 500);
   }
 
   function rewardsMarkup(r: RewardSummary): string {
@@ -834,6 +841,33 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       .map((id) => `<div class="reward-item"><span class="reward-item__art">${decorIcon(id)}</span><span><b>${esc(DECOR_BY_ID[id].name)}</b><small>${r.chapter ? `Gift for finishing ${esc(r.chapter.name)}` : 'New decoration'}</small></span></div>`)
       .join('');
     return `<div class="win-rewards">${coins}${pets}${friends}${decor}${pantry}</div>`;
+  }
+
+  /** What this solve did for the world map: the sanctuary growing, a new stage, a new friend, a region opening. */
+  function growthMarkup(g: GrowthNews | null): string {
+    if (!g) return '';
+    const parts: string[] = [];
+    for (const r of g.opened) {
+      const def = SANCTUARY_BY_ID[r];
+      parts.push(`<div class="reward-item"><span class="reward-item__art reward-item__art--pantry" style="color:${def.accent}">${ICON.globe}</span><span><b>The ${esc(def.name)} is open!</b><small>${esc(def.blurb)}</small></span></div>`);
+    }
+    if (g.growth > 0) {
+      const def = SANCTUARY_BY_ID[g.sanctuary];
+      const short = def.name.replace(/ Sanctuary$/, '');
+      const next = nextStage(app.save, g.sanctuary);
+      if (g.completed) parts.push(`<div class="win-growth is-up" style="--accent:${def.accent}">${ICON.sparkle}<span><b>The ${esc(def.name)} is complete!</b>${g.coins ? ` <span class="num">+${g.coins}</span> Paw Coins` : ''}</span></div>`);
+      else if (g.stageUp) parts.push(`<div class="win-growth is-up" style="--accent:${def.accent}">${ICON.sprout}<span><b>${esc(short)}: ${esc(g.stageUp.name)}!</b> ${esc(g.stageUp.change)}.</span></div>`);
+      if (next && !g.stageUp) {
+        const pct = Math.round(((next.have - next.from) / (next.need - next.from)) * 100);
+        const left = next.need - next.have;
+        parts.push(`<div class="win-growth" style="--accent:${def.accent}">${ICON.sprout}<span class="win-growth__body"><span><b>${esc(short)} +1</b> · ${left === 1 ? 'one more puzzle' : `${left} more puzzles`} to ${esc(next.stage.name.toLowerCase())}</span><span class="progress world-progress" role="progressbar" aria-label="${esc(short)} progress" aria-valuemin="${next.from}" aria-valuemax="${next.need}" aria-valuenow="${next.have}"><span style="width:${pct}%"></span></span></span></div>`);
+      }
+      for (const id of g.arrived) {
+        const c = COMPANION_BY_ID[id];
+        parts.push(`<div class="reward-item"><span class="reward-item__art">${companionSvg(id, 'happy')}</span><span><b>${esc(c.name)} the ${esc(c.kind.toLowerCase())} moved in!</b><small>${esc(c.trait)}</small></span></div>`);
+      }
+    }
+    return parts.length ? `<div class="win-world">${parts.join('')}</div>` : '';
   }
 
   function newsMarkup(nw: MetaNews): string {
@@ -897,7 +931,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     return `<p class="win-next">${ICON.paw}${left === 1 ? 'Someone new arrives after the next level' : `${left} levels until someone new arrives`}</p>`;
   }
 
-  function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary, news: MetaNews, cupScore: ScoreBreakdown | null): void {
+  function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary, news: MetaNews, cupScore: ScoreBreakdown | null, growth: GrowthNews | null): void {
+    // A visit worth making: a new stage, a new friend, or a newly opened sanctuary.
+    const worldVisit = growth && (growth.stageUp || growth.arrived.length || growth.opened.length) ? (growth.growth > 0 ? growth.sanctuary : growth.opened[0]) : null;
     const next = nextAfterWin(mode);
     const meet = rewards.pets.length > 0;
     const firstBoard = mode.kind === 'level' && mode.level === 1 && rec.firstClear;
@@ -937,13 +973,14 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         </div>
         <div class="win-stage win-stage-3">
           ${rewardsMarkup(rewards)}
+          ${growthMarkup(growth)}
           ${newsMarkup(news)}
           ${nextMarkup()}
         </div>
         <div class="sheet__actions">
           <button class="btn btn--block" data-act="${firstBoard ? 'meet' : 'next'}" data-autofocus>${esc(primaryLabel)}</button>
           <div class="win-secondary">
-            ${firstBoard ? '' : `<button class="btn btn--quiet" data-act="${meet ? 'meet' : 'sanctuary'}">${ICON.home}${meet ? `Meet ${esc(PET_BY_ID[rewards.pets[0]].name)}` : 'Visit sanctuary'}</button>`}
+            ${firstBoard ? '' : worldVisit && !meet ? `<button class="btn btn--quiet" data-act="region">${ICON.globe}Visit the ${esc(SANCTUARY_BY_ID[worldVisit].name.replace(/ Sanctuary$/, ''))}</button>` : `<button class="btn btn--quiet" data-act="${meet ? 'meet' : 'sanctuary'}">${ICON.home}${meet ? `Meet ${esc(PET_BY_ID[rewards.pets[0]].name)}` : 'Visit sanctuary'}</button>`}
             <button class="btn btn--quiet" data-act="share" aria-label="Share result">${ICON.share}${firstBoard ? 'Share result' : 'Share'}</button>
           </div>
         </div>`,
@@ -983,6 +1020,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       ws.close();
       if (a.act === 'meet' || a.act === 'sanctuary') {
         app.router.go({ screen: 'sanctuary', welcome: a.act === 'meet' ? rewards.pets : [] });
+        return;
+      }
+      if (a.act === 'region' && worldVisit) {
+        app.router.go({ screen: 'region', id: worldVisit, fresh: growth?.stageUp && growth.sanctuary === worldVisit ? stageOf(app.save, worldVisit) : 0 });
         return;
       }
       // Celebration first, always. An interstitial (if any network is live) can only follow the player's tap.

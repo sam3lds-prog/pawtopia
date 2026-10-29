@@ -303,3 +303,31 @@ Owner decisions (2026-10-29): reward videos through Google AdMob, paid gems thro
 - **Capacitor 6 → 8** (plus `@capacitor/haptics` 8), done before the iOS project was first generated, because both
   plugins require Capacitor 8. Setup steps for Info.plist, App Store Connect products, RevenueCat and AdMob are in
   `docs/native-setup.md`; keys go in `.env.local` (`.env.example` lists them).
+
+## 2026-10-29 · D28 — The world map and regional sanctuaries
+Owner decisions (2026-10-29): four regional sanctuaries — Australian Outback, African Savanna, Arctic, Amazon
+Rainforest — each with animals from that region, tracked on a world map.
+
+- **Opening**: regions open for free at Journey milestones (after levels 6, 20, 40, 60). Opening and growing a region
+  are never sold; there is no way to buy progress.
+- **Growing**: you build one regional sanctuary at a time (the first open, unfinished one, or the one you pick with
+  "Build here"; progress elsewhere is kept). Every solved puzzle adds one to it — Journey (replays too), Daily and Zen;
+  Paw Cup is competition and the guided first board is practice, so neither counts. Stages at 3 / 8 / 15 / 25 solves:
+  first friend, shelter, water and shade, thriving. Each of the first three stages welcomes one of the region's
+  animals; the last gives 150 Paw Coins once (`world:complete:<id>`). Stages and arrivals are derived from the growth
+  count, so a reconcile at startup repairs an interrupted save and nothing is granted twice (`meta/world.ts`).
+- **Animals**: 12 regional wildlife friends (koala, kangaroo, wombat; giraffe, meerkat, elephant calf; snowy owl, polar
+  bear cub, seal pup; toucan, sloth, capybara), drawn in code like Ember and Maple, with pats, food and favorites. They
+  live only in their sanctuary and never appear on a puzzle board (cats and dogs only, D11).
+- **Decor**: each region has four decorations of its own (two for coins, one for video tokens, one for gems), bought
+  once that region is open. The Shop's decor tab picks a sanctuary. Every decoration belongs to exactly one sanctuary.
+- **Map**: Natural Earth land outlines (public domain, via world-atlas) projected with Natural Earth I by a one-off
+  script; the output is committed and the app computes pin positions with the same formula (no d3 at runtime). Harmony
+  is a small fictional island in the Pacific.
+- **Navigation**: the bottom bar's Pets tab becomes **World** (map → regional sanctuary). The resident collection is
+  now the **Animal album** (from World), with every wildlife friend listed by sanctuary. Home shows a strip with the
+  sanctuary being built and how close its next stage is.
+- **Life**: regional scenes reuse the sanctuary ambient director (D24): blades turn, the aurora ripples, birds and
+  butterflies drift, hammocks sway, one short action at a time, nothing looping, still under reduced motion. Animals
+  say hello when you arrive (a bigger hello on the first visit of the day or right after a solve that helped), and a
+  stage just reached grows in.

@@ -8,10 +8,12 @@
  */
 
 import { app } from '../../app/app';
-import { DECOR, DECOR_BY_ID, decorTier, type DecorId, type DecorTier } from '../../meta/catalogs/decor';
+import { DECOR, DECOR_BY_ID, decorHome, decorTier, type DecorId, type DecorTier } from '../../meta/catalogs/decor';
 import { FOODS, FOOD_BY_ID, type FoodId } from '../../meta/catalogs/foods';
 import { chapterAt } from '../../meta/chapters';
-import { buyDecor, decorPrice, owns, walletBalance } from '../../meta/sanctuary';
+import { buyDecor, decorPrice, decorUnlocked, owns, walletBalance } from '../../meta/sanctuary';
+import { SANCTUARIES, SANCTUARY_BY_ID, type RegionId, type SanctuaryId } from '../../meta/catalogs/sanctuaries';
+import { isOpen } from '../../meta/world';
 import { buyFood, foodCount, FOOD_CAP_EACH } from '../../meta/feeding';
 import { grantGemPurchase, isGemPack } from '../../meta/gems';
 import { track } from '../../services/analytics';
@@ -30,8 +32,21 @@ import { ICON } from '../icons';
 import type { Scope, ScreenDef } from '../router';
 
 type Tab = 'decor' | 'food' | 'gems';
-/** The tab the player last looked at, for this app session. */
+/** The tab and sanctuary the player last looked at, for this app session. */
 let lastTab: Tab = 'decor';
+let lastPlace: SanctuaryId = 'harmony';
+
+const placeShort = (id: SanctuaryId) => SANCTUARY_BY_ID[id].name.replace(/ Sanctuary$/, '');
+/** Where a decoration's sanctuary is shown: Harmony's screen or the region's. */
+function goSee(id: DecorId): void {
+  const home = decorHome(DECOR_BY_ID[id]);
+  if (home === 'harmony') app.router.go({ screen: 'sanctuary' });
+  else app.router.go({ screen: 'region', id: home });
+}
+function whereText(id: DecorId): string {
+  const home = decorHome(DECOR_BY_ID[id]);
+  return home === 'harmony' ? 'the garden' : `the ${SANCTUARY_BY_ID[home].name}`;
+}
 
 const CURRENCY_ICON = { coins: ICON.coin, vtoken: ICON.videoToken, gem: ICON.gem } as const;
 const CURRENCY_NAME = { coins: 'Paw Coins', vtoken: 'video tokens', gem: 'gems' } as const;
@@ -39,10 +54,15 @@ const CURRENCY_NAME = { coins: 'Paw Coins', vtoken: 'video tokens', gem: 'gems' 
 export const shopScreen: ScreenDef = {
   tab: 'shop',
   title: 'Shop',
-  mount(root, scope) {
+  mount(root, scope, route) {
     const el = h(`<div class="shop"></div>`);
     root.appendChild(el);
     let tab: Tab = lastTab;
+    if (route.screen === 'shop' && route.sanctuary) {
+      tab = lastTab = 'decor';
+      lastPlace = route.sanctuary;
+    }
+    let place: SanctuaryId = lastPlace;
     let products: ProductInfo[] = PRODUCT_CATALOG.map((p) => ({ ...p, price: null }));
     void iap.products().then((ps) => {
       if (!scope.alive) return;
@@ -60,11 +80,13 @@ export const shopScreen: ScreenDef = {
       const have = owns(app.save, id);
       const price = decorPrice(id);
       let action: string;
+      const locked = !have && !decorUnlocked(app.save, id);
       if (have) action = `<span class="shop-card__state">${ICON.check}Owned</span>`;
+      else if (locked) action = `<span class="shop-card__state">${ICON.lock}Level ${SANCTUARY_BY_ID[decorHome(d)].opensAfterLevel}</span>`;
       else if (d.unlock.kind === 'chapter') action = `<span class="shop-card__state shop-card__state--gift">${ICON.gift}Finish ${esc(chapterAt(d.unlock.chapter - 1).name)}</span>`;
       else action = price ? priceTag(price.currency, price.amount) : '';
-      const label = have ? `${d.name}, owned` : d.unlock.kind === 'chapter' ? `${d.name}, chapter gift` : price ? `${d.name}, ${price.amount} ${CURRENCY_NAME[price.currency]}` : d.name;
-      return `<li><button class="shop-card card card--tap ${have ? 'is-owned' : ''} shop-card--${decorTier(d)}" data-decor="${id}" aria-label="${esc(label)}">
+      const label = have ? `${d.name}, owned` : locked ? `${d.name}, opens with the ${SANCTUARY_BY_ID[decorHome(d)].name}` : d.unlock.kind === 'chapter' ? `${d.name}, chapter gift` : price ? `${d.name}, ${price.amount} ${CURRENCY_NAME[price.currency]}` : d.name;
+      return `<li><button class="shop-card card card--tap ${have ? 'is-owned' : ''} ${locked ? 'is-locked' : ''} shop-card--${decorTier(d)}" data-decor="${id}" aria-label="${esc(label)}">
         <span class="shop-card__art">${decorIcon(id)}</span>
         <span class="shop-card__name">${esc(d.name)}</span>
         ${action}
@@ -72,7 +94,7 @@ export const shopScreen: ScreenDef = {
     }
 
     function decorSection(tier: DecorTier | 'everyday', title: string, note: string, extra = ''): string {
-      const items = DECOR.filter((d) => (tier === 'everyday' ? decorTier(d) === 'coins' || decorTier(d) === 'gift' : decorTier(d) === tier));
+      const items = DECOR.filter((d) => decorHome(d) === place && (tier === 'everyday' ? decorTier(d) === 'coins' || decorTier(d) === 'gift' : decorTier(d) === tier));
       if (!items.length) return '';
       const owned = items.filter((d) => owns(app.save, d.id)).length;
       return `<section class="shop-section shop-section--${tier}">
@@ -93,9 +115,19 @@ export const shopScreen: ScreenDef = {
       </div>`;
     }
 
+    function placeChips(): string {
+      return `<div class="place-chips" role="tablist" aria-label="Which sanctuary">${SANCTUARIES.map((sd) => {
+        const open = sd.id === 'harmony' || isOpen(app.save, sd.id as RegionId);
+        return `<button role="tab" class="place-chip ${open ? '' : 'is-locked'}" data-place="${sd.id}" aria-selected="${sd.id === place}" style="--accent:${sd.accent}">${open ? '' : ICON.lock}${esc(placeShort(sd.id))}</button>`;
+      }).join('')}</div>`;
+    }
+
     function decorTab(): string {
+      const regionLocked = place !== 'harmony' && !isOpen(app.save, place as RegionId);
       return `
-        ${decorSection('everyday', 'Sanctuary decor', 'Paid for with Paw Coins, which you earn by solving puzzles.')}
+        ${placeChips()}
+        ${regionLocked ? `<p class="notice">${ICON.lock}The ${esc(SANCTUARY_BY_ID[place].name)} opens after level ${SANCTUARY_BY_ID[place].opensAfterLevel}. Its decorations can be bought once it opens.</p>` : ''}
+        ${decorSection('everyday', place === 'harmony' ? 'Sanctuary decor' : `${placeShort(place)} decor`, 'Paid for with Paw Coins, which you earn by solving puzzles.')}
         ${decorSection('video', 'Special decor', 'Only for video tokens.', videoTokenCard())}
         ${decorSection('premium', 'Premium decor', `For gems. ${iap.available ? '' : 'Gem packs are coming soon.'}`)}`;
     }
@@ -183,6 +215,13 @@ export const shopScreen: ScreenDef = {
 
     scope.on(el, 'click', async (e) => {
       const t = e.target as HTMLElement;
+      const pc = t.closest('[data-place]') as HTMLElement | null;
+      if (pc) {
+        place = lastPlace = pc.dataset.place as SanctuaryId;
+        render();
+        (el.querySelector(`[data-place="${place}"]`) as HTMLElement | null)?.focus();
+        return;
+      }
       const tb = t.closest('[data-tab]') as HTMLElement | null;
       if (tb && tb.closest('.seg')) {
         tab = lastTab = tb.dataset.tab as Tab;
@@ -252,8 +291,11 @@ function decorSheet(scope: Scope, id: DecorId, rerender: () => void): void {
   const price = decorPrice(id);
   const tier = decorTier(d);
   let actions: string;
-  if (have) actions = `<button class="btn btn--block" data-act="visit">See it in the sanctuary</button>`;
-  else if (d.unlock.kind === 'chapter') actions = `<p class="muted">A gift for finishing ${esc(chapterAt(d.unlock.chapter - 1).name)} (level ${d.unlock.chapter * 20}).</p>`;
+  if (have) actions = `<button class="btn btn--block" data-act="visit">See it in ${esc(whereText(id))}</button>`;
+  else if (!decorUnlocked(app.save, id)) {
+    const sd = SANCTUARY_BY_ID[decorHome(d)];
+    actions = `<p class="muted">For the ${esc(sd.name)}, which opens after level ${sd.opensAfterLevel}. You can buy it once it opens.</p>`;
+  } else if (d.unlock.kind === 'chapter') actions = `<p class="muted">A gift for finishing ${esc(chapterAt(d.unlock.chapter - 1).name)} (level ${d.unlock.chapter * 20}).</p>`;
   else if (price) {
     const short = price.amount - walletBalance(app.save, price.currency);
     const how =
@@ -285,7 +327,7 @@ function decorSheet(scope: Scope, id: DecorId, rerender: () => void): void {
     if (a.act === 'close') sh.close();
     else if (a.act === 'visit') {
       sh.close();
-      app.router.go({ screen: 'sanctuary' });
+      goSee(id);
     } else if (a.act === 'buy') {
       busy = true;
       const r = buyDecor(app.save, id);
@@ -297,10 +339,10 @@ function decorSheet(scope: Scope, id: DecorId, rerender: () => void): void {
         track('decor_bought', { item: id, tier, amount: price?.amount ?? 0 });
         sh.close();
         rerender();
-        toast(news.achievements.length ? `${d.name} is in the garden. Badge unlocked: ${news.achievements[0].name}!` : `${d.name} is in the garden.`);
+        toast(news.achievements.length ? `${d.name} is in ${whereText(id)}. Badge unlocked: ${news.achievements[0].name}!` : `${d.name} is in ${whereText(id)}.`);
       } else {
         busy = false;
-        toast(r === 'insufficient' ? `Not enough ${price ? CURRENCY_NAME[price.currency] : 'coins'} yet.` : r === 'owned' ? 'Already yours.' : 'This one is a chapter gift.');
+        toast(r === 'insufficient' ? `Not enough ${price ? CURRENCY_NAME[price.currency] : 'coins'} yet.` : r === 'owned' ? 'Already yours.' : r === 'locked' ? 'That sanctuary has not opened yet.' : 'This one is a chapter gift.');
       }
     }
   });

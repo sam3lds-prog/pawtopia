@@ -17,7 +17,23 @@
 import { mulberry32, type Rng } from '../../engine/rng';
 import type { Clock } from './faceDirector';
 
-export type AmbientAction = 'blink' | 'look' | 'yawn' | 'wag' | 'stretch' | 'hop' | 'sparkle' | 'glow' | 'drift' | 'twinkle' | 'love';
+export type AmbientAction =
+  | 'blink'
+  | 'look'
+  | 'yawn'
+  | 'wag'
+  | 'stretch'
+  | 'hop'
+  | 'sparkle'
+  | 'glow'
+  | 'drift'
+  | 'twinkle'
+  | 'love'
+  | 'spin'
+  | 'shimmer'
+  | 'sway'
+  | 'flutter'
+  | 'greet';
 
 /** How long each action plays, in ms. Kept short (≤ 1.8 s). */
 export const ACTION_MS: Record<AmbientAction, number> = {
@@ -32,6 +48,11 @@ export const ACTION_MS: Record<AmbientAction, number> = {
   drift: 1800,
   twinkle: 1600,
   love: 1100,
+  spin: 1800,
+  shimmer: 1800,
+  sway: 1600,
+  flutter: 1500,
+  greet: 1400,
 };
 
 /** Actions that only change a face (allowed under reduced motion when the player taps). */

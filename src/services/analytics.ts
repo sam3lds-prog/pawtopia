@@ -28,7 +28,10 @@ export type AnalyticsEvent =
   | 'extra_life_used'
   | 'food_bought'
   | 'animal_fed'
-  | 'companion_unlocked';
+  | 'companion_unlocked'
+  | 'region_open'
+  | 'region_build'
+  | 'region_stage';
 
 export type EventProps = Record<string, string | number | boolean>;
 

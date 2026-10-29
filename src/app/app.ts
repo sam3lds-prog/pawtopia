@@ -19,6 +19,7 @@ import { TEST_BUILD } from '../config/services';
 import { iap } from '../services/iap';
 import { reconcileGemPurchases } from '../meta/gems';
 import { packedLevelTier } from '../game/puzzles';
+import { reconcileWorld } from '../meta/world';
 
 type Listener = () => void;
 
@@ -43,8 +44,10 @@ class App {
     const gift = reconcileRewards(this.save, new Date(), (level, clear) => packedLevelTier(level, clear.spec ?? 1));
     // Everyone, new or returning, gets the starter pantry once (rewards are not back-dated in treats or tickets).
     const pantry = grantStarterItems(this.save);
+    // Any regional friend whose sanctuary stage was reached but not recorded (an interrupted save) arrives now.
+    const friends = reconcileWorld(this.save);
     if (gift.coins > 0 || gift.pets.length || gift.decor.length) this.upgradeGift = gift;
-    if (gift.coins > 0 || gift.pets.length || gift.decor.length || gift.points > 0 || pantry) saveSave(this.save);
+    if (gift.coins > 0 || gift.pets.length || gift.decor.length || gift.points > 0 || pantry || friends.length) saveSave(this.save);
     try {
       const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
       this.systemReduced = mq.matches;

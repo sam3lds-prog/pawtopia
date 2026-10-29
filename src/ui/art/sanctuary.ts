@@ -14,14 +14,8 @@ import type { FaceMood } from '../animation/faceMachine';
 import { petRigMarkup } from './pets';
 import { COMPANION_BY_ID, COMPANIONS, type CompanionId } from '../../meta/catalogs/companions';
 import { companionFigure, woodlandNook } from './companions';
-
-/** A small heart that floats over a figure when the player pats it (hidden until `.is-love`). */
-function heartAbove(x: number, y: number): string {
-  return `<path class="sp-heart" d="M${x} ${y + 3.2} c-3.6 -2.4 -5.4 -4.2 -5.4 -6.2 c0 -1.6 1.2 -2.8 2.7 -2.8 c1.2 0 2.1 0.7 2.7 1.6 c0.6 -0.9 1.5 -1.6 2.7 -1.6 c1.5 0 2.7 1.2 2.7 2.8 c0 2 -1.8 3.8 -5.4 6.2 z" fill="#E8707A" opacity="0"/>`;
-}
-
-const OUT = 'rgba(40,52,52,0.28)';
-const SHADOW = 'rgba(40,52,52,0.13)';
+import { REGION_DECOR_ART, type RegionDecorId } from './regions';
+import { OUT, SHADOW, dusk, heartAbove, iconFrom, type DecorArt } from './sceneKit';
 
 // ------------------------------------------------------------------ backdrop
 
@@ -87,18 +81,12 @@ function brook(): string {
 
 // ------------------------------------------------------------------ decor
 
-interface DecorArt {
-  /** Ground line used for back-to-front ordering. */
-  base: number;
-  /** Crop box for a standalone icon [x, y, w, h]. */
-  box: [number, number, number, number];
-  draw(): string;
-}
-
 const paw = (x: number, y: number, c = '#c8ae84') =>
   `<g fill="${c}"><ellipse cx="${x}" cy="${y + 0.7}" rx="2.4" ry="1.7"/><circle cx="${x - 2.3}" cy="${y - 1.3}" r="0.85"/><circle cx="${x}" cy="${y - 2.1}" r="0.85"/><circle cx="${x + 2.3}" cy="${y - 1.3}" r="0.85"/></g>`;
 
-const DECOR_ART: Record<DecorId, DecorArt> = {
+type HarmonyDecorId = Exclude<DecorId, RegionDecorId>;
+
+const DECOR_ART: Record<HarmonyDecorId, DecorArt> = {
   kite: {
     base: -20,
     box: [16, 4, 72, 72],
@@ -416,27 +404,27 @@ interface FriendSpot {
   on?: { decor: DecorId; x: number; y: number; H: number };
 }
 
-const FRIEND_SPOTS: Record<CompanionId, FriendSpot> = {
+const FRIEND_SPOTS: Partial<Record<CompanionId, FriendSpot>> = {
   ember: { x: 46, y: 224, H: 40, mood: 'happy' },
   maple: { x: 196, y: 160, H: 32, mood: 'sleepy', on: { decor: 'tree', x: 58, y: 117, H: 32 } },
 };
 
-function fireflies(): string {
-  const dots: Array<[number, number]> = [
-    [70, 150],
-    [180, 128],
-    [208, 176],
-    [300, 170],
-    [120, 196],
-    [338, 118],
-  ];
-  return `<g class="sp-fireflies">${dots.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4" fill="#fff3b0" opacity="0.25"/><circle cx="${x}" cy="${y}" r="1.4" fill="#fff8d6"/>`).join('')}</g>`;
-}
+const HARMONY_FIREFLIES: Array<[number, number]> = [
+  [70, 150],
+  [180, 128],
+  [208, 176],
+  [300, 170],
+  [120, 196],
+  [338, 118],
+];
 
 export function sanctuaryScene(state: SceneState, id = 'sanct'): string {
   const shown = new Set(state.decor);
   const items: Array<{ base: number; svg: string }> = [];
-  for (const d of DECOR) if (shown.has(d.id)) items.push({ base: DECOR_ART[d.id].base, svg: `<g data-decor="${d.id}">${DECOR_ART[d.id].draw()}</g>` });
+  for (const d of DECOR) {
+    const a = (DECOR_ART as Partial<Record<DecorId, DecorArt>>)[d.id];
+    if (a && shown.has(d.id)) items.push({ base: a.base, svg: `<g data-decor="${d.id}">${a.draw()}</g>` });
+  }
   for (const p of PETS) {
     if (!state.pets.includes(p.id)) continue;
     const spot = PET_SPOTS[p.id];
@@ -444,35 +432,35 @@ export function sanctuaryScene(state: SceneState, id = 'sanct'): string {
     const x = on ? on.x : spot.x;
     const y = on ? on.y : spot.y;
     // Pets sit just in front of the thing they sit on.
-    items.push({ base: (on ? DECOR_ART[on.decor].base : y) + 0.5, svg: petFigure(p.id, x, y, 46, spot.mood) });
+    items.push({ base: (on ? DECOR_ART[on.decor as HarmonyDecorId].base : y) + 0.5, svg: petFigure(p.id, x, y, 46, spot.mood) });
   }
-  const friends = (state.companions ?? []).filter((c) => c in COMPANION_BY_ID);
+  const friends = (state.companions ?? []).filter((c) => c in COMPANION_BY_ID && COMPANION_BY_ID[c].sanctuary === 'harmony');
   if (friends.some((c) => COMPANION_BY_ID[c].habitat === 'woodland')) items.push({ base: 220, svg: woodlandNook() });
   for (const c of COMPANIONS) {
     if (!friends.includes(c.id)) continue;
     const spot = FRIEND_SPOTS[c.id];
+    if (!spot) continue;
     const on = spot.on && shown.has(spot.on.decor) ? spot.on : null;
     const fx = on ? on.x : spot.x;
     const fy = on ? on.y : spot.y;
     const H = on ? on.H : spot.H;
     const fig = companionFigure(c.id, fx, fy, H, spot.mood).replace(/<\/g>$/, `${heartAbove(fx, fy - H * 1.25)}</g>`);
-    items.push({ base: (on ? DECOR_ART[on.decor].base : fy) + 0.6, svg: fig });
+    items.push({ base: (on ? DECOR_ART[on.decor as HarmonyDecorId].base : fy) + 0.6, svg: fig });
   }
   items.sort((a, b) => a.base - b.base);
-  const dusk = state.evening ? `<rect width="360" height="300" fill="#3b3f6b" opacity="0.16" pointer-events="none"/>${fireflies()}` : '';
-  return backdrop(id) + items.map((i) => i.svg).join('') + dusk;
+  const evening = state.evening ? dusk(HARMONY_FIREFLIES) : '';
+  return backdrop(id) + items.map((i) => i.svg).join('') + evening;
 }
 
 /** Standalone icon of one decoration (shop cards, reward sheets). */
 export function decorIcon(id: DecorId, label?: string): string {
-  const a = DECOR_ART[id];
-  const [x, y, w, h] = a.box;
-  const pad = 4;
-  const size = Math.max(w, h) + pad * 2;
-  const vx = x + w / 2 - size / 2;
-  const vy = y + h / 2 - size / 2;
-  const a11y = label ? `role="img" aria-label="${label.replace(/"/g, '&quot;')}"` : 'aria-hidden="true" focusable="false"';
-  return `<svg class="decor-icon" viewBox="${vx} ${vy} ${size} ${size}" xmlns="http://www.w3.org/2000/svg" ${a11y}>${a.draw()}</svg>`;
+  const a = (DECOR_ART as Partial<Record<DecorId, DecorArt>>)[id] ?? (REGION_DECOR_ART as Partial<Record<DecorId, DecorArt>>)[id];
+  return a ? iconFrom(a, label) : '';
+}
+
+/** Every decoration has art (checked by tests). */
+export function hasDecorArt(id: DecorId): boolean {
+  return id in DECOR_ART || id in REGION_DECOR_ART;
 }
 
 export const SCENE_VIEWBOX = '0 0 360 300';

@@ -4,7 +4,9 @@
  */
 
 import type { SaveV2 } from '../services/storage';
-import { DECOR, DECOR_BY_ID, STARTER_DECOR, type DecorId } from './catalogs/decor';
+import { DECOR, DECOR_BY_ID, STARTER_DECOR, decorHome, type DecorId } from './catalogs/decor';
+import type { SanctuaryId } from './catalogs/sanctuaries';
+import { isOpen } from './world';
 import { itemBalance, spendItem } from './items';
 import { balance, spend } from './ledger';
 import { PETS } from './catalogs/pets';
@@ -25,7 +27,13 @@ export function chooseStarter(save: SaveV2, id: DecorId, now = new Date()): bool
   return true;
 }
 
-export type BuyResult = 'ok' | 'owned' | 'not-for-sale' | 'insufficient';
+export type BuyResult = 'ok' | 'owned' | 'not-for-sale' | 'insufficient' | 'locked';
+
+/** A regional decoration can be bought once its sanctuary is open; Harmony's always can. */
+export function decorUnlocked(save: Pick<SaveV2, 'journey'>, id: DecorId): boolean {
+  const home = decorHome(DECOR_BY_ID[id]);
+  return home === 'harmony' || isOpen(save, home);
+}
 
 /** What a decoration costs, in the one currency it is sold for (null: not for sale, e.g. a chapter gift). */
 export function decorPrice(id: DecorId): { currency: 'coins' | 'vtoken' | 'gem'; amount: number } | null {
@@ -52,6 +60,7 @@ export function buyDecor(save: SaveV2, id: DecorId, now = new Date()): BuyResult
   if (owns(save, id)) return 'owned';
   const price = decorPrice(id);
   if (!price) return 'not-for-sale';
+  if (!decorUnlocked(save, id)) return 'locked';
   const spendId = `buy:decor:${id}`;
   const r = price.currency === 'coins' ? spend(save, spendId, price.amount, 'shop', now, d.name) : spendItem(save, spendId, price.currency, price.amount, now, d.name);
   if (r === 'insufficient' || r === 'none') return 'insufficient';
@@ -66,11 +75,14 @@ export function canAfford(save: Pick<SaveV2, 'inventory'>, id: DecorId): boolean
   return !!p && walletBalance(save, p.currency) >= p.amount;
 }
 
-/** Owned decorations that are out in the garden, one per slot (a premium item wins its slot if both are out). */
-export function shownDecorIds(save: Pick<SaveV2, 'inventory' | 'sanctuary'>): DecorId[] {
+/**
+ * Owned decorations that are out in a sanctuary (Harmony by default), one per slot (a premium item wins its slot if
+ * both are out).
+ */
+export function shownDecorIds(save: Pick<SaveV2, 'inventory' | 'sanctuary'>, where: SanctuaryId = 'harmony'): DecorId[] {
   const out: DecorId[] = [];
   const taken = new Map<string, DecorId>();
-  const ordered = [...DECOR].sort((a, b) => Number(!!b.gems) - Number(!!a.gems));
+  const ordered = [...DECOR].filter((d) => decorHome(d) === where).sort((a, b) => Number(!!b.gems) - Number(!!a.gems));
   for (const d of ordered) {
     if (!isShown(save, d.id)) continue;
     if (d.slot) {
@@ -119,7 +131,7 @@ const TIER_WORD = { easy: 'Easy', medium: 'Medium', hard: 'Hard', expert: 'Exper
  */
 export function sanctuaryChat(save: SaveV2, now = new Date()): string | null {
   const residents = PETS.filter((p) => save.inventory.pets[p.id]).map((p) => ({ name: p.name, at: save.inventory.pets[p.id].unlockedAt }));
-  const friends = COMPANIONS.filter((c) => save.inventory.companions[c.id]).map((c) => ({ name: c.name, at: save.inventory.companions[c.id].unlockedAt }));
+  const friends = COMPANIONS.filter((c) => c.sanctuary === 'harmony' && save.inventory.companions[c.id]).map((c) => ({ name: c.name, at: save.inventory.companions[c.id].unlockedAt }));
   const all = [...residents, ...friends];
   if (!all.length) return null;
   const day = localDateKey(now);

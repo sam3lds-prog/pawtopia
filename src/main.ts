@@ -13,6 +13,8 @@ import { petsScreen } from './ui/screens/pets';
 import { shopScreen } from './ui/screens/shop';
 import { sanctuaryScreen } from './ui/screens/sanctuary';
 import { galleryScreen } from './ui/screens/gallery';
+import { worldScreen } from './ui/screens/world';
+import { regionScreen } from './ui/screens/region';
 import { needsWelcome, welcomeScreen } from './ui/screens/welcome';
 import { track } from './services/analytics';
 import { catchUpAchievements } from './app/events';
@@ -29,6 +31,8 @@ router.register({
   shop: shopScreen,
   sanctuary: sanctuaryScreen,
   gallery: galleryScreen,
+  world: worldScreen,
+  region: regionScreen,
   welcome: welcomeScreen,
   profile: profileScreen,
 });

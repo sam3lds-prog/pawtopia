@@ -161,6 +161,139 @@
   }
 }
 
+/* A string of bulbs warming up. */
+.sanctuary__scene.is-live [data-decor].is-glow .sp-glow-bulbs {
+  animation: sp-glow-bulbs 1800ms ease-in-out;
+}
+@keyframes sp-glow-bulbs {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Stars twinkle like fireflies. */
+.sanctuary__scene.is-live .sp-stars.is-twinkle {
+  animation: sp-twinkle 1600ms ease-in-out;
+}
+
+/* A windmill turns once round, then rests. */
+.sanctuary__scene.is-live .is-spin .sp-blades {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: sp-spin 1800ms ease-in-out;
+}
+@keyframes sp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The aurora ripples. */
+.sanctuary__scene.is-live .is-shimmer .sp-aurora {
+  animation: sp-shimmer 1800ms ease-in-out;
+}
+@keyframes sp-shimmer {
+  50% {
+    opacity: 1;
+    transform: translateX(8px) skewX(-4deg);
+  }
+}
+
+/* A hammock sways; a kite and a balloon bob on the breeze. */
+.sanctuary__scene.is-live .is-sway .sp-sway {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: sp-sway 1600ms ease-in-out;
+}
+@keyframes sp-sway {
+  30% {
+    transform: rotate(3deg);
+  }
+  70% {
+    transform: rotate(-2.5deg);
+  }
+}
+.sanctuary__scene.is-live .is-sway .sp-kite,
+.sanctuary__scene.is-live .is-sway .sp-balloon {
+  animation: sp-bob 1600ms ease-in-out;
+}
+@keyframes sp-bob {
+  50% {
+    transform: translate(3px, -4px);
+  }
+}
+
+/* Birds and butterflies drift a little way and settle back. */
+.sanctuary__scene.is-live .is-flutter .sp-birds {
+  animation: sp-flutter 1500ms ease-in-out;
+}
+@keyframes sp-flutter {
+  40% {
+    transform: translate(9px, -5px);
+  }
+  70% {
+    transform: translate(5px, -2px);
+  }
+}
+
+/* Arrival hello: two happy hops and a heart (bigger after a solve that helped this place). */
+.sanctuary__scene.is-live .sanctuary__pet.is-greet {
+  animation: sp-greet 1400ms ease-out;
+}
+@keyframes sp-greet {
+  0%,
+  100% {
+    transform: none;
+  }
+  14% {
+    transform: translateY(-8px) rotate(-3deg);
+  }
+  28% {
+    transform: scale(1.04, 0.95);
+  }
+  44% {
+    transform: translateY(-6px) rotate(3deg);
+  }
+  58% {
+    transform: scale(1.03, 0.97);
+  }
+  72% {
+    transform: none;
+  }
+}
+.sanctuary__scene.is-live .sanctuary__pet.is-greet .sp-heart {
+  animation: sp-heart 1100ms ease-out 250ms;
+}
+.sanctuary__scene .sanctuary__friend.is-greet .sp-mouth--idle {
+  opacity: 0 !important;
+}
+.sanctuary__scene .sanctuary__friend.is-greet .sp-mouth--happy {
+  opacity: 1 !important;
+}
+
+/* A stage just reached grows in. */
+.sanctuary__scene.is-live .sp-stage.is-new {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: sp-grow 900ms ease-out;
+}
+@keyframes sp-grow {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  100% {
+    transform: none;
+  }
+}
+:root[data-motion='reduce'] .sanctuary__scene .sp-stage.is-new {
+  animation: none;
+}
+
 /* Reduced motion: the scene is still; a tap shows the heart in place instead of floating it. */
 :root[data-motion='reduce'] .sanctuary__scene .sanctuary__pet.is-love .sp-heart {
   opacity: 1;

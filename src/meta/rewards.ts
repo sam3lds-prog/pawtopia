@@ -90,7 +90,8 @@ export function applyLevelRewards(save: SaveV2, level: number, clear: LevelClear
   if (clear.clean) add(sum, save, `clean:L${level}`, ECONOMY.journeyCleanBonus, 'Clean solve', source, now);
   unlockPets(save, level, now, sum);
   for (const c of COMPANIONS) {
-    if (c.unlockLevel === level && !save.inventory.companions[c.id]) {
+    // Harmony friends arrive at Journey milestones; regional friends arrive as their sanctuary grows (meta/world.ts).
+    if (c.unlockLevel !== undefined && c.unlockLevel === level && !save.inventory.companions[c.id]) {
       save.inventory.companions[c.id] = { unlockedAt: now.toISOString() };
       sum.companions.push(c.id);
     }
@@ -174,7 +175,7 @@ export function unlockedCompanions(save: Pick<SaveV2, 'inventory'>): CompanionId
 export function nextArrival(save: Pick<SaveV2, 'inventory'>, solved: number): { name: string; level: number } | null {
   const all = [
     ...PETS.filter((p) => !save.inventory.pets[p.id]).map((p) => ({ name: p.name, level: p.unlockLevel })),
-    ...COMPANIONS.filter((c) => !save.inventory.companions[c.id]).map((c) => ({ name: c.name, level: c.unlockLevel })),
+    ...COMPANIONS.filter((c) => c.unlockLevel !== undefined && !save.inventory.companions[c.id]).map((c) => ({ name: c.name, level: c.unlockLevel! })),
   ].filter((x) => x.level > solved);
   all.sort((a, b) => a.level - b.level);
   return all[0] ?? null;
@@ -182,7 +183,7 @@ export function nextArrival(save: Pick<SaveV2, 'inventory'>, solved: number): { 
 
 /** Journey levels whose first clear welcomes someone new (residents and companions). */
 export function arrivalLevels(): Set<number> {
-  return new Set([...PETS.map((p) => p.unlockLevel), ...COMPANIONS.map((c) => c.unlockLevel)]);
+  return new Set([...PETS.map((p) => p.unlockLevel), ...COMPANIONS.flatMap((c) => (c.unlockLevel !== undefined ? [c.unlockLevel] : []))]);
 }
 
 /** The next pet still to arrive, and at which level. */

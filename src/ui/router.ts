@@ -5,6 +5,7 @@
  */
 
 import type { PetId } from '../meta/catalogs/pets';
+import type { RegionId, SanctuaryId } from '../meta/catalogs/sanctuaries';
 
 export class Scope {
   private disposers: Array<() => void> = [];
@@ -93,15 +94,17 @@ export class Scope {
   }
 }
 
-export type TabId = 'play' | 'home' | 'pets' | 'league' | 'shop';
+export type TabId = 'play' | 'home' | 'world' | 'league' | 'shop';
 
 export type Route =
   | { screen: 'home' }
   | { screen: 'play'; chapter?: number }
   | { screen: 'pets' }
   | { screen: 'league' }
-  | { screen: 'shop' }
+  | { screen: 'shop'; sanctuary?: SanctuaryId }
   | { screen: 'sanctuary'; welcome?: PetId[] }
+  | { screen: 'world' }
+  | { screen: 'region'; id: RegionId; fresh?: number }
   | { screen: 'game' }
   | { screen: 'gallery' }
   | { screen: 'welcome' }

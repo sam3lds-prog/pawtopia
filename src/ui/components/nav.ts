@@ -1,4 +1,4 @@
-/** Bottom navigation: Play | Home | Pets | League | Shop. Hidden during focused play. */
+/** Bottom navigation: Play | Home | World | League | Shop. Hidden during focused play. */
 
 import { h } from '../dom';
 import { ICON } from '../icons';
@@ -7,7 +7,7 @@ import type { Router, TabId } from '../router';
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: 'play', label: 'Play', icon: ICON.play },
   { id: 'home', label: 'Home', icon: ICON.home },
-  { id: 'pets', label: 'Pets', icon: ICON.paw },
+  { id: 'world', label: 'World', icon: ICON.globe },
   { id: 'league', label: 'League', icon: ICON.trophy },
   { id: 'shop', label: 'Shop', icon: ICON.bag },
 ];

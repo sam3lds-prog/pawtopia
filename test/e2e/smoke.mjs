@@ -284,6 +284,33 @@ try {
   const dGivens = await page.evaluate(() => window.__pt.app.active.session.puzzle.givens.length);
   check('tapping the Daily again continues the saved daily', dPlaced === dGivens + 1, `${dPlaced} vs ${dGivens + 1}`);
 
+  // World map: a pin for every sanctuary; the first opens after level 6; every solve grows the sanctuary being built
+  await page.evaluate(() => {
+    const s = window.__pt.app.save;
+    if (s.journey.nextLevel < 7) s.journey.nextLevel = 7;
+    window.__pt.app.persist();
+  });
+  await page.evaluate(() => window.__pt.go({ screen: 'home' }));
+  await page.click('.nav [data-tab="world"]');
+  await page.waitForSelector('.world-map');
+  check('the World tab shows a pin for every sanctuary', (await page.$$('.world-pin')).length === 5);
+  check('the Outback is open and being built', !!(await page.$('.world-pin.is-building[data-go="outback"]')));
+  check('later sanctuaries stay locked until their level', !!(await page.$('.world-pin.is-locked[data-go="amazon"]')));
+  await page.click('.world-card[data-go="outback"]');
+  await page.waitForSelector('.region .sanctuary__scene svg');
+  const g0 = await page.evaluate(() => window.__pt.app.save.world.growth.outback ?? 0);
+  await page.click('.region-progress [data-act="play"]');
+  await page.waitForSelector('.board');
+  await page.waitForTimeout(500);
+  if (await page.$('.overlay')) await page.evaluate(() => document.querySelector('.overlay [data-act]')?.click());
+  await page.waitForTimeout(300);
+  await solveActive();
+  const g1 = await page.evaluate(() => window.__pt.app.save.world.growth.outback ?? 0);
+  check('solving a puzzle grows the sanctuary being built by one', g1 === g0 + 1, `${g0} → ${g1}`);
+  check('the win sheet says how the sanctuary grew', /Outback/.test((await page.textContent('.win-sheet')) ?? ''));
+  await page.evaluate(() => window.__pt.go({ screen: 'shop', sanctuary: 'amazon' }));
+  check('a locked sanctuary’s decorations cannot be bought yet', !!(await page.$('.shop-card.is-locked[data-decor="waterfall"]')));
+
   // Scoped reset
   await page.evaluate(() => window.__pt.go({ screen: 'home' }));
   await page.click('[data-act="settings"]');

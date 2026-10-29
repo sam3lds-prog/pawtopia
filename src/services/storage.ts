@@ -159,6 +159,8 @@ export interface SaveV2 {
   };
   /** Reward videos watched today (all placements share one gentle daily cap). */
   ads: { day: string | null; rewarded: number };
+  /** The world map: which regional sanctuary you're building, and how much each has grown (puzzles solved there). */
+  world: { active: string | null; growth: Record<string, number>; visited: Record<string, string> };
   missions: { dayKey: string | null; weekKey: string | null; progress: Record<string, number>; claimed: Record<string, boolean> };
   achievements: Record<string, string>; // id → unlockedAt
   stats: {
@@ -230,6 +232,7 @@ export function defaultSave(now = new Date()): SaveV2 {
     inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {}, items: [], companions: {} },
     sanctuary: { hidden: {}, visits: 0, affection: {}, patted: {}, fed: {} },
     ads: { day: null, rewarded: 0 },
+    world: { active: null, growth: {}, visited: {} },
     missions: { dayKey: null, weekKey: null, progress: {}, claimed: {} },
     achievements: {},
     stats: { solved: 0, clean: 0, hintFree: 0, losses: 0, comebacks: 0, bestBySize: {}, sizesThisWeek: {}, playDays: {}, lastWin: null },
@@ -431,6 +434,11 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       fed: rec(san.fed, (v) => (isObj(v) && typeof v.day === 'string' ? { day: v.day, n: int(v.n, 0, 0, 1000) } : undefined)),
     },
     ads: { day: isObj(x.ads) ? strOrNull(x.ads.day) : null, rewarded: isObj(x.ads) ? int(x.ads.rewarded, 0, 0, 1000) : 0 },
+    world: {
+      active: isObj(x.world) ? strOrNull(x.world.active) : null,
+      growth: isObj(x.world) ? rec(x.world.growth, numItem) : {},
+      visited: isObj(x.world) ? rec(x.world.visited, strItem) : {},
+    },
     missions: {
       dayKey: strOrNull(mi.dayKey),
       weekKey: strOrNull(mi.weekKey),

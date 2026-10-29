@@ -161,10 +161,12 @@ describe('sanctuary motion stays in the sanctuary', () => {
 describe('wildlife companions', () => {
   it('are a separate model: never a puzzle species, and only the finished ones are listed', () => {
     for (const c of COMPANIONS) expect(isPetId(c.id)).toBe(false);
-    expect(COMPANIONS.map((c) => [c.id, c.unlockLevel])).toEqual([
+    expect(COMPANIONS.filter((c) => c.unlockLevel !== undefined).map((c) => [c.id, c.unlockLevel])).toEqual([
       ['ember', 30],
       ['maple', 45],
     ]);
+    // Regional friends arrive with their sanctuary's stages, never at a level.
+    for (const c of COMPANIONS.filter((x) => x.sanctuary !== 'harmony')) expect(c.unlockLevel, c.id).toBeUndefined();
   });
 
   it('arrive on their level, once, and are back-dated for players already past it', () => {
