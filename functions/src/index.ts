@@ -3,7 +3,8 @@
  * unit-tested logic in src/leaderboard (bundled in by `npm run fb:build`). Clients can't write Firestore directly
  * (firestore.rules); these functions are the only way in, and they ignore anything a client claims about points.
  *
- * App Check: set ENFORCE_APP_CHECK=true in functions/.env once App Attest is set up for the iOS app (docs/native-setup.md).
+ * App Check: the app doesn't send App Check tokens yet (that needs a native App Attest provider plugin), so leave
+ * ENFORCE_APP_CHECK unset until it does; enforcing it now would reject every call (docs/native-setup.md §3).
  */
 
 import { initializeApp } from 'firebase-admin/app';
@@ -11,11 +12,12 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { HttpsError, onCall, type CallableRequest } from 'firebase-functions/v2/https';
-import { LbError, deleteAccount, reportName, setProfile, submitSolves, type Doc, type Store } from '../../src/leaderboard/server';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { LbError, cleanupInactive, deleteAccount, reportName, setProfile, submitSolves, type Doc, type Store } from '../../src/leaderboard/server';
 
 initializeApp();
 const db = getFirestore();
-setGlobalOptions({ region: process.env.FUNCTIONS_REGION || 'us-central1', maxInstances: 10, memory: '512MiB', timeoutSeconds: 30 });
+setGlobalOptions({ region: process.env.FUNCTIONS_REGION || 'us-central1', maxInstances: 10, memory: '512MiB', timeoutSeconds: 60 });
 
 const store: Store = {
   tx: (fn) =>
@@ -32,6 +34,9 @@ const store: Store = {
   deleteTree: async (path) => {
     await db.recursiveDelete(db.doc(path));
   },
+  reportedBy: async (uid) => (await db.collection('reports').where('by', 'array-contains', uid).get()).docs.map((d) => d.id),
+  inactiveSince: async (beforeIso, limit) =>
+    (await db.collection('scores').where('updatedAt', '<', beforeIso).orderBy('updatedAt').limit(limit).get()).docs.map((d) => d.id),
 };
 
 const enforceAppCheck = process.env.ENFORCE_APP_CHECK === 'true';
@@ -59,6 +64,16 @@ export const lbSubmit = onCall({ enforceAppCheck }, (req) => run(() => submitSol
 
 /** Reports another player's name: { uid }. */
 export const lbReport = onCall({ enforceAppCheck }, (req) => run(() => reportName(store, uidOf(req), (req.data as { uid?: unknown } | null)?.uid)));
+
+/** Daily: removes accounts with no leaderboard activity for a year (lost phones, reinstalls), sign-ins included. */
+export const lbCleanup = onSchedule({ schedule: 'every day 04:17', timeZone: 'Etc/UTC' }, async () => {
+  const gone = await cleanupInactive(store);
+  for (const uid of gone)
+    await getAuth()
+      .deleteUser(uid)
+      .catch(() => undefined);
+  if (gone.length) console.log(`removed ${gone.length} inactive leaderboard accounts`);
+});
 
 /** Leaves the leaderboard: deletes every document of the account, then the anonymous sign-in itself. */
 export const lbDelete = onCall({ enforceAppCheck }, (req) =>

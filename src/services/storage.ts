@@ -13,7 +13,7 @@
 import { type KV, platformKV, safeParse } from './kv';
 import type { ModeRef } from '../game/modes';
 import { isValidModeRef } from '../game/modes';
-import type { SessionEvent, SessionSnapshot } from '../game/session';
+import { isSessionEvent, type SessionEvent, type SessionSnapshot } from '../game/session';
 import { dailySpec, levelSpec } from '../engine/levels';
 
 // ------------------------------------------------------------------ keys
@@ -260,7 +260,7 @@ function normLeaderboard(x: unknown): LeaderboardSave {
       const m = p.mode;
       const mode = m.kind === 'level' && Number.isInteger(m.level) ? { kind: 'level' as const, level: m.level as number } : m.kind === 'daily' && typeof m.dateKey === 'string' ? { kind: 'daily' as const, dateKey: m.dateKey } : null;
       if (!mode) continue;
-      pending.push({ key: p.key, mode, spec: p.spec, events: p.events.slice(0, 4000) as SessionEvent[], at: str(p.at, '') });
+      pending.push({ key: p.key, mode, spec: p.spec, events: p.events.slice(0, 4000).filter(isSessionEvent), at: str(p.at, '') });
     }
   pending.splice(0, Math.max(0, pending.length - LB_PENDING_MAX));
   const l = isObj(x.last) ? x.last : null;

@@ -79,9 +79,11 @@ consumable transactions and grants any it missed (a crash between paying and sav
    two composite indexes (weekly table and weekly rank).
 4. Run the security-rules tests once against the emulator: `npm run fb:test` (needs Java; the CLI downloads the
    emulator the first time).
-5. Before inviting players: register the iOS app in Firebase, turn on **App Check** with **App Attest**, then set
-   `ENFORCE_APP_CHECK=true` in `functions/.env` and deploy again. Update the App Store privacy label
-   (docs/privacy-security.md has the exact answers).
+5. Update the App Store privacy label (docs/privacy-security.md has the exact answers).
+6. **App Check is not wired up yet.** The game runs in a web view, where Firebase's web App Check can't use App Attest;
+   it needs a native provider plugin (for example `@capacitor-firebase/app-check`) once the iOS project exists. Until
+   that is added and tested, **leave `ENFORCE_APP_CHECK` unset**: enforcing it would reject every call. The server's
+   replay check and pacing limits work without it; App Check mainly stops scripted sign-ups.
 
 Players are never signed in automatically: nothing reaches Firebase until a player opens League → Leaderboard and taps
 **Join**. Leaving (League → Leaderboard → Leave) deletes their documents and their anonymous account.

@@ -7,7 +7,7 @@ import { profileOf } from '../../src/game/grading';
 import { POINTS } from '../../src/meta/points';
 import { checkSolve, possibleAwards, type BoardRef } from '../../src/leaderboard/check';
 import { cleanNickname, neutralName, suggestNickname } from '../../src/leaderboard/nickname';
-import { LIMITS, LbError, MemoryStore, deleteAccount, reportName, setProfile, submitSolves } from '../../src/leaderboard/server';
+import { LIMITS, LbError, MemoryStore, cleanupInactive, deleteAccount, reportName, setProfile, submitSolves } from '../../src/leaderboard/server';
 
 const NOW = new Date(Date.UTC(2026, 9, 29, 15, 0, 0));
 
@@ -98,6 +98,15 @@ describe('checking a solve', () => {
     expect(checkSolve({ mode: { kind: 'level', level: 0 }, spec: 1, events }, NOW)).toMatchObject({ ok: false, reason: 'bad-board' });
   });
 
+  it('counts a board only on the spec it is issued under, and never more hints than cells', () => {
+    const L80: BoardRef = { kind: 'level', level: 80 };
+    expect(spec(L80)).toBe(2);
+    expect(checkSolve({ mode: L80, spec: 1, events: play(L80).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
+    const { events } = play(L5);
+    const flood: SessionEvent[] = [...events.slice(0, 1), ...Array.from({ length: 200 }, () => ({ t: events[0].t, type: 'hint' as const })), ...events.slice(1)];
+    expect(checkSolve({ mode: L5, spec: spec(L5), events: flood }, NOW)).toMatchObject({ ok: false, reason: 'invalid-log' });
+  });
+
   it('knows which awards a solve could still add', () => {
     expect(possibleAwards(L5, 0, 0)).toEqual(['L5', 'clean:L5', 'nohint:L5']);
     expect(possibleAwards(L5, 1, 2)).toEqual(['L5']);
@@ -117,6 +126,10 @@ describe('nicknames', () => {
     expect(cleanNickname('Pawtopia Team')).toMatchObject({ ok: false, problem: 'words' });
     expect(cleanNickname('Sh1t Head')).toMatchObject({ ok: false, problem: 'words' });
     expect(cleanNickname(42)).toMatchObject({ ok: false });
+    // Ordinary names that merely contain a short blocked word are fine…
+    for (const ok of ['Peacock Fan', 'Hancock', 'Sussex Sam', 'Skillful Cat', 'Dickens', 'Grape Ape', 'Nazir', 'Classy Otter', 'Titania']) expect(cleanNickname(ok), ok).toMatchObject({ ok: true });
+    // …but the word itself, spaced-out strong words and staff impersonation are not.
+    for (const bad of ['Big Dick', 'Kill Bill', 'F u c k', 'Admin Bob', 'Pawtopia Mod', 'Sexy Cat', 'Kills Cats']) expect(cleanNickname(bad), bad).toMatchObject({ ok: false, problem: 'words' });
   });
 
   it('suggestions always pass, and hidden names are neutral and stable', () => {
@@ -178,6 +191,25 @@ describe('leaderboard server', () => {
     await expect(submitSolves(store, 'u1', new Array(LIMITS.perCall + 1).fill('x'), NOW)).rejects.toMatchObject({ code: 'invalid-argument' });
   });
 
+  it('a malformed entry is reported, never crashes the batch', async () => {
+    const store = await joined();
+    const good = { mode: L5, spec: spec(L5), events: play(L5).events };
+    const r = await submitSolves(store, 'u1', [{ ...good, events: [null, ...good.events] }, { ...good, events: [{ t: 'x', type: 'place' }] }, good], NOW);
+    expect(r.results.map((x) => x.status)).toEqual(['bad-request', 'bad-request', 'ok']);
+  });
+
+  it('checks nothing for someone who has not joined or is over the allowance', async () => {
+    const store = new MemoryStore();
+    // A board that would take a long time to rebuild is never rebuilt for a stranger.
+    await expect(submitSolves(store, 'stranger', [{ mode: { kind: 'level', level: 4999 }, spec: 2, events: [] }], NOW)).rejects.toMatchObject({ code: 'failed-precondition' });
+    const s2 = await joined();
+    const doc = s2.docs.get('players/u1')!;
+    s2.docs.set('players/u1', { ...doc, rate: { hour: NOW.toISOString().slice(0, 13), nHour: LIMITS.perHour - 1, day: NOW.toISOString().slice(0, 10), nDay: LIMITS.perHour - 1 } });
+    const good = { mode: L5, spec: spec(L5), events: play(L5).events };
+    const r = await submitSolves(s2, 'u1', [good, { mode: { kind: 'level', level: 4999 }, spec: 2, events: [] }], NOW);
+    expect(r.results.map((x) => x.status)).toEqual(['ok', 'rate-limited']);
+  });
+
   it('limits how many solves count per hour', async () => {
     const store = await joined();
     const doc = store.docs.get('players/u1')!;
@@ -204,13 +236,25 @@ describe('leaderboard server', () => {
     await expect(reportName(store, 'a', 'nobody', NOW)).rejects.toMatchObject({ code: 'not-found' });
   });
 
-  it('leaving deletes every document of the account', async () => {
+  it('leaving deletes every document of the account, including its reports of others', async () => {
     const store = await joined();
     await submitSolves(store, 'u1', [{ mode: L5, spec: spec(L5), events: play(L5).events }], NOW);
     await setProfile(store, 'u2', { nickname: 'Other One', avatar: 'pip' }, NOW);
+    await reportName(store, 'u1', 'u2', NOW);
+    expect(JSON.stringify([...store.docs])).toContain('"u1"');
     await deleteAccount(store, 'u1');
     expect([...store.docs.keys()].filter((k) => k.includes('u1'))).toEqual([]);
+    expect(JSON.stringify([...store.docs])).not.toContain('u1');
     expect(store.docs.has('scores/u2')).toBe(true);
+  });
+
+  it('the daily clean-up removes accounts inactive for a year', async () => {
+    const store = await joined('old');
+    await setProfile(store, 'recent', { nickname: 'Recent One', avatar: 'pip' }, new Date(NOW.getTime() + 300 * 86_400_000));
+    const gone = await cleanupInactive(store, new Date(NOW.getTime() + 400 * 86_400_000));
+    expect(gone).toEqual(['old']);
+    expect(store.docs.has('scores/old')).toBe(false);
+    expect(store.docs.has('scores/recent')).toBe(true);
   });
 
   it('the in-memory store enforces reads before writes, like Firestore', async () => {

@@ -26,6 +26,19 @@ export interface SyncNews {
 }
 
 let inFlight: Promise<SyncNews | null> | null = null;
+/** Bumped whenever the local leaderboard state is reset, so an answer to an older request is ignored. */
+let epoch = 0;
+
+/** Forgets this device's leaderboard state (after leaving, or erasing progress). */
+export function resetLeaderboardLocal(save: SaveV2): void {
+  epoch++;
+  const l = save.leaderboard;
+  l.joined = false;
+  l.pending = [];
+  l.awarded = {};
+  l.last = null;
+  l.joinedAt = null;
+}
 
 /** Sends what's waiting (one batch). Safe to call often; concurrent calls share one request. */
 export function syncLeaderboard(): Promise<SyncNews | null> {
@@ -36,11 +49,16 @@ export function syncLeaderboard(): Promise<SyncNews | null> {
 }
 
 async function run(): Promise<SyncNews | null> {
-  const lb = app.save.leaderboard;
+  const save = app.save;
+  const lb = save.leaderboard;
   if (!lb.joined || leaderboard.mode === 'off' || !lb.pending.length) return null;
   const batch = lb.pending.slice(0, LIMITS.perCall);
+  const started = epoch;
+  // The answer belongs to the state it was sent from: not after leaving, erasing or loading another save.
+  const stale = () => started !== epoch || app.save !== save || !save.leaderboard.joined;
   try {
     const res = await leaderboard.submit(batch);
+    if (stale()) return null;
     const keep = new Set<(typeof batch)[number]>();
     let points = 0;
     res.results.forEach((r, i) => {
@@ -54,8 +72,8 @@ async function run(): Promise<SyncNews | null> {
     app.persist();
     return { sent: batch.length, points };
   } catch (e) {
-    // Signed out or removed on the server: stop sending until the player joins again (the queue is kept).
-    if (e instanceof LbClientError && e.kind === 'not-joined') {
+    // The server says this player isn't on the leaderboard: stop sending until they join again (the queue is kept).
+    if (!stale() && e instanceof LbClientError && e.kind === 'not-joined') {
       app.save.leaderboard.joined = false;
       app.persist();
     }

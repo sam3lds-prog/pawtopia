@@ -17,19 +17,23 @@ sink; identifier-looking keys are dropped), no email, no contacts, no location, 
 
 ## Leaderboard rules (server-enforced)
 
-- **Opt-in, deletable.** Leaving deletes `players/{uid}` (with its awards), `scores/{uid}` and `reports/{uid}`, then the
-  anonymous auth user (`lbDelete`). Settings → Leaderboard says what is stored and links to it.
+- **Opt-in, deletable.** Leaving deletes `players/{uid}` (with its awards), `scores/{uid}`, `reports/{uid}` and the
+  player's id in reports they made, then the anonymous auth user (`lbDelete`). Erasing progress in Settings leaves the
+  leaderboard first. Accounts with no leaderboard activity for a year (a lost phone, a reinstall) are removed by a
+  daily clean-up (`lbCleanup`). Settings → Leaderboard says what is stored and links to it.
 - **Clients never write Firestore.** `firestore.rules` deny every write; reads: `scores` for signed-in users, a
   player's own `players/{uid}` and awards. Tests: `test/firebase/rules.test.ts` (`npm run fb:test`).
 - **Points are computed by the server**, never sent: each solve's board is rebuilt from its mode and spec and its move
   log replayed (`src/leaderboard/check.ts`, which uses `competitions/verify.ts`); unfinished, malformed or impossibly
-  fast logs don't count. Each award id pays once. 60 solves an hour, 250 a day; batches of ≤ 10.
+  fast logs don't count, and a board only counts on the spec it is issued under today. Each award id pays once. 30
+  solves an hour, 80 a day, checked before any board is rebuilt; batches of ≤ 10. A script can still replay boards
+  honestly, so pacing is the real limit; reports and the Firebase console handle the rest.
 - **Names**: 3–20 letters/numbers, no links or handles, a small blocked-word list (`src/leaderboard/nickname.ts`),
-  checked on the device and again on the server; a suggested friendly name is the default. Three distinct reports
-  replace a name with "Player ####". All names are escaped before rendering.
+  checked on the device and again on the server; a suggested friendly name is the default. Three distinct reporters
+  (each with a counted solve) replace a name with "Player ####". All names are escaped before rendering.
 - **Only real players** are ever shown. Development builds and the tester preview use an on-device table that only
   contains the player.
-- **App Check** (App Attest) should be enforced before inviting players (`ENFORCE_APP_CHECK=true`).
+- **App Check** is not wired up yet (needs a native App Attest provider in the iOS app); until then it stays off.
 - No service-account keys in the repo. The Firebase web config is not a secret.
 
 ## App Store privacy label (when each service is on)
@@ -45,7 +49,7 @@ sink; identifier-looking keys are dropped), no email, no contacts, no location, 
 ## Other safeguards
 
 - All dynamic text goes through `esc()` before `innerHTML`.
-- Reset removes only app-owned keys and keeps purchase entitlements; unrelated origin data is never touched. (A
-  player who resets while on the leaderboard keeps their online entry until they leave.)
+- Reset removes only app-owned keys and keeps purchase entitlements; unrelated origin data is never touched. A player
+  on the leaderboard leaves it as part of the reset (if the server can't be reached, nothing is erased).
 - Audience: general (not Kids Category). Kids Category would require removing third-party ads and a separate review.
 - Paw Cup (weekly competition) stays offline practice until its own verified backend exists (`docs/backend-plan.md`).

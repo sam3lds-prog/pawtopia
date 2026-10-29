@@ -230,7 +230,9 @@ class FirebaseLeaderboard implements LeaderboardService {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new LbClientError('offline', 'You seem to be offline.');
       if (code.endsWith('unavailable') || code.endsWith('network-request-failed') || code.endsWith('deadline-exceeded')) throw new LbClientError('offline', 'The leaderboard could not be reached.');
       if (code.endsWith('invalid-argument') || code.endsWith('permission-denied')) throw new LbClientError('invalid', msg, msg);
-      if (code.endsWith('failed-precondition') || code.endsWith('unauthenticated')) throw new LbClientError('not-joined', 'Join the leaderboard first.');
+      // Only the server's own "join first" means the player isn't on the leaderboard. Anything else (an auth or App
+      // Check problem, a server error) must never make the app forget that the player joined.
+      if (code.endsWith('failed-precondition')) throw new LbClientError('not-joined', 'Join the leaderboard first.');
       throw new LbClientError('failed', 'Something went wrong.');
     }
   }

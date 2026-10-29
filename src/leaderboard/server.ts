@@ -30,6 +30,10 @@ export interface Store {
   tx<T>(fn: (tx: Tx) => Promise<T>): Promise<T>;
   /** Deletes a document and everything under it. */
   deleteTree(path: string): Promise<void>;
+  /** Players whose name this player has reported (so leaving can remove those reports too). */
+  reportedBy(uid: string): Promise<string[]>;
+  /** Players with no leaderboard activity since `beforeIso` (oldest first, at most `limit`). */
+  inactiveSince(beforeIso: string, limit: number): Promise<string[]>;
 }
 
 export type LbErrorCode = 'invalid-argument' | 'failed-precondition' | 'not-found' | 'permission-denied' | 'resource-exhausted';
@@ -46,11 +50,16 @@ export class LbError extends Error {
 export const LIMITS = {
   /** Solves per request. */
   perCall: 10,
-  /** Solves counted per hour and per UTC day (a person plays far fewer). */
-  perHour: 60,
-  perDay: 250,
+  /**
+   * Solves checked per hour and per UTC day. Generous for a person (a long evening of the Journey is well under it),
+   * and it bounds what a script could add: logs can be replayed honestly by a bot, so pacing is the real limit.
+   */
+  perHour: 30,
+  perDay: 80,
   /** Distinct reports that replace a name with a neutral one. */
   reportsToHide: 3,
+  /** Accounts with no leaderboard activity for this long are removed by the daily clean-up. */
+  inactiveDays: 365,
 } as const;
 
 export const AVATARS: readonly string[] = [...PETS.map((p) => p.id), ...COMPANIONS.map((c) => c.id)];
@@ -97,19 +106,31 @@ function weekOf(score: Doc | null, now: Date): { weekKey: string; week: number }
   return { weekKey, week: score && score.weekKey === weekKey ? num(score.week) : 0 };
 }
 
+function safeCheck(x: unknown, now: Date): CheckResult | null {
+  const sub = parseSubmission(x);
+  if (!sub) return null;
+  try {
+    return checkSolve(sub, now);
+  } catch {
+    return { ok: false, key: '?', reason: 'invalid-log' };
+  }
+}
+
 /** Records verified solves. Unknown or malformed entries are reported back, never trusted. */
 export async function submitSolves(store: Store, uid: string, raw: unknown, now = new Date()): Promise<SubmitResult> {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > LIMITS.perCall) throw new LbError('invalid-argument', `Send 1 to ${LIMITS.perCall} solves at a time.`);
-  // The expensive part (rebuilding and replaying each board) happens before the transaction.
-  const checks: Array<CheckResult | null> = raw.map((x) => {
-    const sub = parseSubmission(x);
-    return sub ? checkSolve(sub, now) : null;
-  });
+  // Cheap gate first: only a joined player within their hourly / daily allowance gets any boards rebuilt and replayed.
+  const before = await store.tx(async (tx) => tx.get(`players/${uid}`));
+  if (!before) throw new LbError('failed-precondition', 'Join the leaderboard first.');
+  const r0 = readRate(before.rate, now);
+  const budget = Math.max(0, Math.min(LIMITS.perHour - r0.nHour, LIMITS.perDay - r0.nDay));
+  // The expensive part (rebuilding and replaying each board) happens outside the transaction, within the budget.
+  const checks: Array<CheckResult | null | 'over'> = raw.map((x, i) => (i < budget ? safeCheck(x, now) : 'over'));
   return store.tx(async (tx) => {
     const player = await tx.get(`players/${uid}`);
     if (!player) throw new LbError('failed-precondition', 'Join the leaderboard first.');
     const score = await tx.get(`scores/${uid}`);
-    const ids = [...new Set(checks.flatMap((c) => (c && c.ok ? c.awards.map((a) => a.id) : [])))];
+    const ids = [...new Set(checks.flatMap((c) => (c && c !== 'over' && c.ok ? c.awards.map((a) => a.id) : [])))];
     const have = new Set<string>();
     for (const id of ids) if (await tx.get(`players/${uid}/awards/${id}`)) have.add(id);
 
@@ -121,12 +142,12 @@ export async function submitSolves(store: Store, uid: string, raw: unknown, now 
     const at = now.toISOString();
     const results: SubmitResult['results'] = [];
     for (const c of checks) {
-      if (!c) {
-        results.push({ key: '?', status: 'bad-request', points: 0, awarded: [] });
+      if (c === 'over' || rate.nHour >= LIMITS.perHour || rate.nDay >= LIMITS.perDay) {
+        results.push({ key: c && c !== 'over' ? c.key : '?', status: 'rate-limited', points: 0, awarded: [] });
         continue;
       }
-      if (rate.nHour >= LIMITS.perHour || rate.nDay >= LIMITS.perDay) {
-        results.push({ key: c.key, status: 'rate-limited', points: 0, awarded: [] });
+      if (!c) {
+        results.push({ key: '?', status: 'bad-request', points: 0, awarded: [] });
         continue;
       }
       rate.nHour++;
@@ -180,13 +201,31 @@ export async function setProfile(store: Store, uid: string, raw: unknown, now = 
   });
 }
 
-/** Leaving deletes everything stored for the account (the sign-in itself is deleted by the caller). */
+/**
+ * Leaving deletes everything stored for the account: its player data and awards, its public score, reports about its
+ * name, and its id in reports it made about others. (The sign-in itself is deleted by the caller.)
+ */
 export async function deleteAccount(store: Store, uid: string): Promise<void> {
+  for (const target of await store.reportedBy(uid)) {
+    await store.tx(async (tx) => {
+      const rep = await tx.get(`reports/${target}`);
+      if (!rep || !Array.isArray(rep.by)) return;
+      tx.set(`reports/${target}`, { ...rep, by: (rep.by as unknown[]).filter((x) => x !== uid) });
+    });
+  }
   await store.deleteTree(`players/${uid}`);
   await store.tx(async (tx) => {
     tx.delete(`scores/${uid}`);
     tx.delete(`reports/${uid}`);
   });
+}
+
+/** The daily clean-up: removes accounts with no leaderboard activity for `LIMITS.inactiveDays`. Returns their ids. */
+export async function cleanupInactive(store: Store, now = new Date(), limit = 200): Promise<string[]> {
+  const cutoff = new Date(now.getTime() - LIMITS.inactiveDays * 86_400_000).toISOString();
+  const uids = await store.inactiveSince(cutoff, limit);
+  for (const uid of uids) await deleteAccount(store, uid);
+  return uids;
 }
 
 /** Reports another player's name. Enough distinct reports replace it with a neutral one. */
@@ -249,7 +288,24 @@ export class MemoryStore implements Store {
     for (const k of [...this.docs.keys()]) if (k === path || k.startsWith(`${path}/`)) this.docs.delete(k);
   }
 
-  /** Public scores, best first (for the in-memory leaderboard). */
+  async reportedBy(uid: string): Promise<string[]> {
+    const out: string[] = [];
+    for (const [k, v] of this.docs) {
+      const m = /^reports\/([^/]+)$/.exec(k);
+      if (m && Array.isArray(v.by) && v.by.includes(uid)) out.push(m[1]);
+    }
+    return out;
+  }
+
+  async inactiveSince(beforeIso: string, limit: number): Promise<string[]> {
+    return this.scores()
+      .filter((x) => typeof x.updatedAt === 'string' && x.updatedAt < beforeIso)
+      .sort((a, b) => (a.updatedAt < b.updatedAt ? -1 : 1))
+      .slice(0, limit)
+      .map((x) => x.uid);
+  }
+
+  /** Public scores (for the in-memory leaderboard). */
   scores(): Array<PublicScore & { uid: string }> {
     const out: Array<PublicScore & { uid: string }> = [];
     for (const [k, v] of this.docs) {

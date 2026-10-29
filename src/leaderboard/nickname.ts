@@ -11,53 +11,26 @@ export type NickProblem = 'length' | 'characters' | 'words';
 export type NickResult = { ok: true; name: string } | { ok: false; problem: NickProblem };
 
 /**
- * Words (and impersonation of staff) that a nickname may not contain, matched after lowercasing, removing spaces and
- * punctuation and undoing common letter swaps (0→o, 1→i, 3→e, 4→a, 5→s, 7→t, @→a, $→s). Kept short and generic on
- * purpose; the report button handles the rest.
+ * What a nickname may not contain, checked after lowercasing and undoing common letter swaps (0→o, 1→i, 3→e, 4→a,
+ * 5→s, 7→t, @→a, $→s, !→i). Kept short and generic on purpose; the report button handles the rest.
+ *
+ *  - ANYWHERE: unambiguous strings, blocked even inside a longer word or with the spaces removed.
+ *  - WORDS: short words that are also parts of ordinary names (Hancock, Dickens, Sussex, Skillful, Grape), so they are
+ *    blocked only as a whole word (or its plural).
  */
-const BLOCKED = [
-  'fuck',
-  'fuk',
-  'shit',
-  'bitch',
-  'cunt',
-  'dick',
-  'cock',
-  'pussy',
-  'penis',
-  'vagina',
-  'boob',
-  'tits',
-  'slut',
-  'whore',
-  'porn',
-  'sex',
-  'rape',
-  'nazi',
-  'hitler',
-  'nigg',
-  'fag',
-  'retard',
-  'kill',
-  'suicide',
-  'bastard',
-  'asshole',
-  'wank',
-  'admin',
-  'moderator',
-  'pawtopia',
-  'official',
-  'support',
-  'anthropic',
-];
+const ANYWHERE = ['fuck', 'fuk', 'shit', 'cunt', 'nigg', 'whore', 'slut', 'porn', 'hitler', 'bitch', 'pussy', 'penis', 'vagina', 'asshole', 'wank', 'retard', 'suicide', 'rapist', 'pawtopia', 'anthropic'];
+const WORDS = ['dick', 'cock', 'sex', 'sexy', 'kill', 'killer', 'rape', 'tit', 'tits', 'boob', 'fag', 'nazi', 'ass', 'bastard', 'admin', 'moderator', 'mod', 'official', 'support', 'staff'];
 
 const SWAPS: Record<string, string> = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', $: 's', '!': 'i' };
 
-function squash(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[013457@$!]/g, (ch) => SWAPS[ch] ?? ch)
-    .replace(/[^\p{L}]/gu, '');
+const unswap = (s: string) => s.toLowerCase().replace(/[013457@$!]/g, (ch) => SWAPS[ch] ?? ch);
+
+function blocked(name: string): boolean {
+  const plain = unswap(name);
+  const flat = plain.replace(/[^\p{L}]/gu, '');
+  if (ANYWHERE.some((w) => flat.includes(w))) return true;
+  const words = plain.split(/[^\p{L}]+/u).filter(Boolean);
+  return words.some((w) => WORDS.includes(w) || (w.endsWith('s') && WORDS.includes(w.slice(0, -1))));
 }
 
 export function cleanNickname(raw: unknown): NickResult {
@@ -69,8 +42,7 @@ export function cleanNickname(raw: unknown): NickResult {
   if (!/^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u.test(name)) return { ok: false, problem: 'characters' };
   if (/^\d+$/.test(name.replace(/[ ._-]/g, ''))) return { ok: false, problem: 'characters' };
   if (/(https?|www|\.com|\.net|\.org)/i.test(name)) return { ok: false, problem: 'characters' };
-  const flat = squash(name);
-  if (BLOCKED.some((w) => flat.includes(w))) return { ok: false, problem: 'words' };
+  if (blocked(name)) return { ok: false, problem: 'words' };
   return { ok: true, name };
 }
 

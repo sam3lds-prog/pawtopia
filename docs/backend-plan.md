@@ -7,8 +7,9 @@ opt in with a nickname; each Journey level or Daily solved after joining is sent
 replayed on the server, and awarded Paw Points once per award id. Weekly (UTC) and all-time tables. Setup:
 `docs/native-setup.md` §3, `functions/README.md`. Privacy: `docs/privacy-security.md`.
 
-Go-live gate for the leaderboard: rules tests pass on the emulator (`npm run fb:test`), App Check enforced, privacy
-label updated, a real-device join → solve → table → leave run on TestFlight.
+Go-live gate for the leaderboard: rules tests pass on the emulator (`npm run fb:test`), privacy label updated, a
+real-device join → solve → table → leave run on TestFlight. Strongly recommended before a wide launch: a native App
+Check provider (App Attest) so `ENFORCE_APP_CHECK` can be turned on.
 
 ## Not built: online Paw Cup leagues (Phase 6)
 

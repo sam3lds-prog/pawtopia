@@ -560,7 +560,7 @@ export class Session {
     s.pausedAt = now;
     s.outcome = snap.outcome === 'lost' && s.heartsEnabled ? 'lost' : 'playing';
     if (Array.isArray(snap.events)) {
-      for (const e of snap.events.slice(0, MAX_EVENTS)) if (isEvent(e)) s.events.push({ ...e });
+      for (const e of snap.events.slice(0, MAX_EVENTS)) if (isSessionEvent(e)) s.events.push({ ...e });
     }
     s.checkWin();
     return s;
@@ -574,7 +574,7 @@ export class Session {
 const EVENT_TYPES = new Set(['place', 'clear', 'mark', 'unmark', 'undo', 'redo', 'hint', 'pause', 'resume', 'revive']);
 
 /** Shape check only. Whether the moves are legal is decided by replaying them (competitions/verify.ts). */
-function isEvent(e: unknown): e is SessionEvent {
+export function isSessionEvent(e: unknown): e is SessionEvent {
   if (!e || typeof e !== 'object') return false;
   const x = e as Record<string, unknown>;
   return typeof x.t === 'number' && Number.isFinite(x.t) && typeof x.type === 'string' && EVENT_TYPES.has(x.type);

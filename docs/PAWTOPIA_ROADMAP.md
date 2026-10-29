@@ -57,7 +57,7 @@ Defects confirmed in source and fixed in Sprint 0:
 - [x] **Sprint J** (D30) — opt-in Paw Points leaderboard on Firebase, every solve replayed by the server
 - [ ] Game Center and online Paw Cup leagues — not started
 
-Test count: 222 unit tests + 38 browser e2e checks (incl. 9 fixes from a second independent review, D25). Bundle: ~87 kB JS gzipped (incl. both level packs), 11 kB CSS.
+Test count: 275 unit tests + 54 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~150 kB JS gzipped for the app (incl. both level packs); the Firebase SDK loads only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.
@@ -102,7 +102,7 @@ walks between anchor points; capybara, otter, axolotl and owl (need art); season
    `docs/native-setup.md` §1–2. Keys go in `.env.local`, never in git.
 4. **Firebase for the leaderboard**: a project on the Blaze plan with a Web app and Anonymous sign-in, the web config in
    `.env.local`, then `npm --prefix functions install && npm run fb:deploy`, then `npm run fb:test` once (this
-   environment couldn't download the emulator, so the rules tests haven't run yet), then App Check (App Attest) and
-   `ENFORCE_APP_CHECK=true` before inviting players (`docs/native-setup.md` §3).
+   environment couldn't download the emulator, so the rules tests haven't run yet). App Check needs a native App
+   Attest plugin first and stays off until then (`docs/native-setup.md` §3).
 5. **App Store Connect**: rename the listing to Pawtopia (bundle id stays), new screenshots (World map, a regional
    sanctuary, the Leaderboard), and the privacy label for the services you turn on (`docs/privacy-security.md`).

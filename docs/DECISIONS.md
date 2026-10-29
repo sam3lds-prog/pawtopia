@@ -355,11 +355,20 @@ Owner decision (2026-10-29): leaderboard on our own server, Firebase.
 - **Fair by construction**: the client never sends points. It sends which board it solved (mode + spec) and the move
   log; the server rebuilds the board and replays the log with that mode's rules (the same `Session` and verifier the
   game uses), then awards with the app's own point table. Award ids (`L12`, `clean:L12`, `nohint:L12`, `D<date>`) pay
-  once per account. Logs faster than 250 ms per placement don't count; 60 solves an hour, 250 a day. Only boards solved
-  after joining count (earlier solves have no logs to check). To make every board checkable, a hint that places a pet
+  once per account. Logs faster than 250 ms per placement don't count, a board counts only on the spec it is issued
+  under today, and no log may hold more hints than the board has cells. 30 solves an hour, 80 a day, checked before any
+  board is rebuilt. Only boards solved after joining count (earlier solves have no logs to check). Honest about the
+  limit: a script can replay boards like a person would, so pacing (not the replay) bounds what it can add; App Check
+  and reports are the next lines. To make every board checkable, a hint that places a pet
   is now logged as a placement, and Journey/Daily saves keep their move log across resumes.
-- **Names**: 3–20 characters, blocked words, no links; checked on device and server. Three distinct reports replace a
-  name with "Player ####". Only real players are shown, ever.
+- **Names**: 3–20 characters, no links; strong words blocked anywhere, short ambiguous ones only as whole words (so
+  Hancock and Dickens are fine); checked on device and server. Three distinct reporters (each with a counted solve)
+  replace a name with "Player ####". Only real players are shown, ever.
+- **Deletion**: leaving removes every document, the player's id in reports they made, and the sign-in; erasing
+  progress leaves first; a daily clean-up removes accounts inactive for a year. A sync still in flight when the player
+  leaves is ignored.
+- **App Check** isn't wired up: the web view can't use App Attest without a native plugin, and enforcing it without
+  one would reject every call. It stays off until that plugin exists.
 - **Shape**: all decisions in `src/leaderboard/` (pure, unit-tested against an in-memory store that enforces Firestore's
   reads-before-writes); `functions/src/index.ts` only adapts Firestore and Auth. Firestore rules deny all client
   writes. The Firebase SDK is loaded only when the leaderboard is used. Without Firebase settings, development builds

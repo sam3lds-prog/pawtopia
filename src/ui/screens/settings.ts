@@ -8,6 +8,7 @@ import { iap } from '../../services/iap';
 import { ads } from '../../services/ads';
 import { track } from '../../services/analytics';
 import { leaderboard } from '../../services/leaderboard';
+import { resetLeaderboardLocal } from '../../app/leaderboardSync';
 import { openSheet, toast } from '../components/sheet';
 import { actionOf, esc } from '../dom';
 import type { Scope } from '../router';
@@ -205,27 +206,42 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
 }
 
 function confirmErase(scope: Scope, done: () => void): void {
+  const onBoard = app.save.leaderboard.joined && leaderboard.mode !== 'off';
   const cs = openSheet(scope, {
     title: 'Erase all progress?',
     body: `<p class="sheet__lead">Levels, pets, decorations, coins and streaks on this device will be erased. Purchases and settings stay. This can't be undone.</p>
+      ${onBoard ? `<p class="muted">You'll also leave the leaderboard: your name and points there are deleted.</p>` : ''}
+      <p class="lb-field__error" role="alert"></p>
       <div class="sheet__actions">
         <button class="btn btn--quiet" data-act="cancel" data-autofocus>Keep my progress</button>
         <button class="btn btn--danger btn--block" data-act="erase">Erase progress</button>
       </div>`,
   });
-  cs.scope.on(cs.el, 'click', (e) => {
+  let busy = false;
+  cs.scope.on(cs.el, 'click', async (e) => {
     const a = actionOf(e);
-    if (!a) return;
-    if (a.act === 'erase') {
-      const fresh = resetProgress(app.save);
-      // A fresh start gets the starter pantry again, like a new install.
-      grantStarterItems(fresh);
-      app.active = null;
-      app.replaceSave(fresh);
-      cs.close();
-      done();
-      app.router.go({ screen: 'home' });
-      toast('Progress erased.');
-    } else cs.close();
+    if (!a || busy) return;
+    if (a.act !== 'erase') return cs.close();
+    busy = true;
+    if (onBoard) {
+      try {
+        await leaderboard.leave();
+      } catch {
+        // Offline or unreachable: keep everything, so the player can leave the leaderboard first and try again.
+        busy = false;
+        if (cs.scope.alive) (cs.el.querySelector('.lb-field__error') as HTMLElement).textContent = "Couldn't reach the leaderboard to delete your entry there. Check your connection and try again, or leave it first in League.";
+        return;
+      }
+      resetLeaderboardLocal(app.save);
+    }
+    const fresh = resetProgress(app.save);
+    // A fresh start gets the starter pantry again, like a new install.
+    grantStarterItems(fresh);
+    app.active = null;
+    app.replaceSave(fresh);
+    cs.close();
+    done();
+    app.router.go({ screen: 'home' });
+    toast('Progress erased.');
   });
 }

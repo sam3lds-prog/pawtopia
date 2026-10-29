@@ -13,8 +13,8 @@ import type { Difficulty } from '../engine/types';
 import { addDaysKey } from '../game/dates';
 import { profileOf } from '../game/grading';
 import { rulesFor, type ModeRef } from '../game/modes';
-import { puzzleFor } from '../game/puzzles';
-import type { SessionEvent } from '../game/session';
+import { currentSpec, puzzleFor } from '../game/puzzles';
+import { isSessionEvent, type SessionEvent } from '../game/session';
 import type { SpecVersion } from '../game/specs';
 import { POINTS } from '../meta/points';
 
@@ -61,8 +61,8 @@ export function parseSubmission(x: unknown): SolveSubmission | null {
   else if (m.kind === 'daily' && typeof m.dateKey === 'string') mode = { kind: 'daily', dateKey: m.dateKey };
   else return null;
   if (o.spec !== 1 && o.spec !== 2) return null;
-  if (!Array.isArray(o.events)) return null;
-  return { mode, spec: o.spec, events: o.events as SessionEvent[] };
+  if (!Array.isArray(o.events) || o.events.length > MAX_EVENTS || !o.events.every(isSessionEvent)) return null;
+  return { mode, spec: o.spec, events: o.events };
 }
 
 function utcDateKey(d: Date): string {
@@ -80,16 +80,19 @@ export function checkSolve(sub: SolveSubmission, now: Date): CheckResult {
     const today = utcDateKey(now);
     if (m.dateKey > addDaysKey(today, 1) || m.dateKey < addDaysKey(today, -DAILY_WINDOW_DAYS)) return fail('out-of-window');
   }
-  if (sub.spec !== 1 && sub.spec !== 2) return fail('bad-spec');
-  if (sub.events.length > MAX_EVENTS) return fail('too-long');
-
   const mode = m as ModeRef;
+  // A board counts only on the spec it is issued under today (a forger can't pick the better-paying one).
+  if (sub.spec !== currentSpec(mode)) return fail('bad-spec');
+  if (sub.events.length > MAX_EVENTS) return fail('too-long');
   let puzzle;
   try {
     puzzle = puzzleFor(mode, sub.spec);
   } catch {
     return fail('bad-spec');
   }
+  // Each hint is logged once per target cell, so a board can't have more hints than cells; the cap also bounds the
+  // replay's cost (every hint runs the deduction engine).
+  if (sub.events.filter((e) => e.type === 'hint').length > puzzle.size * puzzle.size) return fail('invalid-log');
   const rules = rulesFor(mode);
   const v = verifyAttempt({ puzzle, events: sub.events, parSeconds: 1, ranked: false, hearts: rules.hearts, maxHearts: rules.maxHearts });
   if (!v.valid) return fail('invalid-log');

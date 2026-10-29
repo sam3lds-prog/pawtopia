@@ -6,7 +6,7 @@
  */
 
 import { app } from '../../app/app';
-import { syncLeaderboard } from '../../app/leaderboardSync';
+import { resetLeaderboardLocal, syncLeaderboard } from '../../app/leaderboardSync';
 import { COMPANIONS, isCompanionId } from '../../meta/catalogs/companions';
 import { PETS, isPetId } from '../../meta/catalogs/pets';
 import { cleanNickname, nickProblemText, NICK_MAX, suggestNickname } from '../../leaderboard/nickname';
@@ -318,12 +318,7 @@ function leaveSheet(scope: Scope, done: () => void): void {
     busy = true;
     try {
       await leaderboard.leave();
-      const l = app.save.leaderboard;
-      l.joined = false;
-      l.pending = [];
-      l.awarded = {};
-      l.last = null;
-      l.joinedAt = null;
+      resetLeaderboardLocal(app.save);
       app.persist();
       if (!sh.scope.alive) return;
       sh.close();
