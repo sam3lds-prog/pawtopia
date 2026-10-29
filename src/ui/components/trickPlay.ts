@@ -28,8 +28,14 @@ export function performTrick(svg: SVGSVGElement, fig: SVGGElement, id: TrickId, 
   }
   hearts.forEach((h) => (h.style.display = ''));
   const width = svg.viewBox?.baseVal?.width || Infinity;
-  svg.insertAdjacentHTML('beforeend', trickOverlay(id, t.emote, box, width, !reducedMotion));
-  const overlay = svg.lastElementChild;
+  // With 3D toys (D34) the stage draws the emote and props itself, following the animal; the drawn overlay is for
+  // the drawn animals.
+  const in3d = !!svg.closest('.has-3d');
+  let overlay: Element | null = null;
+  if (!in3d) {
+    svg.insertAdjacentHTML('beforeend', trickOverlay(id, t.emote, box, width, !reducedMotion));
+    overlay = svg.lastElementChild;
+  }
   fig.dataset.trick = id;
   fig.style.setProperty('--trick-dir', String(trickDir(box, width)));
   if (!reducedMotion) fig.classList.add(`is-trick-${id}`);

@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { Actor } from './actor';
+import { ambientClip } from './clips';
 import { Effects } from './effects';
 import { addLights } from './lights';
 import { toySpec } from './species';
@@ -141,11 +142,15 @@ export class SceneStage {
       e.actor.away = el.classList.contains('is-away');
       this.place(e, Number(el.dataset.gx), Number(el.dataset.gy), Number(el.dataset.gh));
     }
+    let gone = false;
     for (const [key, e] of this.entries)
       if (!keep.has(key)) {
         e.actor.toy.dispose();
         this.entries.delete(key);
+        gone = true;
       }
+    // Props may hang on a toy that left (a party hat): start clean.
+    if (gone) this.effects.clear();
   }
 
   /** Stands a toy on a scene point so that it projects exactly onto the drawn figure's spot, nearer ones in front. */
@@ -191,14 +196,15 @@ export class SceneStage {
     for (const c of classes) {
       if (e.seen.classes.has(c)) continue;
       const m = TRACKED.exec(c);
-      if (m && e.actor.ambient(m[1], now, reduced)) this.effects.start(m[1], e.actor, now);
+      if (m && e.actor.ambient(m[1], now, reduced)) this.effects.ambient(m[1], e.actor, now, ambientClip(m[1])?.ms ?? 1000);
     }
     e.actor.away = classes.has('is-away');
     const trick = el.dataset.trick ?? null;
     if (trick && trick !== e.seen.trick) {
+      // Under reduced motion the trick class isn't set: the face and the emote show, still.
       const moving = classes.has(`is-trick-${trick}`);
-      e.actor.perform(trick, now, !moving);
-      this.effects.start(trick, e.actor, now, !moving);
+      const ms = e.actor.perform(trick, now, !moving);
+      if (ms) this.effects.perform(trick, e.actor, now, ms, !moving);
     }
     e.seen = { classes, trick };
   }

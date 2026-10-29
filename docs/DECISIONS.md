@@ -439,6 +439,15 @@ acted out with face and body.
 - **Motion** (`clips.ts`, `actor.ts`): pure, tested clips that start and end at rest: breathing, blinks and ear
   twitches; a look round, a yawn, a stretch, a wag, a hop; a greeting wave; and a stroll that turns to show the
   animal's profile and back. Tricks and emotes take over from small moves.
+- **Tricks in 3D**: the ten tricks are performances with depth (a spin shows the back, the backflip turns over in the
+  air, the rainbow leap turns toward where it lands and walks home through its back), with 3D props that follow the
+  animal: a star burst, a glassy bubble that pops, juggled stars, a rainbow that paints itself, dust puffs, notes. The
+  emote bubble is drawn in 3D beside the head and follows it. The drawn overlays remain for the drawn animals.
+- **Emotes** (revises D33's list): eight feelings acted out with the face and the whole body, in their own tab of the
+  tray and the Shop: Love and Giggle are free; Cheer, Surprise, Sleepy (2 video tokens) and Shy (3) are video-token
+  emotes; Starstruck (45 gems: star eyes, a twirl inside a ring of stars) and Party time (60 gems: a party hat,
+  confetti, a dance) can only be bought. Same ledger, same rules, cosmetic only. New faces: heart eyes, star eyes,
+  giggling, blushing, yawning, surprised.
 - **Cost and fallbacks**: three.js loads only when a sanctuary opens (≈ 156 kB gzipped, its own chunk). Without
   WebGL, if the context is lost, or with Settings → 3D animals off, the drawn animals stay. Frames: smooth while
   something plays, ~30 fps for breathing, a few per second under reduced motion (where nothing moves by itself), none

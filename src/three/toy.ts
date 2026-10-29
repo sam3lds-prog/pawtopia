@@ -574,6 +574,18 @@ export class Toy {
     return out.set(0, this.spec.head[1] * 0.55, 0).applyMatrix4(this.head.matrixWorld);
   }
 
+  /** The body's middle in world space (a bubble around it, stars circling it). */
+  centerAt(out = new THREE.Vector3()): THREE.Vector3 {
+    this.spinner.updateWorldMatrix(true, false);
+    return out.setFromMatrixPosition(this.spinner.matrixWorld);
+  }
+
+  /** The ground point under the toy (world space), wherever it has wandered. */
+  groundAt(out = new THREE.Vector3()): THREE.Vector3 {
+    this.root.updateWorldMatrix(true, false);
+    return out.set(this.mover.position.x, 0, this.mover.position.z).applyMatrix4(this.root.matrixWorld);
+  }
+
   /** Where the paws are (world space), for props held between them. */
   pawsAt(out = new THREE.Vector3()): THREE.Vector3 {
     this.body.updateWorldMatrix(true, false);

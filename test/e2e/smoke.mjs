@@ -277,10 +277,21 @@ try {
   await page.waitForSelector('.trick-tray');
   check('tapping an animal offers its tricks', /^Ask .+ to…$/.test((await page.textContent('.trick-tray__head b'))?.trim() ?? ''));
   await page.click('.trick-chip[data-trick="wave"]');
-  const trick = await page.evaluate(() => ({ on: document.querySelector('.sanctuary__scene .sanctuary__pet[data-trick]')?.dataset.trick, emote: !!document.querySelector('.sanctuary__scene .sp-trick .sp-trick-emote') }));
-  check('a free trick plays with its emote', trick.on === 'wave' && trick.emote, JSON.stringify(trick));
+  const trick = await page.evaluate(() => {
+    const fig = document.querySelector('.sanctuary__scene .sanctuary__pet[data-trick]');
+    const key = fig?.dataset.pet ?? `friend:${fig?.dataset.friend}`;
+    // Drawn animals get a drawn emote; 3D toys perform it on the stage (D34).
+    const shown = !!document.querySelector('.sanctuary__scene .sp-trick .sp-trick-emote') || window.__stage3d?.actor(key)?.performing(performance.now()) === 'wave';
+    return { on: fig?.dataset.trick, shown };
+  });
+  check('a free trick plays with its emote', trick.on === 'wave' && trick.shown, JSON.stringify(trick));
   await page.waitForTimeout(1800);
   check('the trick ends by itself', await page.evaluate(() => !document.querySelector('.sp-trick') && !document.querySelector('.sanctuary__scene [data-trick]')));
+  await page.click('[data-tray-tab="emote"]');
+  await page.click('.trick-chip[data-trick="love"]');
+  check('a free emote plays from the Emotes tab', await page.evaluate(() => document.querySelector('.sanctuary__scene .sanctuary__pet[data-trick]')?.dataset.trick === 'love'));
+  await page.waitForTimeout(1900);
+  await page.click('[data-tray-tab="trick"]');
   await page.click('.trick-chip[data-trick="backflip"]');
   await page.waitForSelector('.trick-sheet');
   check('a premium trick opens its card, bought with gems only', /gem/i.test(await page.textContent('.trick-sheet')) && !(await page.$('.trick-sheet [data-act="watch"]')));
@@ -304,7 +315,7 @@ try {
   check('the Tricks button opens the tray from the keyboard', await page.evaluate(() => !!document.activeElement?.closest('.trick-tray') && document.querySelector('[data-act="tricks"]').getAttribute('aria-expanded') === 'true'));
   await page.evaluate(() => window.__pt.go({ screen: 'shop', tab: 'tricks' }));
   await page.waitForSelector('.trick-card');
-  check('the Shop lists every trick', (await page.$$('.trick-card')).length === 10);
+  check('the Shop lists every trick and emote', (await page.$$('.trick-card')).length === 18);
 
   // Paw Cup: an open attempt survives other play, resumes, and scores from its full move log
   await page.evaluate(() => window.__pt.go({ screen: 'league' }));

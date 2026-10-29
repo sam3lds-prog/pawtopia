@@ -7,7 +7,7 @@
 
 import { app } from '../../app/app';
 import { canOfferVideo, watchVideoFor } from '../../app/rewarded';
-import { TRICK_BY_ID, TRICKS, trickCurrency, type TrickId } from '../../meta/catalogs/tricks';
+import { TRICK_BY_ID, TRICKS, trickCurrency, type TrickId, type TrickKind } from '../../meta/catalogs/tricks';
 import { itemBalance } from '../../meta/items';
 import { buyTrick, ownsTrick } from '../../meta/tricks';
 import { ads } from '../../services/ads';
@@ -56,9 +56,9 @@ function chipClass(id: TrickId): string {
   return `trick-chip ${ownsTrick(app.save, id) ? '' : 'is-locked'} trick-chip--${t.tier}`;
 }
 
-/** The trick buttons, in catalog order: free, then video, then premium. */
-export function trickChips(): string {
-  return TRICKS.map((t) => `<li><button class="${chipClass(t.id)}" data-trick="${t.id}" aria-label="${esc(chipLabel(t.id))}">${chipInner(t.id)}</button></li>`).join('');
+/** The trick (or emote) buttons, in catalog order: free, then video, then premium. */
+export function trickChips(kind: TrickKind = 'trick'): string {
+  return TRICKS.filter((t) => t.kind === kind).map((t) => `<li><button class="${chipClass(t.id)}" data-trick="${t.id}" aria-label="${esc(chipLabel(t.id))}">${chipInner(t.id)}</button></li>`).join('');
 }
 
 /** Updates the chips in place (after a purchase), so focus and scroll stay where they are. */
@@ -97,6 +97,7 @@ export interface TrickTrayOptions {
  */
 export function mountTrickTray(scope: Scope, host: HTMLElement, svg: () => SVGSVGElement | null, opts: TrickTrayOptions = {}): TrickTray {
   let target: Who | null = null;
+  let tab: TrickKind = 'trick';
   host.id ||= `trick-tray-${Math.random().toString(36).slice(2, 8)}`;
 
   const cast = (): Who[] => {
@@ -138,6 +139,9 @@ export function mountTrickTray(scope: Scope, host: HTMLElement, svg: () => SVGSV
         <b>Ask ${esc(name)} to…</b>
         <button class="icon-btn icon-btn--small" data-act="tray-close" aria-label="Close tricks">${ICON.close}</button>
       </div>
+      <div class="seg seg--small trick-tray__tabs" role="tablist" aria-label="Tricks or emotes">
+        ${(['trick', 'emote'] as const).map((k) => `<button role="tab" class="seg__btn" data-tray-tab="${k}" aria-selected="${k === tab}">${k === 'trick' ? 'Tricks' : 'Emotes'}</button>`).join('')}
+      </div>
       ${
         everyone.length > 1
           ? `<div class="trick-tray__who" role="group" aria-label="Who does the trick">${everyone
@@ -145,7 +149,7 @@ export function mountTrickTray(scope: Scope, host: HTMLElement, svg: () => SVGSV
               .join('')}</div>`
           : ''
       }
-      <ul class="trick-tray__list">${trickChips()}</ul>
+      <ul class="trick-tray__list" role="tabpanel" aria-label="${tab === 'trick' ? 'Tricks' : 'Emotes'}">${trickChips(tab)}</ul>
       <p class="sr-only" aria-live="polite" data-tray-status></p>
     </div>`;
   }
@@ -155,6 +159,13 @@ export function mountTrickTray(scope: Scope, host: HTMLElement, svg: () => SVGSV
     if (t.closest('[data-act="tray-close"]')) {
       setTarget(null);
       opts.returnFocus?.()?.focus({ preventScroll: true });
+      return;
+    }
+    const tb = t.closest('[data-tray-tab]') as HTMLElement | null;
+    if (tb) {
+      tab = tb.dataset.trayTab as TrickKind;
+      render();
+      host.querySelector<HTMLElement>(`[data-tray-tab="${tab}"]`)?.focus({ preventScroll: true });
       return;
     }
     const who = t.closest('[data-who]') as HTMLElement | null;
@@ -237,7 +248,7 @@ export function showTrickSheet(scope: Scope, id: TrickId, opts: { who?: string; 
            ${iap.available ? `<button class="btn btn--secondary btn--block" data-act="gems">${ICON.gem}See gem packs</button>` : ''}`
         : `<button class="btn btn--block" data-act="buy" data-autofocus>Buy for ${ICON.gem}<span class="num">${t.price}</span></button>`;
     return `
-      ${t.tier !== 'free' ? `<span class="chip ${t.tier === 'premium' ? 'chip--gem' : 'chip--video'}">${t.tier === 'premium' ? `${ICON.gem}Premium trick` : `${ICON.videoToken}Video-token trick`}</span>` : ''}
+      ${t.tier !== 'free' ? `<span class="chip ${t.tier === 'premium' ? 'chip--gem' : 'chip--video'}">${t.tier === 'premium' ? `${ICON.gem}Premium ${t.kind}` : `${ICON.videoToken}Video-token ${t.kind}`}</span>` : ''}
       <figure class="trick-sheet__stage sanctuary__scene is-live" aria-label="${esc(`${whoName} showing ${t.name}`)}">
         <svg viewBox="0 0 120 90" role="img"><rect width="120" height="90" rx="14" fill="#e6f2df"/><path d="M0 70 Q60 60 120 70 V76 A14 14 0 0 1 106 90 H14 A14 14 0 0 1 0 76 Z" fill="#cfe3c4"/>${stageFigure(who)}</svg>
       </figure>

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { TRICKS, TRICK_BY_ID, isTrickId, trickCurrency } from '../../src/meta/catalogs/tricks';
+import { EMOTE_LIST, TRICKS, TRICK_BY_ID, TRICK_LIST, isTrickId, trickCurrency } from '../../src/meta/catalogs/tricks';
 import { buyTrick, canAffordTrick, ownedTricks, ownsTrick } from '../../src/meta/tricks';
 import { grantItem, itemBalance } from '../../src/meta/items';
 import { grant } from '../../src/meta/ledger';
@@ -10,22 +10,30 @@ import { emoteBubble, trickDir, trickOverlay, trickProps } from '../../src/ui/ar
 const NOW = new Date('2026-10-20T10:00:00Z');
 
 describe('trick catalog (D33)', () => {
-  it('two free tricks, then video-token tricks, then premium gem tricks', () => {
-    const free = TRICKS.filter((t) => t.tier === 'free');
-    const video = TRICKS.filter((t) => t.tier === 'video');
-    const premium = TRICKS.filter((t) => t.tier === 'premium');
-    expect(free.map((t) => t.id)).toEqual(['wave', 'hop']);
-    expect(free.every((t) => t.price === 0 && trickCurrency(t) === null)).toBe(true);
-    expect(video.length).toBeGreaterThanOrEqual(3);
-    expect(video.every((t) => trickCurrency(t) === 'vtoken' && t.price > 0 && t.price <= 5)).toBe(true);
-    expect(premium.length).toBeGreaterThanOrEqual(3);
-    expect(premium.every((t) => trickCurrency(t) === 'gem' && t.price >= 20)).toBe(true);
-    // The premium ones are the most animated: longer and with their own props.
-    const longestVideo = Math.max(...video.map((t) => t.ms));
-    for (const t of premium) {
-      expect(t.ms, t.id).toBeGreaterThanOrEqual(longestVideo - 300);
-      expect(trickProps(t.id, { x: 100, y: 100, w: 30, h: 30 }), t.id).not.toBe('');
+  it('two free tricks, then video-token tricks, then premium gem tricks; emotes the same way', () => {
+    for (const [kind, freeIds] of [
+      ['trick', ['wave', 'hop']],
+      ['emote', ['love', 'laugh']],
+    ] as const) {
+      const list = TRICKS.filter((t) => t.kind === kind);
+      const free = list.filter((t) => t.tier === 'free');
+      const video = list.filter((t) => t.tier === 'video');
+      const premium = list.filter((t) => t.tier === 'premium');
+      expect(free.map((t) => t.id)).toEqual(freeIds);
+      expect(free.every((t) => t.price === 0 && trickCurrency(t) === null)).toBe(true);
+      expect(video.length).toBeGreaterThanOrEqual(3);
+      expect(video.every((t) => trickCurrency(t) === 'vtoken' && t.price > 0 && t.price <= 5)).toBe(true);
+      expect(premium.length).toBeGreaterThanOrEqual(2);
+      expect(premium.every((t) => trickCurrency(t) === 'gem' && t.price >= 20)).toBe(true);
+      // The premium ones are the most animated: longer and with their own props.
+      const longestVideo = Math.max(...video.map((t) => t.ms));
+      for (const t of premium) {
+        expect(t.ms, t.id).toBeGreaterThanOrEqual(longestVideo - 300);
+        if (kind === 'trick') expect(trickProps(t.id, { x: 100, y: 100, w: 30, h: 30 }), t.id).not.toBe('');
+      }
     }
+    expect(EMOTE_LIST.length).toBe(8);
+    expect(TRICK_LIST.length).toBe(10);
   });
 
   it('ids, names and timings are sane', () => {
@@ -44,7 +52,7 @@ describe('trick catalog (D33)', () => {
 describe('learning tricks', () => {
   it('free tricks are always known; nothing else until bought', () => {
     const s = defaultSave(NOW);
-    expect(ownedTricks(s)).toEqual(['wave', 'hop']);
+    expect(ownedTricks(s)).toEqual(['wave', 'hop', 'love', 'laugh']);
     expect(buyTrick(s, 'wave', NOW)).toBe('free');
     expect(ownsTrick(s, 'spin')).toBe(false);
   });

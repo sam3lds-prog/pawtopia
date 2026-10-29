@@ -28,7 +28,7 @@ import { decorIcon } from '../art/sanctuary';
 import { activityFor } from '../art/activities';
 import { foodIcon } from '../art/foods';
 import { trickBadge } from '../art/tricks';
-import { TRICKS, trickCurrency, type TrickId, type TrickTier } from '../../meta/catalogs/tricks';
+import { TRICKS, trickCurrency, type TrickId, type TrickKind, type TrickTier } from '../../meta/catalogs/tricks';
 import { ownsTrick } from '../../meta/tricks';
 import { showTrickSheet } from '../components/tricks';
 import { openSheet, toast } from '../components/sheet';
@@ -182,8 +182,8 @@ export const shopScreen: ScreenDef = {
       </button></li>`;
     }
 
-    function trickSection(tier: TrickTier, title: string, note: string, extra = ''): string {
-      const items = TRICKS.filter((t) => t.tier === tier);
+    function trickSection(kind: TrickKind, tier: TrickTier, title: string, note: string, extra = ''): string {
+      const items = TRICKS.filter((t) => t.kind === kind && t.tier === tier);
       const owned = items.filter((t) => ownsTrick(app.save, t.id)).length;
       return `<section class="shop-section shop-section--${tier === 'free' ? 'everyday' : tier}">
         <div class="section-head"><h2>${esc(title)}</h2>${tier === 'free' ? '' : `<span class="muted num">${owned} of ${items.length} learned</span>`}</div>
@@ -195,10 +195,16 @@ export const shopScreen: ScreenDef = {
 
     function tricksTab(): string {
       return `
-        <p class="muted shop__note">In a sanctuary, tap an animal (or the Tricks button) and ask for a trick. Tricks are just for fun: they change nothing in your puzzles.</p>
-        ${trickSection('free', 'Everyone knows', 'Every resident and wildlife friend can do these.')}
-        ${trickSection('video', 'Video-token tricks', 'Only for video tokens.', videoTokenCard())}
-        ${trickSection('premium', 'Premium tricks', `The most animated tricks, for gems. ${iap.available ? '' : 'Gem packs are coming soon.'}`)}`;
+        <p class="muted shop__note">In a sanctuary, tap an animal (or the Tricks button) and ask for a trick or an emote. They are just for fun: they change nothing in your puzzles.</p>
+        ${videoTokenCard()}
+        <h2 class="shop__group">Tricks</h2>
+        ${trickSection('trick', 'free', 'Everyone knows', 'Every resident and wildlife friend can do these.')}
+        ${trickSection('trick', 'video', 'Video-token tricks', 'Only for video tokens.')}
+        ${trickSection('trick', 'premium', 'Premium tricks', `The most animated tricks, for gems. ${iap.available ? '' : 'Gem packs are coming soon.'}`)}
+        <h2 class="shop__group">Emotes</h2>
+        ${trickSection('emote', 'free', 'Everyone feels', 'Heart eyes and giggles, free for everyone.')}
+        ${trickSection('emote', 'video', 'Video-token emotes', 'Only for video tokens.')}
+        ${trickSection('emote', 'premium', 'Premium emotes', `The most fun ones, with props, for gems. ${iap.available ? '' : 'Gem packs are coming soon.'}`)}`;
     }
 
     function gemsTab(): string {

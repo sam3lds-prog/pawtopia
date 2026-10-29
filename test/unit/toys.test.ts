@@ -8,6 +8,7 @@ import { COMPANIONS } from '../../src/meta/catalogs/companions';
 import { TRICKS } from '../../src/meta/catalogs/tricks';
 import { ACTION_MS } from '../../src/ui/animation/ambientDirector';
 import { Toy, ToyKit } from '../../src/three/toy';
+import { hasEffect } from '../../src/three/effects';
 
 const TAU = Math.PI * 2;
 const near0 = (k: string, v: number) => ((TURN_CHANNELS as readonly string[]).includes(k) ? Math.abs(((v % TAU) + TAU + Math.PI) % TAU - Math.PI) : Math.abs(v));
@@ -92,5 +93,13 @@ describe('3D clips', () => {
       expect(right, id).toBeGreaterThan(0.2);
       expect(left, id).toBeLessThan(-0.2);
     }
+  });
+});
+
+describe('3D props', () => {
+  it('every premium trick and emote, and most others, bring props of their own; a pat brings a heart', () => {
+    const bubbleOnly = ['wave', 'spin'];
+    for (const t of TRICKS) expect(hasEffect(`perform:${t.id}`), t.id).toBe(!bubbleOnly.includes(t.id));
+    expect(hasEffect('ambient:love')).toBe(true);
   });
 });

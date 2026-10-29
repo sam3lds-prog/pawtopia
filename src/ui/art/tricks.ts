@@ -18,6 +18,9 @@ const f = (n: number) => n.toFixed(1);
 const starPath = (x: number, y: number, r: number) =>
   `M${f(x)} ${f(y - r)} L${f(x + r * 0.3)} ${f(y - r * 0.3)} L${f(x + r)} ${f(y)} L${f(x + r * 0.3)} ${f(y + r * 0.3)} L${f(x)} ${f(y + r)} L${f(x - r * 0.3)} ${f(y + r * 0.3)} L${f(x - r)} ${f(y)} L${f(x - r * 0.3)} ${f(y - r * 0.3)} Z`;
 
+const heartPath = (x: number, y: number, r: number) =>
+  `M${f(x)} ${f(y + r * 0.8)} C${f(x - r * 1.28)} ${f(y - r * 0.1)} ${f(x - r * 0.78)} ${f(y - r * 1.05)} ${f(x)} ${f(y - r * 0.38)} C${f(x + r * 0.78)} ${f(y - r * 1.05)} ${f(x + r * 1.28)} ${f(y - r * 0.1)} ${f(x)} ${f(y + r * 0.8)} Z`;
+
 /** A small glyph centered on (x, y), about `s` across. */
 export function glyph(g: EmoteGlyph, x: number, y: number, s: number): string {
   const k = s / 10;
@@ -40,6 +43,35 @@ export function glyph(g: EmoteGlyph, x: number, y: number, s: number): string {
       return ['#e8707a', '#f2c230', '#6fb07c', '#5b9bc4']
         .map((c, i) => `<path d="M${f(x - (4.6 - i) * k)} ${f(y + 2.4 * k)} a${f((4.6 - i) * k)} ${f((4.6 - i) * k)} 0 0 1 ${f(2 * (4.6 - i) * k)} 0" stroke="${c}" stroke-width="${f(0.9 * k)}" fill="none"/>`)
         .join('');
+    case 'heart':
+      return `<path d="${heartPath(x, y + 0.4 * k, 4.4 * k)}" fill="#E8556A"/><ellipse cx="${f(x - 1.9 * k)}" cy="${f(y - 1.6 * k)}" rx="${f(0.9 * k)}" ry="${f(0.6 * k)}" fill="#fff" opacity=".7"/>`;
+    case 'laugh':
+      return `<circle cx="${f(x)}" cy="${f(y)}" r="${f(4.6 * k)}" fill="#FFD866" stroke="#D9902A" stroke-width="${f(0.5 * k)}"/>
+        <path d="M${f(x - 2.8 * k)} ${f(y - 0.6 * k)} l${f(1.2 * k)} ${f(-1.2 * k)} l${f(1.2 * k)} ${f(1.2 * k)} M${f(x + 0.4 * k)} ${f(y - 0.6 * k)} l${f(1.2 * k)} ${f(-1.2 * k)} l${f(1.2 * k)} ${f(1.2 * k)}" stroke="#2F2A27" stroke-width="${f(0.6 * k)}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M${f(x - 2.6 * k)} ${f(y + 0.9 * k)} q${f(2.6 * k)} ${f(3.8 * k)} ${f(5.2 * k)} 0 z" fill="#7A3B3B"/>`;
+    case 'cheer':
+      return [-1, 1]
+        .map((d) => {
+          const px = x + d * 2.4 * k;
+          const py = y - 0.4 * k;
+          return `<g fill="#c96f4a" transform="rotate(${d * 14} ${f(px)} ${f(py)})"><ellipse cx="${f(px)}" cy="${f(py + 1.4 * k)}" rx="${f(1.7 * k)}" ry="${f(1.4 * k)}"/><circle cx="${f(px - 1.7 * k)}" cy="${f(py - 0.6 * k)}" r="${f(0.7 * k)}"/><circle cx="${f(px)}" cy="${f(py - 1.4 * k)}" r="${f(0.7 * k)}"/><circle cx="${f(px + 1.7 * k)}" cy="${f(py - 0.6 * k)}" r="${f(0.7 * k)}"/></g>`;
+        })
+        .join('') + `<path d="M${f(x)} ${f(y - 4.6 * k)} v${f(1.6 * k)}" stroke="#F2C230" stroke-width="${f(0.7 * k)}" stroke-linecap="round"/>`;
+    case 'zzz':
+      return `<g fill="none" stroke="#5b6b8a" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M${f(x - 4 * k)} ${f(y - 0.2 * k)} h${f(3.4 * k)} l${f(-3.4 * k)} ${f(3.6 * k)} h${f(3.4 * k)}" stroke-width="${f(0.9 * k)}"/>
+        <path d="M${f(x + 0.8 * k)} ${f(y - 3.6 * k)} h${f(2.6 * k)} l${f(-2.6 * k)} ${f(2.8 * k)} h${f(2.6 * k)}" stroke-width="${f(0.75 * k)}"/></g>`;
+    case 'blush':
+      return `<path d="M${f(x - 3.4 * k)} ${f(y - 0.6 * k)} q${f(1.1 * k)} ${f(1 * k)} ${f(2.2 * k)} 0 M${f(x + 1.2 * k)} ${f(y - 0.6 * k)} q${f(1.1 * k)} ${f(1 * k)} ${f(2.2 * k)} 0" stroke="#2F2A27" stroke-width="${f(0.6 * k)}" fill="none" stroke-linecap="round"/>
+        <ellipse cx="${f(x - 2.6 * k)}" cy="${f(y + 1.8 * k)}" rx="${f(1.6 * k)}" ry="${f(0.9 * k)}" fill="#F08A9A"/><ellipse cx="${f(x + 2.6 * k)}" cy="${f(y + 1.8 * k)}" rx="${f(1.6 * k)}" ry="${f(0.9 * k)}" fill="#F08A9A"/>
+        <path d="M${f(x - 0.8 * k)} ${f(y + 3.2 * k)} q${f(0.8 * k)} ${f(0.6 * k)} ${f(1.6 * k)} 0" stroke="#2F2A27" stroke-width="${f(0.5 * k)}" fill="none" stroke-linecap="round"/>`;
+    case 'starry':
+      return `<path d="${starPath(x - 0.6 * k, y + 0.6 * k, 4 * k)}" fill="#F7C534" stroke="#D9902A" stroke-width="${f(0.4 * k)}"/><path d="${starPath(x + 3.4 * k, y - 3.2 * k, 1.6 * k)}" fill="#F4A6D0"/><path d="${starPath(x + 3.8 * k, y + 2.8 * k, 1.1 * k)}" fill="#9FE0E6"/>`;
+    case 'party':
+      return `<path d="M${f(x - 3.8 * k)} ${f(y + 4 * k)} L${f(x - 1.2 * k)} ${f(y - 2.6 * k)} L${f(x + 1.6 * k)} ${f(y + 0.2 * k)} Z" fill="#9b7fd0" stroke="#6E58A6" stroke-width="${f(0.4 * k)}" stroke-linejoin="round"/>
+        <path d="M${f(x - 2.6 * k)} ${f(y + 1 * k)} l${f(1.8 * k)} ${f(1.6 * k)}" stroke="#F2C230" stroke-width="${f(0.6 * k)}"/>
+        <circle cx="${f(x + 1.6 * k)}" cy="${f(y - 3.6 * k)}" r="${f(0.7 * k)}" fill="#E8707A"/><circle cx="${f(x + 3.6 * k)}" cy="${f(y - 1.4 * k)}" r="${f(0.6 * k)}" fill="#5B9BC4"/><circle cx="${f(x - 0.4 * k)}" cy="${f(y - 4.4 * k)}" r="${f(0.55 * k)}" fill="#6FB07C"/>
+        <path d="M${f(x + 0.8 * k)} ${f(y - 1.2 * k)} q${f(1.4 * k)} ${f(-1.2 * k)} ${f(2.8 * k)} ${f(-0.2 * k)}" stroke="#F2C230" stroke-width="${f(0.5 * k)}" fill="none" stroke-linecap="round"/>`;
   }
 }
 

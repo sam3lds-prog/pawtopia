@@ -828,6 +828,144 @@
   animation: sp-trick-burst 3400ms ease-out forwards;
 }
 
+/* ================================================================== Emotes (D34), drawn: what shows without 3D */
+.sanctuary__scene.is-live .sp-trick--love .sp-trick-emote {
+  animation: sp-emote 1800ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-love {
+  animation: sp-trick-sway 1800ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-trick--laugh .sp-trick-emote {
+  animation: sp-emote 1800ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-laugh {
+  animation: sp-trick-giggle 1800ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-trick--cheer .sp-trick-emote {
+  animation: sp-emote 2000ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-cheer {
+  animation: sp-trick-cheer 2000ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-trick--surprised .sp-trick-emote {
+  animation: sp-emote 1600ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-surprised {
+  animation: sp-trick-jumpback 1600ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-trick--sleepy .sp-trick-emote {
+  animation: sp-emote 3000ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-sleepy {
+  animation: sp-trick-nod 3000ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-trick--shy .sp-trick-emote {
+  animation: sp-emote 2200ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-shy {
+  animation: sp-trick-sway 2200ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-trick--starstruck .sp-trick-emote {
+  animation: sp-emote 3000ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-starstruck {
+  animation: sp-trick-twirl 3000ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-trick--party .sp-trick-emote {
+  animation: sp-emote 3400ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-party {
+  animation: sp-act-dance 3400ms ease-in-out;
+}
+@keyframes sp-trick-sway {
+  0%,
+  100% {
+    transform: none;
+  }
+  25% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(5deg) translateY(-2px);
+  }
+  75% {
+    transform: rotate(-4deg);
+  }
+}
+@keyframes sp-trick-giggle {
+  0%,
+  100% {
+    transform: none;
+  }
+  10%,
+  30%,
+  50%,
+  70% {
+    transform: rotate(-4deg) translateY(-1px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: rotate(4deg);
+  }
+}
+@keyframes sp-trick-cheer {
+  0%,
+  100% {
+    transform: none;
+  }
+  22%,
+  62% {
+    transform: translateY(-10px) scale(0.96, 1.05);
+  }
+  40%,
+  80% {
+    transform: scale(1.05, 0.95);
+  }
+}
+@keyframes sp-trick-jumpback {
+  0%,
+  100% {
+    transform: none;
+  }
+  18% {
+    transform: translateY(-8px) scale(0.95, 1.08);
+  }
+  35%,
+  85% {
+    transform: scale(1.04, 0.97);
+  }
+}
+@keyframes sp-trick-nod {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: rotate(-4deg) scale(1, 1.04);
+  }
+  45%,
+  75% {
+    transform: rotate(6deg) translateY(2px);
+  }
+  60% {
+    transform: rotate(3deg);
+  }
+}
+@keyframes sp-trick-twirl {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: translateY(-14px) scaleX(-1);
+  }
+  60% {
+    transform: translateY(-8px);
+  }
+}
+
 /* Reduced motion: the emote shows, still; the animal doesn't move. */
 :root[data-motion='reduce'] .sanctuary__scene .sp-trick,
 :root[data-motion='reduce'] .sanctuary__scene .sp-trick * {
