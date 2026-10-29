@@ -229,7 +229,7 @@ class FirebaseLeaderboard implements LeaderboardService {
       const msg = String((e as { message?: string }).message ?? '');
       if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new LbClientError('offline', 'You seem to be offline.');
       if (code.endsWith('unavailable') || code.endsWith('network-request-failed') || code.endsWith('deadline-exceeded')) throw new LbClientError('offline', 'The leaderboard could not be reached.');
-      if (code.endsWith('invalid-argument')) throw new LbClientError('invalid', msg, msg);
+      if (code.endsWith('invalid-argument') || code.endsWith('permission-denied')) throw new LbClientError('invalid', msg, msg);
       if (code.endsWith('failed-precondition') || code.endsWith('unauthenticated')) throw new LbClientError('not-joined', 'Join the leaderboard first.');
       throw new LbClientError('failed', 'Something went wrong.');
     }

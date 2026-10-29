@@ -192,6 +192,9 @@ describe('leaderboard server', () => {
   it('three different reports replace a name with a neutral one', async () => {
     const store = await joined('target', 'Rude Name');
     for (const u of ['a', 'b', 'c']) await setProfile(store, u, { nickname: `Reporter ${u}x`, avatar: 'pip' }, NOW);
+    // Reporting needs a counted solve first.
+    await expect(reportName(store, 'a', 'target', NOW)).rejects.toMatchObject({ code: 'permission-denied' });
+    for (const u of ['a', 'b', 'c']) await submitSolves(store, u, [{ mode: L5, spec: spec(L5), events: play(L5).events }], NOW);
     expect(await reportName(store, 'a', 'target', NOW)).toEqual({ hidden: false });
     expect(await reportName(store, 'a', 'target', NOW)).toEqual({ hidden: false }); // same reporter twice counts once
     expect(await reportName(store, 'b', 'target', NOW)).toEqual({ hidden: false });

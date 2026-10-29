@@ -197,6 +197,9 @@ export async function reportName(store: Store, reporter: string, rawTarget: unkn
   return store.tx(async (tx) => {
     const reporterJoined = await tx.get(`players/${reporter}`);
     if (!reporterJoined) throw new LbError('failed-precondition', 'Join the leaderboard first.');
+    // Only players who have actually played (a counted solve) can report, so throwaway accounts can't rename people.
+    const reporterScore = await tx.get(`scores/${reporter}`);
+    if (num(reporterScore?.solves) < 1) throw new LbError('permission-denied', 'Solve a board on the leaderboard first.');
     const rep = await tx.get(`reports/${target}`);
     const score = await tx.get(`scores/${target}`);
     const player = await tx.get(`players/${target}`);

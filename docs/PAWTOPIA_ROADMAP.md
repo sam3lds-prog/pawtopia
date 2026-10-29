@@ -48,8 +48,14 @@ Defects confirmed in source and fixed in Sprint 0:
   pantry, Paw Points and Paw Rank, staged win sheet, replay goals
 - [x] **Sprint D** (D24) — living sanctuary (ambient director, ≤ 2 actors), Ember the fox and Maple the red panda,
   daily pats, honest small talk, evening fireflies; path milestones fixed
-- [ ] **Sprint E** — accounts, online leaderboards, Game Center, rewarded ads, StoreKit: waiting on provider approvals
-  (see "Needs you")
+- [x] **Sprint F** (D26) — softer board (no dark region lines), colored life and hint icons, Play opens on your level
+- [x] **Sprint G** (D27) — Paw Coins, video tokens and gems; food and treats; optional reward videos (AdMob); gem
+  packs (RevenueCat); Capacitor 8
+- [x] **Sprint H** (D28) — world map; Outback, Savanna, Arctic and Amazon sanctuaries that grow with every puzzle; 12
+  regional animals; 16 regional decorations; Animal album
+- [x] **Sprint I** (D29) — animals greet you, react to food and taps, stroll; livelier, still calm
+- [x] **Sprint J** (D30) — opt-in Paw Points leaderboard on Firebase, every solve replayed by the server
+- [ ] Game Center and online Paw Cup leagues — not started
 
 Test count: 222 unit tests + 38 browser e2e checks (incl. 9 fixes from a second independent review, D25). Bundle: ~87 kB JS gzipped (incl. both level packs), 11 kB CSS.
 
@@ -75,8 +81,10 @@ walks between anchor points; capybara, otter, axolotl and owl (need art); season
 
 ## Not built yet (by design)
 
-- **Online leagues, Daily Dash rankings, friends** — need the Phase 6 backend (`docs/backend-plan.md`). Flags off.
-- **Real purchases and ads** — need StoreKit / an ad SDK (Phase 7). Release builds show "Not available".
+- **Online Paw Cup leagues, Daily Dash rankings, friends** — need their own verified backend (`docs/backend-plan.md`).
+  The Paw Points leaderboard is built (D30).
+- **Gems and reward videos** are integrated (D27) and switch on with their keys; release builds without keys show
+  "coming soon" and no videos.
 - **Pet cosmetic accents, more habitats, seasonal themes, music, localization, dark mode** — P4 backlog.
 - **Native haptics** use `@capacitor/haptics` already; needs a device check once `ios/` is generated.
 
@@ -90,9 +98,11 @@ walks between anchor points; capybara, otter, axolotl and owl (need art); season
 1. **Run it on a phone**: `npm run build && npx cap add ios && npx cap sync && npx cap open ios`, set your Team in Xcode,
    run on a device. Please check face animation smoothness and 9×9 legibility on your smallest iPhone.
 2. **Upgrade test**: install the current App Store / TestFlight v1, play a few levels, then install this build over it.
-3. **App Store Connect**: rename the listing to Pawtopia (bundle id stays), new screenshots, privacy label "Data Not
-   Collected" for this build (`docs/release-checklist.md`).
-4. **When you want purchases** (Phase 7): create the five non-consumable products in App Store Connect and pick a
-   StoreKit bridge (RevenueCat Capacitor SDK suggested); share product ids, not secrets.
-5. **When you want online leagues** (Phase 6): a Firebase project on the Blaze plan with the iOS app registered and
-   App Check (App Attest) enabled; then approve flipping `featureFlags.onlineLeagues` after the go-live gate passes.
+3. **Keys for gems and videos** (when you want them live): App Store Connect products, RevenueCat and AdMob, as in
+   `docs/native-setup.md` §1–2. Keys go in `.env.local`, never in git.
+4. **Firebase for the leaderboard**: a project on the Blaze plan with a Web app and Anonymous sign-in, the web config in
+   `.env.local`, then `npm --prefix functions install && npm run fb:deploy`, then `npm run fb:test` once (this
+   environment couldn't download the emulator, so the rules tests haven't run yet), then App Check (App Attest) and
+   `ENFORCE_APP_CHECK=true` before inviting players (`docs/native-setup.md` §3).
+5. **App Store Connect**: rename the listing to Pawtopia (bundle id stays), new screenshots (World map, a regional
+   sanctuary, the Leaderboard), and the privacy label for the services you turn on (`docs/privacy-security.md`).

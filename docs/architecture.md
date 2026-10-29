@@ -11,15 +11,17 @@ unchanged.
              │ art/ (pet rigs, sanctuary)  animation/    │
              └───────┬──────────────┬────────────────────┘
                      │              │
-          app/ (context, gameFlow, events)
+          app/ (context, gameFlow, events, rewarded, leaderboardSync)
                      │
-   ┌─────────────────┼──────────────────────┬─────────────────────┐
- game/ (session,  meta/ (progression,     competitions/        services/
- modes, puzzles,  rewards, ledger, items, (scoring, verify,    (storage+migration,
- specs, grading,  missions, achievements, leagueRules, cup,    kv guard, ads, iap,
- persistence)     sanctuary, catalogs)    localCup)            analytics, audio, haptics)
+   ┌─────────────────┼──────────────────────┬──────────────────┬─────────────────────┐
+ game/ (session,  meta/ (progression,     competitions/      leaderboard/        services/
+ modes, puzzles,  rewards, ledger, items, (scoring, verify,  (check, server,     (storage+migration,
+ specs, grading,  points, world, feeding, leagueRules, cup,  nickname, queue —   kv guard, ads, iap,
+ persistence)     missions, achievements, localCup)          shared with the     leaderboard, analytics,
+                  sanctuary, catalogs)                       Cloud Functions)    audio, haptics)
  engine/ (solver, deduce, generator, levels, rng)  ← unchanged from v1
  data/ (levelPack: frozen levels 1–60; journeyPack2: frozen levels 61–150)
+ functions/ (Firebase callable functions: a thin Firestore/Auth adapter around leaderboard/server.ts)
 ```
 
 ## Key flows
@@ -40,7 +42,17 @@ interstitial *may* be considered by `shouldShowInterstitial` (never in release t
 
 **Startup.** `storage.loadSave` (v2, or migrate v1 with backup + round-trip check) → `rewards.reconcileRewards`
 (idempotent catch-up for v1 progress and back-dated Paw Points) → `items.grantStarterItems` (once) →
-`catchUpAchievements` → route to Welcome (fresh install) or Home.
+`world.reconcileWorld` (regional friends whose stage was reached) → `catchUpAchievements` → gem purchase reconcile and
+leaderboard sync in the background → route to Welcome (fresh install) or Home.
+
+**Growing a sanctuary.** On a win (not Paw Cup, not the guided board) `world.growOnSolve` adds one to the regional
+sanctuary being built; stages, arrivals and the completion gift are derived from that count, so re-running is safe.
+The win sheet shows the growth; "Visit" opens `screens/region` with the new stage growing in. D28.
+
+**Leaderboard.** If the player joined, the win also queues `{mode, spec, move log}` (`leaderboard/queue.ts`) and
+`leaderboardSync` sends batches to `lbSubmit`, which rebuilds the board, replays the log (`leaderboard/check.ts` →
+`competitions/verify.ts`) and awards Paw Points once per award id (`leaderboard/server.ts`). The League's table reads
+`scores` from Firestore. D30.
 
 ## Screen lifecycle
 
@@ -76,8 +88,15 @@ Hearts stay in the `Session`; hint costs are decided by `Session.hintCost` and r
 ## Sanctuary life
 
 `ui/animation/ambientDirector.ts` (DOM-free, fake-clock tested) schedules small actions on sanctuary figures and
-decorations, at most two at once; `styles/sanctuary-life.css` holds all sanctuary motion, scoped to the live scene.
-Wildlife friends (`meta/catalogs/companions.ts`, `ui/art/companions.ts`) are separate from the cat/dog residents. D24.
+decorations, at most three at once; `ui/components/sceneLife.ts` gives each figure and lively part its repertoire and
+plays arrival greetings; `styles/sanctuary-life.css` holds all sanctuary motion, scoped to the live scene. Wildlife
+friends (`meta/catalogs/companions.ts`, `ui/art/companions.ts`) are separate from the cat/dog residents. Regional
+scenes (`ui/art/regions.ts`) are built from stage features, regional decor and their three animals. D24, D28, D29.
+
+## World map
+
+`ui/art/worldMap.data.ts` is generated once by `scripts/build-world-map.ts` (Natural Earth via world-atlas, Natural
+Earth I projection); `ui/art/worldMap.ts` places pins with the same formula at runtime (tested against d3). D28.
 
 ## Faces
 
@@ -109,4 +128,7 @@ backend or a store stays off until integrated, tested and approved.
 | `test/unit/economy.test.ts` | ledger idempotency, rewards, v1 reconcile, decor purchase, scene |
 | `test/unit/competition.test.ts` | score fixtures, tie-breaks, league settlement, replay verifier tamper cases |
 | `test/unit/meta.test.ts` | missions, badges, v1 stats, local cup attempt limits |
-| `test/e2e/smoke.mjs` | first run, next level, resume, purchase once, scoped reset, facial-only in a browser |
+| `test/unit/world.test.ts` | projection, regions opening, growth/stages/arrivals/gift once, switching, reconcile, regional decor, scenes |
+| `test/unit/leaderboard.test.ts` | solve replay (mistakes, hints, extra lives), rejections, awards once, weekly rollover, rate limits, names, reports, deletion, queue |
+| `test/firebase/rules.test.ts` | Firestore rules against the emulator (`npm run fb:test`; not part of `npm test`) |
+| `test/e2e/smoke.mjs` | first run, next level, resume, purchase once, sanctuary life, world map growth, leaderboard join → solve → leave, scoped reset |

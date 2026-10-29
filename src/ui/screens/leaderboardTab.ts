@@ -39,6 +39,7 @@ function errorText(e: unknown): string {
   if (e instanceof LbClientError) {
     if (e.kind === 'offline') return "Couldn't reach the leaderboard. Check your connection and try again.";
     if (e.kind === 'invalid' && e.detail && ['length', 'characters', 'words'].includes(e.detail)) return nickProblemText(e.detail as 'length');
+    if (e.kind === 'invalid' && e.detail?.includes(' ')) return e.detail;
     if (e.kind === 'unavailable') return 'The leaderboard is not open yet.';
   }
   return 'Something went wrong. Please try again in a moment.';
