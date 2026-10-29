@@ -67,7 +67,7 @@ export interface LevelClear {
   hintFree: boolean; // ever solved without hints
   stars: number; // 1–3, cosmetic only
   /** Spec of the board these times belong to (missing = 1). A level number that got a new board starts fresh times. */
-  spec?: 1 | 2;
+  spec?: 1 | 2 | 3;
 }
 
 export interface DailyClear {
@@ -200,7 +200,7 @@ export interface SavedSession {
   digest: string;
   generatorVersion: number;
   /** Puzzle spec the board was issued under (src/game/specs.ts). Missing in older saves, which were all spec 1. */
-  specVersion?: 1 | 2;
+  specVersion?: 1 | 2 | 3;
   savedAt: string;
   snap: SessionSnapshot;
 }
@@ -225,7 +225,7 @@ export function defaultSettings(): Settings {
 export interface PendingSolve {
   key: string;
   mode: { kind: 'level'; level: number } | { kind: 'daily'; dateKey: string };
-  spec: 1 | 2;
+  spec: 1 | 2 | 3;
   events: SessionEvent[];
   at: string;
 }
@@ -256,7 +256,7 @@ function normLeaderboard(x: unknown): LeaderboardSave {
   const pending: PendingSolve[] = [];
   if (Array.isArray(x.pending))
     for (const p of x.pending) {
-      if (!isObj(p) || !isObj(p.mode) || !Array.isArray(p.events) || (p.spec !== 1 && p.spec !== 2) || typeof p.key !== 'string') continue;
+      if (!isObj(p) || !isObj(p.mode) || !Array.isArray(p.events) || (p.spec !== 1 && p.spec !== 2 && p.spec !== 3) || typeof p.key !== 'string') continue;
       const m = p.mode;
       const mode = m.kind === 'level' && Number.isInteger(m.level) ? { kind: 'level' as const, level: m.level as number } : m.kind === 'daily' && typeof m.dateKey === 'string' ? { kind: 'daily' as const, dateKey: m.dateKey } : null;
       if (!mode) continue;
@@ -407,7 +407,7 @@ function normSavedSession(x: unknown): SavedSession | null {
     mode: x.mode,
     digest: x.digest,
     generatorVersion: int(x.generatorVersion, 1),
-    ...(x.specVersion === 2 ? { specVersion: 2 as const } : x.specVersion === 1 ? { specVersion: 1 as const } : {}),
+    ...(x.specVersion === 3 ? { specVersion: 3 as const } : x.specVersion === 2 ? { specVersion: 2 as const } : x.specVersion === 1 ? { specVersion: 1 as const } : {}),
     savedAt: str(x.savedAt, ''),
     snap: x.snap as unknown as SessionSnapshot,
   };
@@ -445,7 +445,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
           clean: bool(v.clean, false),
           hintFree: bool(v.hintFree, false),
           stars: int(v.stars, 1, 1, 3),
-          ...(v.spec === 2 ? { spec: 2 as const } : {}),
+          ...(v.spec === 2 || v.spec === 3 ? { spec: v.spec as 2 | 3 } : {}),
         };
       }),
     },

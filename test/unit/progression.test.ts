@@ -130,6 +130,6 @@ describe('onboarding', () => {
     expect(levelTip(4)).toMatch(/region/);
     expect(levelTip(7)).toMatch(/side by side/);
     expect(levelTip(3)).toBeNull();
-    for (const L of [2, 4, 7, 11, 12, 19, 27, 41]) expect(levelTip(L)!.split('. ').length).toBeLessThanOrEqual(2);
+    for (const L of [2, 4, 6, 7, 10, 12, 15, 19, 40]) expect(levelTip(L)!.split('. ').length).toBeLessThanOrEqual(2);
   });
 });

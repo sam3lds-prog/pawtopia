@@ -31,8 +31,8 @@ export interface PackFile {
  * (src/game/grading.ts) so the label shown to players is the one the board was verified with.
  */
 export interface PackLevel2 extends PackLevel {
-  spec: 1 | 2;
-  /** What the spec asked for (spec 2 only). */
+  spec: 1 | 2 | 3;
+  /** What the spec asked for (spec 2 and 3). */
   target?: Difficulty;
   /** Measured label and score under `gradingVersion`. */
   tier: Difficulty;

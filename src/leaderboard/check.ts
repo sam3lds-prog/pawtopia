@@ -60,7 +60,7 @@ export function parseSubmission(x: unknown): SolveSubmission | null {
   if (m.kind === 'level' && Number.isInteger(m.level)) mode = { kind: 'level', level: m.level as number };
   else if (m.kind === 'daily' && typeof m.dateKey === 'string') mode = { kind: 'daily', dateKey: m.dateKey };
   else return null;
-  if (o.spec !== 1 && o.spec !== 2) return null;
+  if (o.spec !== 1 && o.spec !== 2 && o.spec !== 3) return null;
   if (!Array.isArray(o.events) || o.events.length > MAX_EVENTS || !o.events.every(isSessionEvent)) return null;
   return { mode, spec: o.spec, events: o.events };
 }

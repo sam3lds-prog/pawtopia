@@ -27,8 +27,9 @@ describe('Journey launch pack', () => {
     }
   }, 30_000);
 
-  it('Journey levels come from the pack', () => {
-    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 12 }))).toBe(puzzleDigest(pack[11].puzzle));
+  it('Journey levels come from the pack (the first lessons today; levels 6–60 for boards saved under spec 1)', () => {
+    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 4 }))).toBe(puzzleDigest(pack[3].puzzle));
+    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 12 }, 1))).toBe(puzzleDigest(pack[11].puzzle));
     expect(levelMeta(7)?.technique).toBe('neighbor-lock');
     expect(levelMeta(61)).toBeNull();
   });

@@ -18,12 +18,13 @@ export const TUTORIAL_STEPS = 2;
 const TIPS: Record<number, string> = {
   2: 'Every row and every column holds exactly one cat and one dog.',
   4: 'Colors count too: each color region gets one cat and one dog.',
+  6: 'Seven by seven already! Same rules, more room. There is always a logical next step.',
   7: 'New idea: pets never sit side by side. Mark tiles beside a pet as Empty.',
-  11: 'Six by six. Same rules, a little more room to think.',
+  10: 'A smaller board now and then is a breather, not always an easy one.',
   12: 'Stuck? Hint first shows where to look, then why.',
+  15: 'Eight by eight. Start with lines that have only a few open tiles.',
   19: "If a color's open tiles all share one row, that row's pet must live in that color.",
-  27: 'Seven by seven. There is always a logical next step.',
-  41: 'Eight by eight. Start with lines that have only a few open tiles.',
+  40: 'Nine by nine, the biggest boards. Take it one line at a time.',
 };
 
 /** One-sentence coaching shown when a Journey level opens, or null. */

@@ -100,8 +100,8 @@ describe('checking a solve', () => {
 
   it('counts a board only on the spec it is issued under, and never more hints than cells', () => {
     const L80: BoardRef = { kind: 'level', level: 80 };
-    expect(spec(L80)).toBe(2);
-    expect(checkSolve({ mode: L80, spec: 1, events: play(L80).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
+    expect(spec(L80)).toBe(3);
+    expect(checkSolve({ mode: L80, spec: 2, events: play(L80).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
     const { events } = play(L5);
     const flood: SessionEvent[] = [...events.slice(0, 1), ...Array.from({ length: 200 }, () => ({ t: events[0].t, type: 'hint' as const })), ...events.slice(1)];
     expect(checkSolve({ mode: L5, spec: spec(L5), events: flood }, NOW)).toMatchObject({ ok: false, reason: 'invalid-log' });

@@ -13,8 +13,9 @@ import type { ModeRef } from './modes';
 import { modeKey } from './modes';
 import { LEVEL_PACK } from '../data/levelPack';
 import { JOURNEY_PACK_2 } from '../data/journeyPack2';
+import { JOURNEY_PACK_3 } from '../data/journeyPack3';
 import { decodePack, type PackLevel, type PackLevel2 } from '../data/packFormat';
-import { DAILY_V2_FROM, JOURNEY_V2_FROM, dailyTargetV2, journeyTargetV2, pickBoard, type SpecVersion } from './specs';
+import { DAILY_V2_FROM, JOURNEY_V3_FROM, dailyTargetV2, journeyTargetV2, journeyTargetV3, pickBoard, type SpecVersion } from './specs';
 
 export type { SpecVersion } from './specs';
 
@@ -28,13 +29,15 @@ export type PuzzleSource = (mode: ModeRef, spec: SpecVersion) => Puzzle | null;
 
 const PACK = new Map(decodePack(LEVEL_PACK).map((e) => [e.level, e]));
 const PACK_2 = new Map(decodePack(JOURNEY_PACK_2).map((e) => [e.level, e]));
+const PACK_3 = new Map(decodePack(JOURNEY_PACK_3).map((e) => [e.level, e]));
 
 /**
- * The spec a mode's board is issued under today. Journey levels from JOURNEY_V2_FROM and dailies from DAILY_V2_FROM
- * use spec 2 (5×5–8×8, measured difficulty); everything else, including Zen and Paw Cup, stays on spec 1.
+ * The spec a mode's board is issued under today. Journey levels from JOURNEY_V3_FROM use spec 3 (the steeper ramp up
+ * to 9×9, D31); dailies from DAILY_V2_FROM use spec 2 (≤ 8×8); levels 1–5, older dailies, Zen and Paw Cup stay on
+ * spec 1. Spec 2 Journey boards (71+) remain buildable for boards saved under it.
  */
 export function currentSpec(mode: ModeRef): SpecVersion {
-  if (mode.kind === 'level') return mode.level >= JOURNEY_V2_FROM ? 2 : 1;
+  if (mode.kind === 'level') return mode.level >= JOURNEY_V3_FROM ? 3 : 1;
   if (mode.kind === 'daily') return mode.dateKey >= DAILY_V2_FROM ? 2 : 1;
   return 1;
 }
@@ -45,8 +48,9 @@ export function currentSpec(mode: ModeRef): SpecVersion {
  */
 export const levelPackSource: PuzzleSource = (mode, spec) => {
   if (mode.kind !== 'level') return null;
+  if (spec === 3) return PACK_3.get(mode.level)?.puzzle ?? null;
   const first = PACK.get(mode.level);
-  if (first) return first.puzzle;
+  if (first && spec === 1) return first.puzzle;
   const second = PACK_2.get(mode.level);
   return second && second.meta.spec === spec ? second.puzzle : null;
 };
@@ -56,15 +60,18 @@ export const levelPackSource: PuzzleSource = (mode, spec) => {
  * board isn't in a pack (beyond 150, or an old spec-1 board at 71+).
  */
 export function packedLevelTier(level: number, spec: SpecVersion): Difficulty | undefined {
+  if (spec === 3) return PACK_3.get(level)?.meta.tier;
   const first = PACK.get(level);
-  if (first) return profileOf(first.puzzle).tier;
+  if (first && spec === 1) return profileOf(first.puzzle).tier;
   const second = PACK_2.get(level);
   return second && second.meta.spec === spec ? second.meta.tier : undefined;
 }
 
-/** Pack-2 metadata (spec, measured tier) for a level, or null outside 61–150. */
-export function journeyMeta(level: number): PackLevel2 | null {
-  return PACK_2.get(level)?.meta ?? null;
+/** Pack metadata (spec, measured tier) for a level's board under a spec, or null when it isn't in pack 2 or 3. */
+export function journeyMeta(level: number, spec: SpecVersion = currentSpec({ kind: 'level', level })): PackLevel2 | null {
+  if (spec === 3) return PACK_3.get(level)?.meta ?? null;
+  const m = PACK_2.get(level)?.meta;
+  return m && m.spec === spec ? m : null;
 }
 
 /** Grading metadata for a shipped level (null beyond the pack). */
@@ -96,6 +103,7 @@ export function puzzleFor(mode: ModeRef, spec: SpecVersion = currentSpec(mode)):
 function generateFor(mode: ModeRef, version: SpecVersion): Puzzle {
   switch (mode.kind) {
     case 'level': {
+      if (version === 3) return pickBoard(journeyTargetV3(mode.level));
       if (version === 2) return pickBoard(journeyTargetV2(mode.level));
       const spec = levelSpec(mode.level);
       return generatePuzzle({ size: spec.size, seed: spec.seed, difficulty: spec.difficulty });
@@ -118,7 +126,7 @@ function generateFor(mode: ModeRef, version: SpecVersion): Puzzle {
 export function sizeFor(mode: ModeRef, spec: SpecVersion = currentSpec(mode)): number {
   switch (mode.kind) {
     case 'level':
-      return spec === 2 ? journeyTargetV2(mode.level).size : levelSpec(mode.level).size;
+      return spec === 3 ? journeyTargetV3(mode.level).size : spec === 2 ? journeyTargetV2(mode.level).size : levelSpec(mode.level).size;
     case 'daily':
       return spec === 2 ? dailyTargetV2(mode.dateKey).size : dailySpec(dateFromKey(mode.dateKey)).size;
     case 'zen':

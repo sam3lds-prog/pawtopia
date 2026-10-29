@@ -46,9 +46,15 @@ is why a level that asked for Medium could silently get something else under the
 ## Where each label is used
 
 - Board header chip, the Play path's next level, and Home's continue card show the measured label.
-- Journey 71+ and dailies from 2026-10-27 are *chosen* by it: `pickBoard` tries candidate seeds in a fixed order and
-  takes the first board whose measured label matches the slot (80 tries; every slot through level 150 and a year of
-  dailies matched). If nothing matched it would take the closest and label it truthfully.
+- Journey levels 6+ (spec 3, D31) and dailies from 2026-10-27 (spec 2) are *chosen* by it: `pickBoard` tries
+  candidate seeds in a fixed order and takes the first board whose measured label matches the slot (80 tries; every
+  slot through level 150 and a year of dailies matched). If nothing matched it would take the closest and label it
+  truthfully.
+- **Spec 3 ramp** (`journeyTargetV3`): levels 6–20 are mostly 7×7 (easy → hard) with a first 8×8 at 15 and two 6×6
+  breathers; 21–40 mix 7×7 and 8×8 (8×8 more often) and end on the first 9×9; 41–70 are mostly 8×8 with a 9×9 every
+  few levels; 71–100 make 9×9 the main size; 101+ lean harder. A smaller board still turns up now and then, so size
+  and difficulty stay independent. Levels 6–150 are frozen in `src/data/journeyPack3.ts` (mix: 9×9 ×66, 8×8 ×45,
+  7×7 ×27, 6×6 ×7). Levels 1–5 keep their launch boards. Dailies stay at most 8×8.
 - Paw Cup keeps its published lineup and par times (owner decision, 2026-10-26); its in-game chip still shows the
   measured label.
 
@@ -56,7 +62,7 @@ is why a level that asked for Medium could silently get something else under the
 
 Changing a weight or threshold changes labels and which boards future slots pick. Bump `GRADING_VERSION`, re-run
 `npm run grade:report`, and note it in `DECISIONS.md`. Shipped Journey levels are frozen in `src/data/journeyPack2.ts`
-and `npm run pack:check` fails if regenerating them would give a different board, so a formula change can never
+and `src/data/journeyPack3.ts`, and `npm run pack:check` fails if regenerating them would give a different board, so a formula change can never
 silently swap a level a player has seen. Levels beyond 150 and future dailies would change; that needs a spec bump.
 
 Calibration data collected from real players (solve time, mistakes and hint use by size) would sharpen these weights,

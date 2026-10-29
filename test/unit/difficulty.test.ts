@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { JOURNEY_PACK_2 } from '../../src/data/journeyPack2';
-import { JOURNEY_PACK_FIRST, JOURNEY_PACK_LAST } from '../../src/data/journeyPackRange';
+import { JOURNEY_PACK_3 } from '../../src/data/journeyPack3';
+import { JOURNEY_PACK3_LAST, JOURNEY_PACK_FIRST, JOURNEY_PACK_LAST } from '../../src/data/journeyPackRange';
 import { LEVEL_PACK } from '../../src/data/levelPack';
 import { decodePack, verifyBoard } from '../../src/data/packFormat';
 import { generatePuzzle } from '../../src/engine/generator';
@@ -10,13 +11,14 @@ import { cupBoardSpec } from '../../src/competitions/cup';
 import { addDaysKey, dateFromKey } from '../../src/game/dates';
 import { GRADING_VERSION, profileBoard, profileOf, tierFor, displayDifficulty, difficultyReason } from '../../src/game/grading';
 import { currentSpec, puzzleDigest, puzzleFor, sizeFor, journeyMeta } from '../../src/game/puzzles';
-import { DAILY_V2_FROM, JOURNEY_V2_FROM, MAX_NEW_BOARD_SIZE, dailyTargetV2, journeyTargetV2, pickBoard } from '../../src/game/specs';
+import { DAILY_V2_FROM, JOURNEY_V2_FROM, JOURNEY_V3_FROM, MAX_JOURNEY_SIZE, MAX_NEW_BOARD_SIZE, dailyTargetV2, journeyTargetV2, journeyTargetV3, pickBoard } from '../../src/game/specs';
 import { Session } from '../../src/game/session';
 import { captureSession, resumeSession } from '../../src/game/sessionPersistence';
 import { recordWin } from '../../src/meta/progression';
 import { defaultSave } from '../../src/services/storage';
 
 const pack2 = decodePack(JOURNEY_PACK_2);
+const pack3 = decodePack(JOURNEY_PACK_3);
 
 describe('measured difficulty', () => {
   it('is deterministic for a board', () => {
@@ -90,35 +92,80 @@ describe('Journey pack 2 (levels 61–150)', () => {
   });
 });
 
+describe('Journey pack 3 (spec 3, levels 6–150): the steeper ramp', () => {
+  it('is contiguous, records the grading version, and every board is valid, unique, logic-solvable and at most 9×9', () => {
+    expect(pack3.map((e) => e.level)).toEqual(Array.from({ length: JOURNEY_PACK3_LAST - JOURNEY_V3_FROM + 1 }, (_, i) => i + JOURNEY_V3_FROM));
+    expect(JOURNEY_PACK_3.gradingVersion).toBe(GRADING_VERSION);
+    for (const e of pack3) {
+      expect(e.meta.spec).toBe(3);
+      expect(verifyBoard(e.puzzle), `level ${e.level}`).toEqual([]);
+      expect(e.puzzle.size, `level ${e.level}`).toBeLessThanOrEqual(MAX_JOURNEY_SIZE);
+    }
+  }, 120_000);
+
+  it('is reproducible, and each board measures exactly the difficulty its slot asks for', () => {
+    for (const e of pack3) {
+      const t = journeyTargetV3(e.level);
+      expect(e.puzzle.size, `level ${e.level}`).toBe(t.size);
+      expect(e.meta.tier, `level ${e.level}`).toBe(profileOf(e.puzzle).tier);
+      expect(e.meta.tier, `level ${e.level}`).toBe(t.tier);
+    }
+    for (const L of [6, 15, 40, 77, 150]) expect(puzzleDigest(pickBoard(journeyTargetV3(L))), `level ${L}`).toBe(puzzleDigest(pack3.find((e) => e.level === L)!.puzzle));
+  }, 120_000);
+
+  it('ramps the way it should: 7×7 right after the first lessons, 8×8 joining, 9×9 from 40 and the main size after 70', () => {
+    const size = (L: number) => pack3.find((e) => e.level === L)!.puzzle.size;
+    const share = (from: number, to: number, n: number) => pack3.filter((e) => e.level >= from && e.level <= to && e.puzzle.size === n).length / (to - from + 1);
+    expect(size(6)).toBe(7);
+    expect(share(6, 20, 7)).toBeGreaterThanOrEqual(0.6);
+    expect(share(6, 39, 9)).toBe(0);
+    expect(size(40)).toBe(9);
+    expect(share(21, 40, 8)).toBeGreaterThan(share(21, 40, 7));
+    expect(share(41, 70, 9)).toBeGreaterThan(0.2);
+    expect(share(71, 150, 9)).toBeGreaterThanOrEqual(0.6);
+    // Breathers: a smaller board still turns up now and then.
+    expect(pack3.some((e) => e.level > 40 && e.puzzle.size <= 7)).toBe(true);
+  });
+});
+
 describe('versioned specs', () => {
-  it('Journey 71+ and dailies from the cut-over use spec 2; earlier boards, Zen and Paw Cup stay on spec 1', () => {
-    expect(currentSpec({ kind: 'level', level: 70 })).toBe(1);
-    expect(currentSpec({ kind: 'level', level: 71 })).toBe(2);
+  it('Journey 6+ uses spec 3, dailies from the cut-over spec 2; the first lessons, Zen and Paw Cup stay on spec 1', () => {
+    expect(currentSpec({ kind: 'level', level: 5 })).toBe(1);
+    expect(currentSpec({ kind: 'level', level: 6 })).toBe(3);
+    expect(currentSpec({ kind: 'level', level: 70 })).toBe(3);
+    expect(currentSpec({ kind: 'level', level: 71 })).toBe(3);
     expect(currentSpec({ kind: 'daily', dateKey: addDaysKey(DAILY_V2_FROM, -1) })).toBe(1);
     expect(currentSpec({ kind: 'daily', dateKey: DAILY_V2_FROM })).toBe(2);
     expect(currentSpec({ kind: 'zen', size: 6, seed: 3 })).toBe(1);
     expect(currentSpec({ kind: 'cup', weekKey: '2026-W44', index: 4 })).toBe(1);
   });
 
-  it('new Journey boards come from pack 2, and the old 9×9 is still there for a board saved under spec 1', () => {
+  it('new Journey boards come from pack 3, and boards saved under spec 1 or 2 still find their own board', () => {
     const now = puzzleFor({ kind: 'level', level: 75 });
-    expect(puzzleDigest(now)).toBe(puzzleDigest(pack2.find((e) => e.level === 75)!.puzzle));
-    expect(now.size).toBeLessThanOrEqual(8);
-    expect(journeyMeta(75)?.spec).toBe(2);
-    const legacy = puzzleFor({ kind: 'level', level: 75 }, 1);
-    expect(legacy.size).toBe(9);
+    expect(puzzleDigest(now)).toBe(puzzleDigest(pack3.find((e) => e.level === 75)!.puzzle));
+    expect(journeyMeta(75)?.spec).toBe(3);
     expect(sizeFor({ kind: 'level', level: 75 })).toBe(now.size);
+    // Spec 2 (the ≤ 8×8 rotation) and spec 1 (the original 9×9) are still buildable for saves made under them.
+    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 75 }, 2))).toBe(puzzleDigest(pack2.find((e) => e.level === 75)!.puzzle));
+    expect(journeyMeta(75, 2)?.spec).toBe(2);
+    expect(puzzleFor({ kind: 'level', level: 75 }, 1).size).toBe(9);
     expect(sizeFor({ kind: 'level', level: 75 }, 1)).toBe(9);
+    // Levels 6–60 under spec 1 are still the launch pack's boards; 1–5 never changed.
+    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 12 }, 1))).toBe(puzzleDigest(decodePack(LEVEL_PACK)[11].puzzle));
+    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 3 }))).toBe(puzzleDigest(decodePack(LEVEL_PACK)[2].puzzle));
   });
 
-  it('levels beyond pack 2 are picked on device by the same rule (≤ 8×8, measured label = target)', () => {
-    for (const L of [151, 156, 160]) {
+  it('levels beyond pack 3 are picked on device by the same rule (≤ 9×9, measured label = target)', () => {
+    for (const L of [151, 156, 158]) {
       const p = puzzleFor({ kind: 'level', level: L });
-      const t = journeyTargetV2(L);
+      const t = journeyTargetV3(L);
       expect(p.size).toBe(t.size);
       expect(displayDifficulty(p)).toBe(t.tier);
     }
-  }, 30_000);
+    // The old spec-2 rule still works for boards saved under it.
+    const old = puzzleFor({ kind: 'level', level: 160 }, 2);
+    expect(old.size).toBe(journeyTargetV2(160).size);
+  }, 60_000);
 
   it('no daily from the cut-over is larger than 8×8, and its label is measured', () => {
     let k = DAILY_V2_FROM;
@@ -163,12 +210,17 @@ describe('saved boards across the spec change', () => {
     expect(back.session.cells[placed![0]][placed![1]]).toBe(legacy.solution[placed![0]][placed![1]]);
   });
 
-  it('new saves record their spec and resume on it', () => {
+  it('new saves record their spec and resume on it; a board saved under spec 2 resumes on spec 2', () => {
     const mode = { kind: 'level' as const, level: 75 };
     const s = new Session(puzzleFor(mode), { maxHearts: 5 });
     const saved = captureSession(mode, s)!;
-    expect(saved.specVersion).toBe(2);
+    expect(saved.specVersion).toBe(3);
     expect(resumeSession(saved)!.session.size).toBe(puzzleFor(mode).size);
+    const old = new Session(puzzleFor(mode, 2), { maxHearts: 5 });
+    const saved2 = captureSession(mode, old, new Date(), 2)!;
+    const back = resumeSession(JSON.parse(JSON.stringify(saved2)))!;
+    expect(back.spec).toBe(2);
+    expect(puzzleDigest(back.session.puzzle)).toBe(puzzleDigest(puzzleFor(mode, 2)));
   });
 
   it('times only compare on the same board: a level that moved to spec 2 starts a fresh best, keeps its clear and stars', () => {

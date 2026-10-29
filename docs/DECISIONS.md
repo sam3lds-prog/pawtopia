@@ -375,3 +375,16 @@ Owner decision (2026-10-29): leaderboard on our own server, Firebase.
   and the tester preview run the same logic on the device (a table with only you); release builds say it's coming.
 - **Not done here**: the security-rules tests and the functions could not be run against the Firebase emulator in this
   environment (its download is blocked); they are ready to run with `npm run fb:test` / `npm run fb:emulators`.
+
+## 2026-10-29 · D31 — A steeper Journey: 7×7 from level 6, then 8×8 and 9×9
+Owner decisions (2026-10-29): new boards for every level from 6; 8×8 and 9×9 mix later. This revises D22's 8×8 cap
+for the Journey (dailies keep it).
+
+- **Spec 3** (`game/specs.ts → journeyTargetV3`, frozen in `data/journeyPack3.ts` for 6–150): 7×7 right after the five
+  first lessons, 8×8 from 15, the first 9×9 at 40, 9×9 the main size after 70, with occasional smaller breather boards.
+  Each board is chosen by measured difficulty and its label is what it measures.
+- **What players keep**: levels already cleared stay cleared with their stars, coins, points and arrivals. A replay of
+  such a level is the new board, with its best time starting fresh (times only compare on the same board). A board in
+  progress resumes on the spec it was started on (spec 1 and 2 boards stay buildable), and the leaderboard counts a
+  board only on the spec it's issued under today.
+- Tips moved with the sizes (7×7 at 6, 8×8 at 15, 9×9 at 40).
