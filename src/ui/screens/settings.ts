@@ -16,7 +16,7 @@ import { featureFlags } from '../../config/featureFlags';
 import { showRules } from './rules';
 import { ICON } from '../icons';
 
-type BoolKey = 'autoMark' | 'showTimer' | 'largeBoard' | 'sound' | 'haptics' | 'highContrast' | 'regionPatterns' | 'leftHanded';
+type BoolKey = 'autoMark' | 'showTimer' | 'largeBoard' | 'sound' | 'haptics' | 'highContrast' | 'regionPatterns' | 'leftHanded' | 'toys3d';
 
 function sw(key: BoolKey, label: string, help = ''): string {
   const on = app.settings[key];
@@ -83,6 +83,7 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
           ['reduce', 'Reduced'],
           ['full', 'Full'],
         ])}
+        ${sw('toys3d', '3D animals', 'Sanctuary animals as 3D toys. Off draws them flat and saves battery.')}
         ${sw('highContrast', 'High contrast')}
         ${sw('regionPatterns', 'Region patterns', 'Adds a texture to each color region')}
         ${sw('leftHanded', 'Left-handed layout')}

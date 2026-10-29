@@ -1,0 +1,26 @@
+/* 3D toys over a sanctuary scene (D34). The drawn animals stay where they are, invisible, so taps and state keep
+   working; the canvas on top shows their 3D twins. */
+.sanctuary__scene > .scene3d {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 260ms ease-out;
+}
+.sanctuary__scene.has-3d > .scene3d {
+  opacity: 1;
+}
+.sanctuary__scene.has-3d .sanctuary__pet {
+  opacity: 0;
+  transition: opacity 260ms ease-out;
+}
+.sanctuary__scene.has-3d .sanctuary__pet,
+.sanctuary__scene.has-3d .sanctuary__pet * {
+  animation: none !important;
+}
+:root[data-motion='reduce'] .sanctuary__scene > .scene3d,
+:root[data-motion='reduce'] .sanctuary__scene.has-3d .sanctuary__pet {
+  transition: none;
+}

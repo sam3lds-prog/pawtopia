@@ -17,6 +17,7 @@ import { companionSvg } from '../art/companions';
 import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
 import { animalName, startSceneActivities, type ActivityRunner } from '../components/activities';
 import { mountTrickTray } from '../components/tricks';
+import { createScene3D } from '../components/scene3d';
 import { trickBadge } from '../art/tricks';
 import { localDateKey } from '../../game/dates';
 import { track } from '../../services/analytics';
@@ -77,13 +78,17 @@ export const sanctuaryScreen: ScreenDef = {
     // ---------------------------------------------------------------- ambient life (D24)
     let life: SceneLife | null = null;
     let acts: ActivityRunner | null = null;
+    // 3D toys over the drawn scene (D34); kept across re-renders.
+    const s3d = createScene3D();
     scope.onDispose(() => {
       life?.dispose();
       acts?.dispose();
+      s3d.dispose();
     });
     scope.on(document, 'visibilitychange', () => {
       life?.setLive(!document.hidden);
       acts?.setLive(!document.hidden);
+      s3d.setLive(!document.hidden);
     });
 
     function wireLife(): void {
@@ -92,6 +97,7 @@ export const sanctuaryScreen: ScreenDef = {
       const svg = el.querySelector<SVGSVGElement>('.sanctuary__scene svg');
       life = svg ? startSceneLife(svg, 'sanct') : null;
       acts = svg ? startSceneActivities(svg, el.querySelector('[data-chat]'), () => app.reducedMotion, animalName) : null;
+      s3d.attach(el.querySelector<HTMLElement>('.sanctuary__scene'), svg);
       const btn = tricksBtn();
       if (btn) btn.hidden = !svg?.querySelector('.sanctuary__pet');
       el.querySelector('.sanctuary__under')?.after(trayHost);

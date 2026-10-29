@@ -20,6 +20,7 @@ import { decorIcon, SCENE_VIEWBOX } from '../art/sanctuary';
 import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
 import { animalName, startSceneActivities, type ActivityRunner } from '../components/activities';
 import { mountTrickTray } from '../components/tricks';
+import { createScene3D } from '../components/scene3d';
 import { trickBadge } from '../art/tricks';
 import { toast } from '../components/sheet';
 import { esc, h, plural } from '../dom';
@@ -58,13 +59,17 @@ export const regionScreen: ScreenDef = {
     });
     let life: SceneLife | null = null;
     let acts: ActivityRunner | null = null;
+    // 3D toys over the drawn scene (D34); kept across re-renders.
+    const s3d = createScene3D();
     scope.onDispose(() => {
       life?.dispose();
       acts?.dispose();
+      s3d.dispose();
     });
     scope.on(document, 'visibilitychange', () => {
       life?.setLive(!document.hidden);
       acts?.setLive(!document.hidden);
+      s3d.setLive(!document.hidden);
     });
 
     function progressCard(): string {
@@ -166,6 +171,7 @@ export const regionScreen: ScreenDef = {
       const svg = el.querySelector<SVGSVGElement>('.sanctuary__scene svg');
       life = svg ? startSceneLife(svg, `region-${id}`) : null;
       acts = svg && open ? startSceneActivities(svg, el.querySelector('[data-chat]'), () => app.reducedMotion, animalName) : null;
+      s3d.attach(open ? el.querySelector<HTMLElement>('.sanctuary__scene') : null, svg);
       const btn = tricksBtn();
       if (btn) btn.hidden = !open || !svg?.querySelector('.sanctuary__pet');
       el.querySelector('.sanctuary__under')?.after(trayHost);

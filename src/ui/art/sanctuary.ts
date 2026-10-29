@@ -383,7 +383,7 @@ export function residentFigure(id: PetId, x: number, y: number, H: number, mood:
   const k = H / 64;
   const headTop = y - bh * 1.55 - H * 0.82;
   const head = petRigMarkup(id, mood, `translate(${x - H / 2} ${headTop}) scale(${k})`);
-  return `<g class="sanctuary__pet" data-pet="${id}" data-name="${P.name}">${body}${head}${heartAbove(x, headTop - 2)}</g>`;
+  return `<g class="sanctuary__pet" data-pet="${id}" data-name="${P.name}" data-gx="${x}" data-gy="${y}" data-gh="${H}" data-mood="${mood}">${body}${head}${heartAbove(x, headTop - 2)}</g>`;
 }
 
 // ------------------------------------------------------------------ scene

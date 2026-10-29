@@ -238,6 +238,8 @@ try {
       () => false,
     );
   check('residents say hello when you arrive', greeted);
+  await page.waitForSelector('.sanctuary__scene.has-3d > canvas.scene3d', { timeout: 15000 }).catch(() => {});
+  check('the residents appear as 3D toys over the drawn garden', await page.evaluate(() => !!document.querySelector('.sanctuary__scene.has-3d > canvas.scene3d') && getComputedStyle(document.querySelector('.sanctuary__scene .sanctuary__pet')).opacity === '0'));
   await page.waitForTimeout(3000);
   await page.evaluate(() => {
     window.__seen = new Set();

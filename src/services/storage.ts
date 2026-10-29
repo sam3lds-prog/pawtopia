@@ -55,6 +55,8 @@ export interface Settings {
   controls: ControlScheme;
   showTimer: boolean;
   largeBoard: boolean;
+  /** Sanctuary animals as 3D toys (D34); off draws them flat, like before. */
+  toys3d: boolean;
   /** The pet tool the player last picked, so the next board opens with it selected. */
   lastSpecies: 'cat' | 'dog';
 }
@@ -220,6 +222,7 @@ export function defaultSettings(): Settings {
     controls: 'tools',
     showTimer: true,
     largeBoard: false,
+    toys3d: true,
     lastSpecies: 'cat',
   };
 }
@@ -341,6 +344,7 @@ function normSettings(x: unknown): Settings {
     controls: oneOf(x.controls, ['tools', 'classic'] as const, d.controls),
     showTimer: bool(x.showTimer, d.showTimer),
     largeBoard: bool(x.largeBoard, d.largeBoard),
+    toys3d: bool(x.toys3d, d.toys3d),
     lastSpecies: oneOf(x.lastSpecies, ['cat', 'dog'] as const, d.lastSpecies),
   };
 }

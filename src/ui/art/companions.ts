@@ -321,7 +321,7 @@ export function companionFigure(id: CompanionId, x: number, y: number, H: number
     if (kind === 'tall') headTop -= H * 0.4;
   }
   const name = COMPANION_BY_ID[id].name;
-  return `<g class="sanctuary__pet sanctuary__friend" data-friend="${id}" data-name="${name}">${bodySvg}<g class="sp-tail">${tail}</g><g transform="translate(${headX.toFixed(1)} ${headTop.toFixed(1)}) scale(${k.toFixed(3)})">${head(id, mood)}</g></g>`;
+  return `<g class="sanctuary__pet sanctuary__friend" data-friend="${id}" data-name="${name}" data-gx="${x}" data-gy="${y}" data-gh="${H}" data-mood="${mood}">${bodySvg}<g class="sp-tail">${tail}</g><g transform="translate(${headX.toFixed(1)} ${headTop.toFixed(1)}) scale(${k.toFixed(3)})">${head(id, mood)}</g></g>`;
 }
 
 /** The figure's head-top y, for placing a floating heart above it. */

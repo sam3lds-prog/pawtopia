@@ -423,3 +423,24 @@ more animated tricks that can only be bought with gems.
 - **Motion policy** (extends D24/D32): each trick is 1.3–3.4 s and over by itself; props never outlast it; the board
   is never touched; under reduced motion only the emote shows, still. Ambient life and activities leave an animal
   alone while it performs. Tricks change nothing in puzzles, rankings or rewards.
+
+## 2026-10-29 · D34 — The sanctuary animals become 3D soft toys
+Owner decisions (2026-10-29): real 3D animals (not 2.5D, not whole 3D scenes); soft-toy look; tricks plus new emotes
+acted out with face and body.
+
+- **Models** (`src/three/species.ts`, `toy.ts`): all 20 animals are built in code from rounded parts with a plush
+  finish (a soft sheen), in their 2D colors, with painted faces (`face.ts`: eyes, brows, blush and mouths per
+  expression) and a small rig: body, head, ears, front legs or wings or flippers, hind legs, tail, trunk. No model files.
+- **In the scene** (`stage.ts`): a transparent WebGL canvas lies over the drawn sanctuary; each toy stands exactly on
+  its drawn figure's spot (`data-gx/gy/gh`), nearer ones in front, with a soft ground shadow. The drawn figures stay,
+  invisible, as the source of truth: the stage watches their classes (`is-hop`, `is-trick-…`, `is-away`) and plays
+  the same thing in 3D, so the ambient director, tricks and activities needed no new wiring. Taps still land on the
+  drawn figures; a toy that has wandered off is picked by a ray.
+- **Motion** (`clips.ts`, `actor.ts`): pure, tested clips that start and end at rest: breathing, blinks and ear
+  twitches; a look round, a yawn, a stretch, a wag, a hop; a greeting wave; and a stroll that turns to show the
+  animal's profile and back. Tricks and emotes take over from small moves.
+- **Cost and fallbacks**: three.js loads only when a sanctuary opens (≈ 156 kB gzipped, its own chunk). Without
+  WebGL, if the context is lost, or with Settings → 3D animals off, the drawn animals stay. Frames: smooth while
+  something plays, ~30 fps for breathing, a few per second under reduced motion (where nothing moves by itself), none
+  when hidden or scrolled away. The canvas and context are released when the screen closes.
+- The puzzle board is untouched (faces only, D11).

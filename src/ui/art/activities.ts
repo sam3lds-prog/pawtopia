@@ -199,6 +199,7 @@ export function riderFigure(id: string, x: number, y: number, H: number, mood: C
   return svg
     .replace(/class="sanctuary__pet( sanctuary__friend)?"/, 'class="sp-rider-fig"')
     .replace(/ data-(pet|friend)="/g, ' data-rider="')
+    .replace(/ data-g([xyh])="/g, ' data-r$1="')
     .replace(/<path class="sp-heart"[^>]*\/>/g, '');
 }
 
