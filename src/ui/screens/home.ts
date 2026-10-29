@@ -111,11 +111,11 @@ export const homeScreen: ScreenDef = {
         ${
           !save.onboarding.seenPantryIntro && save.onboarding.tutorialDone
             ? `<section class="card pantry-intro" data-pantry-intro aria-labelledby="pantry-title">
-          <h2 id="pantry-title">New: treats and hint tickets</h2>
+          <h2 id="pantry-title">New: extra lives and hints</h2>
           <p class="muted">Journey and Daily boards now give you ${CASUAL_HEARTS} hearts. They start fresh on every board.</p>
           <div class="pantry-row">
-            <span class="pantry-chip">${ICON.treat}<b class="num">${itemBalance(save, 'treat')}</b><small>treats: one heart back each</small></span>
-            <span class="pantry-chip">${ICON.ticket}<b class="num">${itemBalance(save, 'hint')}</b><small>hint tickets: one hint each</small></span>
+            <span class="pantry-chip">${ICON.lifePlus}<b class="num">${itemBalance(save, 'life')}</b><small>extra lives: one heart back each</small></span>
+            <span class="pantry-chip">${ICON.bulb}<b class="num">${itemBalance(save, 'hint')}</b><small>hints: one hint each</small></span>
           </div>
           <p class="muted">Each board's first hint is free. Earn more by clearing new levels and finishing errands. Zen hints are always free.</p>
           <button class="btn btn--secondary btn--block" data-act="pantry-ok">Got it</button>
@@ -180,9 +180,9 @@ export const homeScreen: ScreenDef = {
     }
     renderMissions();
 
-    /** A treat or ticket that comes with an errand's coins. */
+    /** An extra life or hint that comes with an errand's coins. */
     function extras(d: MissionDef): string {
-      return `${d.items?.treat ? ICON.treat : ''}${d.items?.hint ? ICON.ticket : ''}`;
+      return `${d.items?.life ? ICON.lifePlus : ''}${d.items?.hint ? ICON.bulb : ''}`;
     }
 
     // Players coming from v1: say what their earlier progress turned into, once.
@@ -220,8 +220,8 @@ export const homeScreen: ScreenDef = {
           renderMissions();
           const pill = el.querySelector('[data-coins]');
           if (pill) pill.outerHTML = coinPill();
-          // Say exactly what arrived (a full treat jar turns a treat into coins).
-          const more = [got.treats ? `+${plural(got.treats, 'treat')}` : '', got.hints ? `+${plural(got.hints, 'hint ticket')}` : ''].filter(Boolean);
+          // Say exactly what arrived (when the pantry is full, the item arrives as coins).
+          const more = [got.lives ? `+${plural(got.lives, 'extra life', 'extra lives')}` : '', got.hints ? `+${plural(got.hints, 'hint')}` : ''].filter(Boolean);
           toast([`+${coins} Paw Coins`, ...more].join(' · '));
         }
         return;

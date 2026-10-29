@@ -50,9 +50,11 @@
   --error-soft: #f9e1df;
 
   /* Board */
+  /* Regions are separated by soft light seams (the board's mat), not dark lines. High contrast keeps dark dividers. */
+  --seam: #fbf8f1;
   --divider: #34433f;
-  --grid: rgba(40, 52, 52, 0.11);
-  --board-frame: #34433f;
+  --grid: rgba(40, 52, 52, 0.09);
+  --board-frame: rgba(40, 52, 52, 0.1);
   --r0: #ddd3f6; /* lavender */
   --r1: #d2eedb; /* mint */
   --r2: #f9dcc6; /* apricot */

@@ -86,12 +86,12 @@ export interface LedgerEntry {
 }
 
 /**
- * Item ledger entry: treats (one heart each), hint tickets, and Paw Points. Append-only and idempotent like the coin
+ * Item ledger entry: extra lives (one heart each), hints, and Paw Points. Append-only and idempotent like the coin
  * ledger: an id is applied at most once, and a balance is the sum of its entries.
  */
 export interface ItemEntry {
   id: string;
-  item: 'treat' | 'hint' | 'points';
+  item: 'life' | 'hint' | 'points';
   delta: number;
   at: string;
   source: 'journey' | 'daily' | 'mission' | 'gift' | 'use' | 'migration' | 'ad';
@@ -136,7 +136,7 @@ export interface SaveV2 {
     equippedAccent: Record<string, string>; // petId → accentId
     favorites: Record<string, boolean>;
     decor: Record<string, { ownedAt: string }>;
-    /** Treats, hint tickets and Paw Points (src/meta/items.ts). */
+    /** Extra lives, hints and Paw Points (src/meta/items.ts). */
     items: ItemEntry[];
     /** Sanctuary-only wildlife friends (src/meta/catalogs/companions.ts). */
     companions: Record<string, { unlockedAt: string }>;
@@ -174,7 +174,7 @@ export interface SaveV2 {
     starterDecorChosen: boolean;
     seenLeagueIntro: boolean;
     sessions: number;
-    /** The one-time Home card explaining hearts, treats and hint tickets has been dismissed. */
+    /** The one-time Home card explaining hearts, extra lives and hints has been dismissed. */
     seenPantryIntro: boolean;
   };
   lastSession: SavedSession | null;
@@ -285,7 +285,7 @@ function normLastWin(x: unknown): SaveV2['stats']['lastWin'] {
   };
 }
 
-const ITEM_KINDS = ['treat', 'hint', 'points'] as const;
+const ITEM_KINDS = ['life', 'hint', 'points'] as const;
 const ITEM_SOURCES = ['journey', 'daily', 'mission', 'gift', 'use', 'migration', 'ad'] as const;
 
 function normItems(x: unknown): ItemEntry[] {
@@ -295,11 +295,13 @@ function normItems(x: unknown): ItemEntry[] {
   for (const e of x) {
     if (!isObj(e) || typeof e.id !== 'string' || seen.has(e.id)) continue;
     if (typeof e.delta !== 'number' || !Number.isFinite(e.delta)) continue;
-    if (!(ITEM_KINDS as readonly unknown[]).includes(e.item)) continue;
+    // Extra lives were called treats before D26.
+    const item = e.item === 'treat' ? 'life' : e.item;
+    if (!(ITEM_KINDS as readonly unknown[]).includes(item)) continue;
     seen.add(e.id);
     out.push({
       id: e.id,
-      item: e.item as ItemEntry['item'],
+      item: item as ItemEntry['item'],
       delta: Math.round(e.delta),
       at: str(e.at, ''),
       source: oneOf(e.source, ITEM_SOURCES, 'gift'),

@@ -150,7 +150,8 @@ try {
   await page.waitForTimeout(800);
   check('the ghost and strike are gone afterwards', !(await page.$('.cell__strike')) && !(await page.$('.cell__ghost')));
 
-  // The pet tool picked last is selected on the next board
+  // The pet tool picked last is selected on the next board; the Play tab opens on the current level
+  check('regions are separated by soft seams, not dark lines', await page.evaluate(() => getComputedStyle(document.querySelector('.board__lines .div')).stroke !== 'rgb(52, 67, 63)'));
   await page.click('[data-tool="dog"]');
   await solveActive({ stopAfter: 1 }).catch(() => {});
   await page.click('[data-tool="dog"]');
@@ -160,33 +161,33 @@ try {
   await page.waitForTimeout(200);
   check('the next board opens with the last pet tool', (await page.getAttribute('[data-tool="dog"]', 'aria-checked')) === 'true');
 
-  // Hint tickets: the board's first look is free, the exact cell costs one ticket, placing that cell costs nothing more
-  const tickets = () => page.evaluate(() => window.__pt.app.save.inventory.items.filter((e) => e.item === 'hint').reduce((a, e) => a + e.delta, 0));
-  const t0 = await tickets();
+  // Hints: the board's first look is free, the exact cell costs one hint, placing that cell costs nothing more
+  const hintCount = () => page.evaluate(() => window.__pt.app.save.inventory.items.filter((e) => e.item === 'hint').reduce((a, e) => a + e.delta, 0));
+  const t0 = await hintCount();
   check('a fresh board offers a free first hint', (await page.textContent('[data-hint-badge]'))?.trim() === 'Free');
   await page.click('[data-act="hint"]');
-  check('the first look costs no ticket', (await tickets()) === t0, `${t0} → ${await tickets()}`);
+  check('the first look costs no ticket', (await hintCount()) === t0, `${t0} → ${await hintCount()}`);
   await page.click('[data-act="hint"]');
-  check('the exact cell costs one ticket', (await tickets()) === t0 - 1, `${t0} → ${await tickets()}`);
+  check('the exact cell costs one ticket', (await hintCount()) === t0 - 1, `${t0} → ${await hintCount()}`);
   await page.click('[data-act="hint"]');
-  check('placing that same cell costs nothing more', (await tickets()) === t0 - 1, `${t0} → ${await tickets()}`);
+  check('placing that same cell costs nothing more', (await hintCount()) === t0 - 1, `${t0} → ${await hintCount()}`);
 
-  // Treats: one heart back from the hearts button, kept with the board
+  // Extra lives: one heart back from the hearts button, kept with the board
   const wc = await page.evaluate(() => {
     const s = window.__pt.app.active.session;
     for (let r = 0; r < s.size; r++) for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] !== 2 && s.puzzle.solution[r][c] === 2) return [r, c];
   });
   await page.click('[data-tool="cat"]');
   await page.click(`.cell[data-r="${wc[0]}"][data-c="${wc[1]}"]`);
-  const treatsBefore = await page.evaluate(() => window.__pt.app.save.inventory.items.filter((e) => e.item === 'treat').reduce((a, e) => a + e.delta, 0));
+  const treatsBefore = await page.evaluate(() => window.__pt.app.save.inventory.items.filter((e) => e.item === 'life').reduce((a, e) => a + e.delta, 0));
   await page.click('[data-act="hearts"]');
-  await page.click('[data-act="treat"]');
+  await page.click('[data-act="life"]');
   await page.waitForTimeout(150);
   const afterTreat = await page.evaluate(() => ({
     hearts: window.__pt.app.active.session.hearts,
-    treats: window.__pt.app.save.inventory.items.filter((e) => e.item === 'treat').reduce((a, e) => a + e.delta, 0),
+    treats: window.__pt.app.save.inventory.items.filter((e) => e.item === 'life').reduce((a, e) => a + e.delta, 0),
   }));
-  check('a treat gives one heart back and is used once', afterTreat.hearts === 5 && afterTreat.treats === treatsBefore - 1, JSON.stringify({ treatsBefore, ...afterTreat }));
+  check('an extra life gives one heart back and is used once', afterTreat.hearts === 5 && afterTreat.treats === treatsBefore - 1, JSON.stringify({ treatsBefore, ...afterTreat }));
   await solveActive();
   check('the win sheet shows Paw Points', /Paw Points/.test((await page.textContent('.win-sheet')) ?? ''));
   await page.click('[data-act="next"]');

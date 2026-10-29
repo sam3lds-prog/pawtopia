@@ -105,8 +105,8 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
         <button class="row" data-qa="skip:31"><span class="row__label">Skip to level 31<small>Marks 1–30 solved: all six residents and Ember the fox</small></span>${ICON.chevron}</button>
         <button class="row" data-qa="skip:46"><span class="row__label">Skip to level 46<small>Adds Maple the red panda (in the Blossom Tree)</small></span>${ICON.chevron}</button>
         <button class="row" data-qa="skip:76"><span class="row__label">Skip to level 76<small>The new 5×5–8×8 ladder starts at 71</small></span>${ICON.chevron}</button>
-        <button class="row" data-qa="empty"><span class="row__label">Empty treats and hint tickets<small>See "no tickets" and the loss sheet without treats</small></span>${ICON.chevron}</button>
-        <button class="row" data-qa="fill"><span class="row__label">Fill treats and tickets to 10<small>Earning more turns into coins</small></span>${ICON.chevron}</button>
+        <button class="row" data-qa="empty"><span class="row__label">Empty extra lives and hints<small>See "no hints left" and the loss sheet without extra lives</small></span>${ICON.chevron}</button>
+        <button class="row" data-qa="fill"><span class="row__label">Fill extra lives and hints to 10<small>Earning more turns into coins</small></span>${ICON.chevron}</button>
       </div>`
           : ''
       }
@@ -126,10 +126,10 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
         // Reload so the normal startup catch-up hands out the skipped levels' residents, gifts and points, once.
         location.reload();
       } else {
-        setPantry(app.save, 'treat', what === 'fill' ? ITEM_CAP.treat : 0);
+        setPantry(app.save, 'life', what === 'fill' ? ITEM_CAP.life : 0);
         setPantry(app.save, 'hint', what === 'fill' ? ITEM_CAP.hint : 0);
         app.persist();
-        toast(what === 'fill' ? 'Treats and tickets: 10 each.' : 'Treats and tickets: 0.');
+        toast(what === 'fill' ? 'Extra lives and hints: 10 each.' : 'Extra lives and hints: 0.');
       }
       return;
     }

@@ -21,8 +21,8 @@ export interface MissionDef {
   title: string;
   target: number;
   coins: number;
-  /** A treat or hint ticket that comes with the coins (never asks for an ad). */
-  items?: { treat?: number; hint?: number };
+  /** An extra life or hint that comes with the coins (never asks for an ad). */
+  items?: { life?: number; hint?: number };
   /** How much an event advances it. */
   step(e: MissionEvent): number;
 }
@@ -31,7 +31,7 @@ const solved = (e: MissionEvent) => (e.kind === 'solved' ? 1 : 0);
 
 export const DAILY_POOL: readonly MissionDef[] = [
   { id: 'solve1', title: 'Solve any board', target: 1, coins: 20, step: solved },
-  { id: 'clean1', title: 'Solve a board with no mistakes', target: 1, coins: 25, items: { treat: 1 }, step: (e) => (e.kind === 'solved' && e.mistakes === 0 ? 1 : 0) },
+  { id: 'clean1', title: 'Solve a board with no mistakes', target: 1, coins: 25, items: { life: 1 }, step: (e) => (e.kind === 'solved' && e.mistakes === 0 ? 1 : 0) },
   { id: 'daily', title: "Finish today's Daily Cozy Puzzle", target: 1, coins: 25, step: (e) => (e.kind === 'solved' && e.mode === 'daily' ? 1 : 0) },
   { id: 'nohint7', title: 'Solve a 7×7 or larger without hints', target: 1, coins: 30, items: { hint: 1 }, step: (e) => (e.kind === 'solved' && e.size >= 7 && e.hints === 0 ? 1 : 0) },
   { id: 'zen1', title: 'Solve a board in the Zen Garden', target: 1, coins: 20, step: (e) => (e.kind === 'solved' && e.mode === 'zen' ? 1 : 0) },
@@ -44,7 +44,7 @@ export const WEEKLY: MissionDef = {
   title: 'Solve boards of three different sizes',
   target: 3,
   coins: 60,
-  items: { treat: 1, hint: 1 },
+  items: { life: 1, hint: 1 },
   step: () => 0, // computed from stats.sizesThisWeek
 };
 
@@ -117,22 +117,22 @@ export function recordMissionEvent(save: SaveV2, e: MissionEvent, now = new Date
 export interface MissionClaim {
   /** The mission's own coins. */
   coins: number;
-  /** Treats and tickets that went into the pantry, and coins given instead for any that didn't fit. */
-  treats: number;
+  /** Extra lives and hints that went into the pantry, and coins given instead for any that didn't fit. */
+  lives: number;
   hints: number;
   overflowCoins: number;
 }
 
 /** Claims a finished mission once, reporting exactly what was granted. */
 export function claimMissionDetailed(save: SaveV2, key: string, now = new Date()): MissionClaim {
-  const out: MissionClaim = { coins: 0, treats: 0, hints: 0, overflowCoins: 0 };
+  const out: MissionClaim = { coins: 0, lives: 0, hints: 0, overflowCoins: 0 };
   const st = missionStates(save, now).find((m) => m.key === key);
   if (!st || !st.done || st.claimed) return out;
   save.missions.claimed[key] = true;
-  if (st.def.items?.treat) {
-    const g = grantItem(save, `mission:${key}:treat`, 'treat', st.def.items.treat, 'mission', now, st.def.title);
+  if (st.def.items?.life) {
+    const g = grantItem(save, `mission:${key}:treat`, 'life', st.def.items.life, 'mission', now, st.def.title);
     if (g) {
-      out.treats += g.granted;
+      out.lives += g.granted;
       out.overflowCoins += g.overflowCoins;
     }
   }
@@ -147,7 +147,7 @@ export function claimMissionDetailed(save: SaveV2, key: string, now = new Date()
   return out;
 }
 
-/** Claims a finished mission's coins (and any treat or ticket), once. Returns the mission's coins. */
+/** Claims a finished mission's coins (and any extra life or hint), once. Returns the mission's coins. */
 export function claimMission(save: SaveV2, key: string, now = new Date()): number {
   return claimMissionDetailed(save, key, now).coins;
 }

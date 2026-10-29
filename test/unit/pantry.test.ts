@@ -27,14 +27,14 @@ const NOW = new Date('2026-10-26T15:00:00Z');
 describe('item ledger', () => {
   it('grants once per id and uses never go below zero', () => {
     const s = defaultSave(NOW);
-    expect(grantItem(s, 'g1', 'treat', 2, 'gift', NOW)).toMatchObject({ granted: 2, overflowCoins: 0 });
-    expect(grantItem(s, 'g1', 'treat', 2, 'gift', NOW)).toBeNull();
-    expect(itemBalance(s, 'treat')).toBe(2);
-    expect(useItem(s, 'u1', 'treat', NOW)).toBe('ok');
-    expect(useItem(s, 'u1', 'treat', NOW)).toBe('already');
-    expect(useItem(s, 'u2', 'treat', NOW)).toBe('ok');
-    expect(useItem(s, 'u3', 'treat', NOW)).toBe('none');
-    expect(itemBalance(s, 'treat')).toBe(0);
+    expect(grantItem(s, 'g1', 'life', 2, 'gift', NOW)).toMatchObject({ granted: 2, overflowCoins: 0 });
+    expect(grantItem(s, 'g1', 'life', 2, 'gift', NOW)).toBeNull();
+    expect(itemBalance(s, 'life')).toBe(2);
+    expect(useItem(s, 'u1', 'life', NOW)).toBe('ok');
+    expect(useItem(s, 'u1', 'life', NOW)).toBe('already');
+    expect(useItem(s, 'u2', 'life', NOW)).toBe('ok');
+    expect(useItem(s, 'u3', 'life', NOW)).toBe('none');
+    expect(itemBalance(s, 'life')).toBe(0);
   });
 
   it('stops at the cap and turns the rest into coins, once, so nothing earned is lost', () => {
@@ -52,21 +52,21 @@ describe('item ledger', () => {
   it('Paw Points have no cap and survive a save round trip with the pantry', () => {
     const s = defaultSave(NOW);
     grantItem(s, 'p', 'points', 50_000, 'journey', NOW);
-    grantItem(s, 't', 'treat', 3, 'gift', NOW);
+    grantItem(s, 't', 'life', 3, 'gift', NOW);
     const back = normalizeSave(JSON.parse(JSON.stringify(s)), NOW);
     expect(pawPoints(back)).toBe(50_000);
-    expect(itemBalance(back, 'treat')).toBe(3);
+    expect(itemBalance(back, 'life')).toBe(3);
   });
 
   it('drops malformed or duplicated entries when loading', () => {
     const s = JSON.parse(JSON.stringify(defaultSave(NOW)));
     s.inventory.items = [
-      { id: 'a', item: 'treat', delta: 2, at: '', source: 'gift' },
-      { id: 'a', item: 'treat', delta: 2, at: '', source: 'gift' },
+      { id: 'a', item: 'life', delta: 2, at: '', source: 'gift' },
+      { id: 'a', item: 'life', delta: 2, at: '', source: 'gift' },
       { id: 'b', item: 'gold', delta: 9, at: '', source: 'gift' },
       { id: 'c', item: 'hint', delta: 'x', at: '', source: 'gift' },
     ];
-    expect(itemBalance(normalizeSave(s, NOW), 'treat')).toBe(2);
+    expect(itemBalance(normalizeSave(s, NOW), 'life')).toBe(2);
     expect(normalizeSave(s, NOW).inventory.items).toHaveLength(1);
   });
 
@@ -74,7 +74,7 @@ describe('item ledger', () => {
     const s = defaultSave(NOW);
     expect(grantStarterItems(s, NOW)).toBe(true);
     expect(grantStarterItems(s, NOW)).toBe(false);
-    expect(itemBalance(s, 'treat')).toBe(STARTER_ITEMS.treat);
+    expect(itemBalance(s, 'life')).toBe(STARTER_ITEMS.life);
     expect(itemBalance(s, 'hint')).toBe(STARTER_ITEMS.hint);
   });
 });
@@ -85,20 +85,20 @@ describe('earning treats, tickets and points', () => {
   it('a first clear gives a treat, every second new level a ticket, and points by measured difficulty', () => {
     const s = defaultSave(NOW);
     const r1 = rewardsForWin(s, { kind: 'level', level: 13 }, recordWin(s, { kind: 'level', level: 13 }, win, NOW), NOW, 'hard');
-    expect(r1).toMatchObject({ treats: 1, hints: 0, points: POINTS.journeyBase + POINTS.difficulty.hard + POINTS.clean + POINTS.hintFree });
+    expect(r1).toMatchObject({ lives: 1, hints: 0, points: POINTS.journeyBase + POINTS.difficulty.hard + POINTS.clean + POINTS.hintFree });
     const r2 = rewardsForWin(s, { kind: 'level', level: 14 }, recordWin(s, { kind: 'level', level: 14 }, { ...win, mistakes: 2, hintsUsed: 1 }, NOW), NOW, 'easy');
-    expect(r2).toMatchObject({ treats: 1, hints: 1, points: POINTS.journeyBase });
+    expect(r2).toMatchObject({ lives: 1, hints: 1, points: POINTS.journeyBase });
   });
 
   it('replays earn no treats, tickets or base points; a later clean solve earns its bonus once', () => {
     const s = defaultSave(NOW);
     const mode = { kind: 'level' as const, level: 14 };
     rewardsForWin(s, mode, recordWin(s, mode, { ...win, mistakes: 1, hintsUsed: 1 }, NOW), NOW, 'medium');
-    const before = { t: itemBalance(s, 'treat'), h: itemBalance(s, 'hint'), p: pawPoints(s) };
+    const before = { t: itemBalance(s, 'life'), h: itemBalance(s, 'hint'), p: pawPoints(s) };
     const replay = rewardsForWin(s, mode, recordWin(s, mode, win, NOW), NOW, 'medium');
-    expect(replay.treats + replay.hints).toBe(0);
+    expect(replay.lives + replay.hints).toBe(0);
     expect(replay.points).toBe(POINTS.clean + POINTS.hintFree); // first clean / hint-free solve of this level
-    expect(itemBalance(s, 'treat')).toBe(before.t);
+    expect(itemBalance(s, 'life')).toBe(before.t);
     expect(itemBalance(s, 'hint')).toBe(before.h);
     const again = rewardsForWin(s, mode, recordWin(s, mode, win, NOW), NOW, 'medium');
     expect(again.points).toBe(0);
@@ -110,7 +110,7 @@ describe('earning treats, tickets and points', () => {
     for (let L = 1; L <= 14; L++) s.journey.clears[`L${L}`] = { firstClearAt: 'x', bestSeconds: 60, bestMistakes: 0, clean: L % 2 === 0, hintFree: false, stars: 2 };
     const g = reconcileRewards(s, NOW, () => 'easy');
     expect(g.points).toBe(14 * POINTS.journeyBase + 7 * POINTS.clean);
-    expect(itemBalance(s, 'treat')).toBe(0);
+    expect(itemBalance(s, 'life')).toBe(0);
     expect(itemBalance(s, 'hint')).toBe(0);
     expect(reconcileRewards(s, NOW, () => 'easy').points).toBe(0);
   });
@@ -132,8 +132,8 @@ describe('earning treats, tickets and points', () => {
     }
     const expected = missionStates(s, NOW)
       .filter((m) => m.claimed)
-      .reduce((a, m) => ({ treat: a.treat + (m.def.items?.treat ?? 0), hint: a.hint + (m.def.items?.hint ?? 0) }), { treat: 0, hint: 0 });
-    expect(itemBalance(s, 'treat')).toBe(expected.treat);
+      .reduce((a, m) => ({ life: a.life + (m.def.items?.life ?? 0), hint: a.hint + (m.def.items?.hint ?? 0) }), { life: 0, hint: 0 });
+    expect(itemBalance(s, 'life')).toBe(expected.life);
     expect(itemBalance(s, 'hint')).toBe(expected.hint);
   });
 
@@ -286,23 +286,37 @@ describe('fixes from the independent review', () => {
     const { claimMissionDetailed } = await import('../../src/meta/missions');
     const { localWeekStart, localDateKey } = await import('../../src/game/dates');
     const s = defaultSave(NOW);
-    grantItem(s, 'fill', 'treat', ITEM_CAP.treat, 'gift', NOW);
+    grantItem(s, 'fill', 'life', ITEM_CAP.life, 'gift', NOW);
     // The weekly errand (three sizes) comes with a treat and a ticket.
     const wk = localWeekStart(localDateKey(NOW));
     for (const n of [5, 6, 7]) s.stats.sizesThisWeek[`${wk}:${n}`] = true;
     const weekly = missionStates(s, NOW).find((m) => m.weekly)!;
     expect(weekly.done).toBe(true);
     const got = claimMissionDetailed(s, weekly.key, NOW);
-    expect(got.treats).toBe(0);
+    expect(got.lives).toBe(0);
     expect(got.hints).toBe(1);
     expect(got.overflowCoins).toBe(OVERFLOW_COINS);
-    expect(itemBalance(s, 'treat')).toBe(ITEM_CAP.treat);
-    expect(claimMissionDetailed(s, weekly.key, NOW)).toEqual({ coins: 0, treats: 0, hints: 0, overflowCoins: 0 });
+    expect(itemBalance(s, 'life')).toBe(ITEM_CAP.life);
+    expect(claimMissionDetailed(s, weekly.key, NOW)).toEqual({ coins: 0, lives: 0, hints: 0, overflowCoins: 0 });
   });
 
   it('a treat is only offered when it would really give a heart back', () => {
     const s = new Session(p, { maxHearts: CASUAL_HEARTS });
     expect(s.canAddHeart()).toBe(false);
     expect(new Session(p, { hearts: false }).canAddHeart()).toBe(false);
+  });
+});
+
+describe('treats became extra lives (D26)', () => {
+  it('old saves keep their extra lives: ledger entries named "treat" load as "life"', () => {
+    const s = JSON.parse(JSON.stringify(defaultSave(NOW)));
+    s.inventory.items = [
+      { id: 'starter:pantry:treat', item: 'treat', delta: 3, at: '', source: 'gift' },
+      { id: 'use:treat:L4:1', item: 'treat', delta: -1, at: '', source: 'use' },
+    ];
+    const back = normalizeSave(s, NOW);
+    expect(itemBalance(back, 'life')).toBe(2);
+    // The starter pantry id is unchanged, so it is never granted a second time.
+    expect(grantStarterItems(back, NOW)).toBe(false);
   });
 });

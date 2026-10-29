@@ -27,12 +27,18 @@
   grid-auto-rows: var(--cell);
   border-radius: 18px;
   overflow: hidden;
-  background: var(--surface);
+  background: var(--seam);
   box-shadow:
-    0 0 0 3px var(--board-frame),
-    0 22px 40px -22px rgba(40, 52, 52, 0.45);
+    0 0 0 4px var(--seam),
+    0 0 0 5px var(--board-frame),
+    0 22px 40px -22px rgba(40, 52, 52, 0.38);
   touch-action: none;
   flex: none;
+}
+:root[data-contrast='high'] .board {
+  box-shadow:
+    0 0 0 3px var(--divider),
+    0 22px 40px -22px rgba(40, 52, 52, 0.45);
 }
 .board.is-pannable {
   touch-action: pan-x pan-y;
@@ -51,9 +57,13 @@
   stroke-width: 1;
 }
 .board__lines .div {
+  stroke: var(--seam);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+:root[data-contrast='high'] .board__lines .div {
   stroke: var(--divider);
   stroke-width: 2.75;
-  stroke-linecap: round;
 }
 
 .cell {
@@ -273,7 +283,7 @@
   aspect-ratio: 1;
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 0 0 2px var(--board-frame);
+  box-shadow: 0 0 0 1px var(--board-frame);
   background: var(--surface);
 }
 .mini-board i {

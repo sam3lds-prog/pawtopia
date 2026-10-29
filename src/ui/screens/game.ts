@@ -77,11 +77,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   /** Tutorial: the placement the coach is pointing at. */
   let guide: { step: number; r: number; c: number; species: Species; unit: UnitRef | null; text: string } | null = null;
   let winPet: PetId | null = null;
-  // Zen and the guided first board never charge for hints. Treats work on casual boards with hearts (not Paw Cup).
+  // Zen and the guided first board never charge for hints. Extra lives work on casual boards with hearts (not Paw Cup).
   const freeHints = mode.kind === 'zen' || tutorial;
   const pantryOn = rules.revive && rules.hearts && !tutorial;
   const tickets = () => itemBalance(app.save, 'hint');
-  const treats = () => itemBalance(app.save, 'treat');
+  const lives = () => itemBalance(app.save, 'life');
 
   const el = h(`
     <div class="game" data-mode="${mode.kind}">
@@ -115,7 +115,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       <div class="actions">
         <button class="act" data-act="undo">${ICON.undo}<span>Undo</span></button>
         <button class="act" data-act="redo">${ICON.redo}<span>Redo</span></button>
-        <button class="act" data-act="hint" ${rules.hints ? '' : 'disabled aria-describedby="no-hints"'}>${ICON.hint}<span data-hint-label>Hint</span>${rules.hints && !freeHints ? '<span class="act__badge" data-hint-badge></span>' : ''}</button>
+        <button class="act" data-act="hint" ${rules.hints ? '' : 'disabled aria-describedby="no-hints"'}>${rules.hints ? ICON.bulb : ICON.hint}<span data-hint-label>Hint</span>${rules.hints && !freeHints ? '<span class="act__badge" data-hint-badge></span>' : ''}</button>
         <button class="act" data-act="rules">${ICON.help}<span>Rules</span></button>
       </div>
       ${rules.hints ? '' : '<p id="no-hints" class="sr-only">Hints are off in Paw Cup so every player has the same rules.</p>'}
@@ -177,8 +177,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     progressEl.textContent = `${s.placedCount()} of ${total} pets placed`;
     if (heartsEl) {
       heartsEl.dataset.max = String(s.maxHearts);
-      heartsEl.innerHTML = Array.from({ length: s.maxHearts }, (_, i) => (i < s.hearts ? ICON.heart : ICON.heartOff)).join('');
-      heartsEl.setAttribute('aria-label', pantryOn ? `${plural(s.hearts, 'heart')} left. Treats: ${treats()}. Tap to use one.` : `${plural(s.hearts, 'heart')} left`);
+      heartsEl.innerHTML = Array.from({ length: s.maxHearts }, (_, i) => (i < s.hearts ? ICON.life : ICON.lifeOff)).join('');
+      heartsEl.setAttribute('aria-label', pantryOn ? `${plural(s.hearts, 'heart')} left. Extra lives: ${lives()}. Tap to use one.` : `${plural(s.hearts, 'heart')} left`);
     }
     for (const b of el.querySelectorAll<HTMLButtonElement>('[data-tool]')) b.setAttribute('aria-checked', String(b.dataset.tool === tool));
     (qs(el, '[data-act="undo"]') as HTMLButtonElement).disabled = !s.canUndo() || finished;
@@ -197,10 +197,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         const next = finished ? null : s.peekHint();
         nextIsFree = !!next && s.hintCost(next, 1, freeHints) === 0;
       }
-      badge.innerHTML = nextIsFree ? 'Free' : `${ICON.ticket}<span class="num">${tickets()}</span>`;
+      badge.innerHTML = nextIsFree ? 'Free' : `<span class="num">${tickets()}</span>`;
       badge.classList.toggle('is-free', nextIsFree);
       const hb = badge.closest('button')!;
-      hb.setAttribute('aria-label', nextIsFree ? `${hintLabel?.textContent ?? 'Hint'}, free` : `${hintLabel?.textContent ?? 'Hint'}, uses a hint ticket. ${plural(tickets(), 'ticket')} left`);
+      hb.setAttribute('aria-label', nextIsFree ? `${hintLabel?.textContent ?? 'Hint'}, free` : `${hintLabel?.textContent ?? 'Hint'}, uses one of your hints. ${plural(tickets(), 'hint')} left`);
     }
     tick();
     syncGuide();
@@ -481,7 +481,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     }
     s.commitHint(info, tier, true);
     app.saveActive();
-    toast(`Hint ticket used · ${tickets()} left`, ICON.ticket);
+    toast(`Hint used · ${tickets()} left`, ICON.bulb);
     return true;
   }
 
@@ -490,11 +490,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     pauseBoard();
     const canWatch = ads.available && !app.removeAds;
     const ns = openSheet(scope, {
-      title: 'No hint tickets left',
+      title: 'No hints left',
       body: `
-        <p class="sheet__lead">This board's free look is used. You earn a ticket for every second new Journey level and from some of the day's errands. Zen Garden hints are always free.</p>
+        <p class="sheet__lead">This board's free look is used. You earn a hint for every second new Journey level and from some of the day's errands. Zen Garden hints are always free.</p>
         <div class="sheet__actions">
-          ${canWatch ? `<button class="btn btn--block" data-act="watch">${ICON.ticket}Watch a short video for 1 ticket</button>` : ''}
+          ${canWatch ? `<button class="btn btn--block" data-act="watch">${ICON.bulb}Watch a short video for 1 hint</button>` : ''}
           <button class="btn ${canWatch ? 'btn--quiet' : 'btn--block'}" data-act="close" data-autofocus>Keep thinking</button>
         </div>`,
       onClose: () => {
@@ -517,7 +517,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
           track('rewarded_ad_complete', { placement: 'hint' });
           grantItem(app.save, `ad:hint:${Date.now()}`, 'hint', 1, 'ad', new Date(), 'Rewarded video');
           app.persist();
-          toast('+1 hint ticket', ICON.ticket);
+          toast('+1 hint', ICON.bulb);
         }
         ns.close();
         paint();
@@ -525,22 +525,22 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     });
   }
 
-  /** Hearts sheet: how many are left on this board, the treat pantry, and using one treat for one heart. */
+  /** Hearts sheet: how many are left on this board, the pantry, and using one extra life for one heart. */
   function openHearts(): void {
     if (finished || sheet || !pantryOn) return;
     pauseBoard();
-    const have = treats();
+    const have = lives();
     const full = s.hearts >= s.maxHearts;
     const hs = openSheet(scope, {
-      title: 'Hearts and treats',
+      title: 'Hearts and extra lives',
       body: `
-        <p class="sheet__lead">${plural(s.hearts, 'heart')} of ${s.maxHearts} left on this board. Hearts start fresh on every board; treats keep between boards.</p>
-        <div class="pantry-row"><span class="pantry-chip">${ICON.treat}<b class="num">${have}</b><small>of ${ITEM_CAP.treat} treats</small></span><span class="pantry-chip">${ICON.ticket}<b class="num">${tickets()}</b><small>hint tickets</small></span></div>
+        <p class="sheet__lead">${plural(s.hearts, 'heart')} of ${s.maxHearts} left on this board. Hearts start fresh on every board; extra lives keep between boards.</p>
+        <div class="pantry-row"><span class="pantry-chip">${ICON.lifePlus}<b class="num">${have}</b><small>of ${ITEM_CAP.life} extra lives</small></span><span class="pantry-chip">${ICON.bulb}<b class="num">${tickets()}</b><small>hints</small></span></div>
         <div class="sheet__actions">
-          <button class="btn btn--block" data-act="treat" ${have < 1 || full ? 'disabled' : ''}>${ICON.treat}${full ? 'Hearts are full' : have < 1 ? 'No treats yet' : 'Use a treat: +1 heart'}</button>
+          <button class="btn btn--block" data-act="life" ${have < 1 || full ? 'disabled' : ''}>${ICON.lifePlus}${full ? 'Hearts are full' : have < 1 ? 'No extra lives yet' : 'Use an extra life: +1 heart'}</button>
           <button class="btn btn--quiet" data-act="close" data-autofocus>Back to the board</button>
         </div>
-        <p class="muted">Treats come from clearing new Journey levels and some errands.</p>`,
+        <p class="muted">Extra lives come from clearing new Journey levels and some errands.</p>`,
       onClose: () => {
         sheet = null;
         resumeIfOnScreen();
@@ -550,20 +550,20 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     hs.scope.on(hs.el, 'click', (e) => {
       const a = actionOf(e);
       if (!a) return;
-      if (a.act === 'treat') {
-        if (useTreat()) coach(`A treat! ${plural(s.hearts, 'heart')} left.`);
+      if (a.act === 'life') {
+        if (useLife()) coach(`An extra life! ${plural(s.hearts, 'heart')} left.`);
       }
       hs.close();
     });
   }
 
-  /** Spends one treat for one heart. The pantry and the board are saved together. */
-  function useTreat(): boolean {
-    // Checked first, so a treat is only ever spent when it will really give a heart back.
-    if (!pantryOn || !s.canAddHeart() || treats() < 1) return false;
-    if (useItem(app.save, `use:treat:${modeKey(mode)}:${Date.now()}`, 'treat', new Date(), 'Heart') !== 'ok') return false;
+  /** Spends one extra life for one heart. The pantry and the board are saved together. */
+  function useLife(): boolean {
+    // Checked first, so an extra life is only ever spent when it will really give a heart back.
+    if (!pantryOn || !s.canAddHeart() || lives() < 1) return false;
+    if (useItem(app.save, `use:life:${modeKey(mode)}:${Date.now()}`, 'life', new Date(), 'Heart') !== 'ok') return false;
     s.addHeart();
-    track('treat_used', { mode: mode.kind });
+    track('extra_life_used', { mode: mode.kind });
     haptic('success');
     paint();
     app.saveActive();
@@ -806,13 +806,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   }
 
   function rewardsMarkup(r: RewardSummary): string {
-    if (!r.coins && !r.pets.length && !r.decor.length && !r.treats && !r.hints && !r.companions.length) return '';
+    if (!r.coins && !r.pets.length && !r.decor.length && !r.lives && !r.hints && !r.companions.length) return '';
     const friends = r.companions
       .map((id) => `<div class="reward-item"><span class="reward-item__art">${companionSvg(id, 'happy')}</span><span><b>${esc(COMPANION_BY_ID[id].name)} the ${esc(COMPANION_BY_ID[id].kind.toLowerCase())} moved in!</b><small>${esc(COMPANION_BY_ID[id].trait)}</small></span></div>`)
       .join('');
     const pantry = [
-      r.treats ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.treat}</span><span><b>+${plural(r.treats, 'treat')}</b><small>One heart back on any Journey or Daily board</small></span></div>` : '',
-      r.hints ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.ticket}</span><span><b>+${plural(r.hints, 'hint ticket')}</b><small>Pays for one hint, whichever step you need</small></span></div>` : '',
+      r.lives ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.lifePlus}</span><span><b>+${plural(r.lives, 'extra life', 'extra lives')}</b><small>One heart back on any Journey or Daily board</small></span></div>` : '',
+      r.hints ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.bulb}</span><span><b>+${plural(r.hints, 'hint')}</b><small>Pays for one hint, whichever step you need</small></span></div>` : '',
     ].join('');
     const coins = r.coins
       ? `<div class="reward-coins"><span class="reward-coins__amt">${ICON.coin}<b class="num">+${r.coins}</b></span><span class="muted">${esc(r.lines.map((l) => l.label).join(' · '))}</span></div>`
@@ -1030,18 +1030,18 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     track('puzzle_fail', { mode: mode.kind, size: n });
     haptic('error');
     const canRevive = rules.revive && (app.removeAds || ads.available);
-    const canTreat = pantryOn && treats() > 0;
+    const canLife = pantryOn && lives() > 0;
     const wrongs = `${numberWord(s.maxHearts)} wrong placements`;
     sheet = openSheet(scope, {
       title: mode.kind === 'cup' ? 'Attempt ended' : 'Out of hearts',
       center: true,
       dismissible: false,
       body: `
-        <p class="sheet__lead">${mode.kind === 'cup' ? `${wrongs} end a Paw Cup attempt.` : canTreat || canRevive ? `${wrongs}. Keep this board with a heart back, or start fresh.` : `${wrongs}. Start this board again with a fresh line of logic.`}</p>
+        <p class="sheet__lead">${mode.kind === 'cup' ? `${wrongs} end a Paw Cup attempt.` : canLife || canRevive ? `${wrongs}. Keep this board with a heart back, or start fresh.` : `${wrongs}. Start this board again with a fresh line of logic.`}</p>
         <div class="sheet__actions">
-          ${canTreat ? `<button class="btn btn--block" data-act="treat">${ICON.treat}Use a treat: +1 heart<span class="btn__price">${treats()} left</span></button>` : ''}
-          ${canRevive ? `<button class="btn ${canTreat ? 'btn--secondary' : ''} btn--block" data-act="revive">Refill hearts${app.removeAds ? '' : '<span class="btn__price">Watch ad</span>'}</button>` : ''}
-          ${mode.kind === 'cup' ? '' : `<button class="btn ${canRevive || canTreat ? 'btn--secondary' : ''} btn--block" data-act="restart">${ICON.restart}Try again</button>`}
+          ${canLife ? `<button class="btn btn--block" data-act="life">${ICON.lifePlus}Use an extra life: +1 heart<span class="btn__price">${lives()} left</span></button>` : ''}
+          ${canRevive ? `<button class="btn ${canLife ? 'btn--secondary' : ''} btn--block" data-act="revive">Refill hearts${app.removeAds ? '' : '<span class="btn__price">Watch ad</span>'}</button>` : ''}
+          ${mode.kind === 'cup' ? '' : `<button class="btn ${canRevive || canLife ? 'btn--secondary' : ''} btn--block" data-act="restart">${ICON.restart}Try again</button>`}
           <button class="btn btn--quiet" data-act="leave">${mode.kind === 'cup' ? 'Back to Paw Cup' : 'Back home'}</button>
         </div>`,
     });
@@ -1050,14 +1050,14 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     ls.scope.on(ls.el, 'click', async (e) => {
       const a = actionOf(e);
       if (!a || busy) return;
-      if (a.act === 'treat') {
+      if (a.act === 'life') {
         busy = true;
-        const ok = useTreat();
+        const ok = useLife();
         busy = false;
         if (!ok) return;
         ls.close();
         sheet = null;
-        coach('A treat! One heart back, and your board is just as you left it.');
+        coach('An extra life! One heart back, and your board is just as you left it.');
         resumeIfOnScreen();
         return;
       }

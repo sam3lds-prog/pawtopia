@@ -14,7 +14,7 @@ import { grant, type LedgerSource } from './ledger';
 import type { WinRecord } from './progression';
 import type { Difficulty } from '../engine/types';
 import { COMPANIONS, type CompanionId } from './catalogs/companions';
-import { CLEAR_TREATS, HINT_EVERY, POINTS, grantItem, hasItemEntry, type ItemSource } from './items';
+import { CLEAR_LIVES, HINT_EVERY, POINTS, grantItem, hasItemEntry, type ItemSource } from './items';
 
 export interface RewardLine {
   id: string;
@@ -28,8 +28,8 @@ export interface RewardSummary {
   pets: PetId[];
   decor: DecorId[];
   chapter: Chapter | null;
-  /** Treats and hint tickets that went into the pantry. */
-  treats: number;
+  /** Extra lives and hints that went into the pantry. */
+  lives: number;
   hints: number;
   /** Paw Points earned (progress only). */
   points: number;
@@ -38,7 +38,7 @@ export interface RewardSummary {
 }
 
 function empty(): RewardSummary {
-  return { coins: 0, lines: [], pets: [], decor: [], chapter: null, treats: 0, hints: 0, points: 0, companions: [] };
+  return { coins: 0, lines: [], pets: [], decor: [], chapter: null, lives: 0, hints: 0, points: 0, companions: [] };
 }
 
 function addPoints(sum: RewardSummary, save: SaveV2, id: string, n: number, source: ItemSource, now: Date, note: string): void {
@@ -46,15 +46,15 @@ function addPoints(sum: RewardSummary, save: SaveV2, id: string, n: number, sour
   if (g) sum.points += g.granted;
 }
 
-/** Puts a treat or ticket in the pantry once per id; anything over the cap arrives as coins. */
-function addItem(sum: RewardSummary, save: SaveV2, id: string, kind: 'treat' | 'hint', n: number, source: ItemSource, now: Date, note: string): void {
+/** Puts an extra life or hint in the pantry once per id; anything over the cap arrives as coins. */
+function addItem(sum: RewardSummary, save: SaveV2, id: string, kind: 'life' | 'hint', n: number, source: ItemSource, now: Date, note: string): void {
   const g = grantItem(save, id, kind, n, source, now, note);
   if (!g) return;
-  if (kind === 'treat') sum.treats += g.granted;
+  if (kind === 'life') sum.lives += g.granted;
   else sum.hints += g.granted;
   if (g.overflowCoins) {
     sum.coins += g.overflowCoins;
-    sum.lines.push({ id: `${id}:full`, label: kind === 'treat' ? 'Treat jar full' : 'Ticket box full', coins: g.overflowCoins });
+    sum.lines.push({ id: `${id}:full`, label: kind === 'life' ? 'Extra lives full' : 'Hints full', coins: g.overflowCoins });
   }
 }
 
@@ -77,7 +77,7 @@ function unlockPets(save: SaveV2, level: number, now: Date, sum: RewardSummary):
 
 /**
  * Journey rewards for a cleared level. Safe to call any number of times. `tier` is the measured difficulty of the board
- * that was cleared (unknown → no difficulty bonus); Paw Points are back-dated for old clears, treats and tickets are not.
+ * that was cleared (unknown → no difficulty bonus); Paw Points are back-dated for old clears, extra lives and hints are not.
  */
 export function applyLevelRewards(save: SaveV2, level: number, clear: LevelClear | undefined, now = new Date(), source: LedgerSource = 'journey', tier?: Difficulty): RewardSummary {
   const sum = empty();
@@ -110,7 +110,7 @@ export function applyLevelRewards(save: SaveV2, level: number, clear: LevelClear
 }
 
 /**
- * Rewards for a just-recorded win. `tier` is the measured difficulty of the solved board. Treats and hint tickets come
+ * Rewards for a just-recorded win. `tier` is the measured difficulty of the solved board. Extra lives and hints come
  * only from a *first* clear (replays earn nothing), so they are granted here rather than in `applyLevelRewards`, which
  * also runs over old clears on startup.
  */
@@ -118,7 +118,8 @@ export function rewardsForWin(save: SaveV2, mode: ModeRef, rec: WinRecord, now =
   if (mode.kind === 'level') {
     const sum = applyLevelRewards(save, mode.level, save.journey.clears[`L${mode.level}`], now, 'journey', tier);
     if (rec.firstClear) {
-      addItem(sum, save, `treat:L${mode.level}`, 'treat', CLEAR_TREATS, 'journey', now, `Level ${mode.level}`);
+      // The `treat:` id prefix predates the Extra life name (D26) and stays, so a level never grants twice.
+      addItem(sum, save, `treat:L${mode.level}`, 'life', CLEAR_LIVES, 'journey', now, `Level ${mode.level}`);
       if (mode.level % HINT_EVERY === 0) addItem(sum, save, `hint:L${mode.level}`, 'hint', 1, 'journey', now, `Level ${mode.level}`);
     }
     return sum;

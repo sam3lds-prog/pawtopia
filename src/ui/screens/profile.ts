@@ -35,8 +35,8 @@ export const profileScreen: ScreenDef = {
           <span class="rank-bar" role="progressbar" aria-label="Progress to the next Paw Rank" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span style="width:${pct}%"></span></span>
           <p class="muted">${nextName ? `${(rank.next! - pts).toLocaleString()} points to ${esc(nextName)}. ` : ''}Points come from first clears (more for harder boards) and clean or hint-free solves. They only measure your own progress.</p>
           <div class="pantry-row">
-            <span class="pantry-chip">${ICON.treat}<b class="num">${itemBalance(s, 'treat')}</b><small>of ${ITEM_CAP.treat} treats<br>+1 heart each</small></span>
-            <span class="pantry-chip">${ICON.ticket}<b class="num">${itemBalance(s, 'hint')}</b><small>of ${ITEM_CAP.hint} hint tickets</small></span>
+            <span class="pantry-chip">${ICON.lifePlus}<b class="num">${itemBalance(s, 'life')}</b><small>of ${ITEM_CAP.life} extra lives<br>+1 heart each</small></span>
+            <span class="pantry-chip">${ICON.bulb}<b class="num">${itemBalance(s, 'hint')}</b><small>of ${ITEM_CAP.hint} hints</small></span>
           </div>
         </section>
         <section class="card">

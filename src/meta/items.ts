@@ -1,10 +1,12 @@
 /**
- * Treats, hint tickets and Paw Points.
+ * Extra lives, hints and Paw Points.
  *
  * Three things that are easy to mix up are kept apart on purpose:
  *  - **Hearts** belong to one board (five on Journey and Daily) and never carry over. They live in the Session.
- *  - **Treats** and **hint tickets** are a small pantry that persists between boards. A treat gives one heart back on a
- *    casual board; a ticket pays for one hint target. Neither can be used in Paw Cup.
+ *  - **Extra lives** and **hints** are a small pantry that persists between boards. An extra life gives one heart back
+ *    on a casual board; a hint pays for one hint target. Neither can be used in Paw Cup. (Extra lives were called
+ *    "treats" before D26; "treats" are now food for sanctuary animals. Old ledger ids keep their `treat` wording so
+ *    nothing is ever granted twice.)
  *  - **Paw Points** only ever go up. They measure progress (Paw Rank) and buy nothing.
  * Paw Coins stay cosmetic-only (src/meta/ledger.ts).
  *
@@ -16,20 +18,20 @@ import type { Difficulty } from '../engine/types';
 import type { ItemEntry, SaveV2 } from '../services/storage';
 import { grant } from './ledger';
 
-export type PantryItem = 'treat' | 'hint';
+export type PantryItem = 'life' | 'hint';
 export type ItemKind = ItemEntry['item'];
 export type ItemSource = ItemEntry['source'];
 
 /** Soft caps keep the pantry easy to read. Anything earned past a cap becomes coins instead of vanishing. */
-export const ITEM_CAP: Record<PantryItem, number> = { treat: 10, hint: 10 };
+export const ITEM_CAP: Record<PantryItem, number> = { life: 10, hint: 10 };
 /** Coins per item that didn't fit. */
 export const OVERFLOW_COINS = 10;
 
 /** Once for every player, new or returning (instead of back-dating rewards for old clears). */
-export const STARTER_ITEMS = { id: 'starter:pantry', treat: 3, hint: 5 } as const;
+export const STARTER_ITEMS = { id: 'starter:pantry', life: 3, hint: 5 } as const;
 
 /** Milestone grants for a *first* clear of a Journey level. Replays earn nothing. */
-export const CLEAR_TREATS = 1;
+export const CLEAR_LIVES = 1;
 /** One hint ticket for every second new level (even level numbers). */
 export const HINT_EVERY = 2;
 
@@ -54,7 +56,7 @@ export interface ItemGrant {
 }
 
 /**
- * Grants `n` of an item once per id. Treats and tickets stop at their cap; the rest is converted to coins (also once).
+ * Grants `n` of an item once per id. Extra lives and hints stop at their cap; the rest is converted to coins (also once).
  * Returns null if this id was already applied.
  */
 export function grantItem(save: Items, id: string, kind: ItemKind, n: number, source: ItemSource, now = new Date(), note?: string): ItemGrant | null {
@@ -67,14 +69,14 @@ export function grantItem(save: Items, id: string, kind: ItemKind, n: number, so
   let overflowCoins = 0;
   if (granted < want) {
     const coins = (want - granted) * OVERFLOW_COINS;
-    if (grant(save, `${id}:full`, coins, 'gift', now, `${kind === 'treat' ? 'Treat jar' : 'Ticket box'} full`)) overflowCoins = coins;
+    if (grant(save, `${id}:full`, coins, 'gift', now, `${kind === 'life' ? 'Extra lives' : 'Hints'} full`)) overflowCoins = coins;
   }
   return { kind, granted, overflowCoins };
 }
 
 export type UseResult = 'ok' | 'already' | 'none';
 
-/** Uses one treat or ticket, once per id. Never goes below zero. */
+/** Uses one extra life or hint, once per id. Never goes below zero. */
 export function useItem(save: Items, id: string, kind: PantryItem, now = new Date(), note?: string): UseResult {
   if (hasItemEntry(save, id)) return 'already';
   if (itemBalance(save, kind) < 1) return 'none';
@@ -84,8 +86,9 @@ export function useItem(save: Items, id: string, kind: PantryItem, now = new Dat
 
 /** The one-time starter pantry. Safe to call on every launch. Returns true the one time it grants. */
 export function grantStarterItems(save: Items, now = new Date()): boolean {
+  // The id keeps its original `treat` wording (D26), so players who already received the pantry don't get it twice.
   if (hasItemEntry(save, `${STARTER_ITEMS.id}:treat`)) return false;
-  grantItem(save, `${STARTER_ITEMS.id}:treat`, 'treat', STARTER_ITEMS.treat, 'gift', now, 'Starter pantry');
+  grantItem(save, `${STARTER_ITEMS.id}:treat`, 'life', STARTER_ITEMS.life, 'gift', now, 'Starter pantry');
   grantItem(save, `${STARTER_ITEMS.id}:hint`, 'hint', STARTER_ITEMS.hint, 'gift', now, 'Starter pantry');
   return true;
 }

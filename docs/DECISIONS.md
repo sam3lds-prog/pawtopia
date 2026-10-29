@@ -257,3 +257,17 @@ fixed with tests where testable:
 9. The Play path showed the new board's size for a level whose old 9×9 was still in progress. It now uses the saved spec.
 Also: a treat is spent only after checking it will really restore a heart; erasing progress grants the starter pantry
 again; the release checklist now covers setting `DAILY_V2_FROM` to the rollout date and pinning grading changes.
+
+## 2026-10-29 · D26 — Softer board, colored game icons, Play opens on your level, treats become Extra lives
+- **Board**: dark region dividers and the dark frame are gone. Regions are separated by 4px light seams in the board's
+  ivory, with a faint outer ring and shadow. Players who need stronger edges get the dark dividers back in
+  Settings → High contrast (unchanged), and Region patterns still add texture.
+- **Icons**: lives are glossy hearts (a lost one is a pale dashed outline, so it isn't color alone); hints are a golden
+  bulb with a paw; extra lives, video tokens, gems and food have their own colored icons. Drawn in layers, no
+  gradients, so cloned copies render identically.
+- **Play tab**: opens centered on the level you're on, with a pinned "Play level N · size · difficulty" button above the
+  tab bar (it resumes a saved board of that level, on that board's own spec).
+- **Naming**: the item that gives a heart back is now an **Extra life** (ledger kind `life`; saved `treat` entries load
+  as `life`). Hint tickets are just **hints** in the UI. "Treats" now means food for sanctuary animals (D27). Ledger
+  ids keep their original `treat` wording (`starter:pantry:treat`, `treat:L12`, `mission:…:treat`) so nothing is ever
+  granted twice.

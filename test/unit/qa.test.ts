@@ -27,10 +27,10 @@ describe('tester shortcuts', () => {
 
   it('sets the pantry to an exact amount through the ledger', () => {
     const s = defaultSave();
-    setPantry(s, 'treat', 10);
+    setPantry(s, 'life', 10);
     setPantry(s, 'hint', 0);
-    expect(itemBalance(s, 'treat')).toBe(10);
-    setPantry(s, 'treat', 0);
-    expect(itemBalance(s, 'treat')).toBe(0);
+    expect(itemBalance(s, 'life')).toBe(10);
+    setPantry(s, 'life', 0);
+    expect(itemBalance(s, 'life')).toBe(0);
   });
 });

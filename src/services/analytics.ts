@@ -25,7 +25,7 @@ export type AnalyticsEvent =
   | 'animation_reduced_mode'
   | 'mission_claimed'
   | 'achievement_unlocked'
-  | 'treat_used'
+  | 'extra_life_used'
   | 'companion_unlocked';
 
 export type EventProps = Record<string, string | number | boolean>;

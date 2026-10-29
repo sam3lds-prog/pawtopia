@@ -99,6 +99,18 @@ export const playScreen: ScreenDef = {
     const dailyKey = localDateKey();
     const daily = { dateKey: dailyKey, size: sizeFor({ kind: 'daily', dateKey: dailyKey }) };
     const dailyDone = !!save.daily.done[daily.dateKey];
+    // The level you're on, with the board it will really open (a saved board keeps its own spec).
+    const curMode = { kind: 'level' as const, level: next };
+    const curSaved = savedFor(curMode);
+    const resumable = !!curSaved && hasMeaningfulProgress(curSaved);
+    const curSpec = resumable ? (curSaved!.specVersion ?? 1) : undefined;
+    const curSize = sizeFor(curMode, curSpec);
+    let goSub = `${curSize}×${curSize}`;
+    try {
+      goSub += ` · ${capitalize(displayDifficulty(puzzleFor(curMode, curSpec)))}`;
+    } catch {
+      /* label is decorative */
+    }
 
     const el = h(`
       <div class="play">
@@ -125,6 +137,12 @@ export const playScreen: ScreenDef = {
           ${chapters.map((c) => `<button role="tab" class="chapter-tab" data-chapter="${c.index}" aria-selected="${c.index === current}">${c.index + 1}</button>`).join('')}
         </div>
         <div data-chapter-body></div>
+        <div class="play-go">
+          <button class="btn btn--block play-go__btn" data-act="go" aria-describedby="play-go-sub">
+            <span class="play-go__label">${resumable ? 'Resume' : 'Play'} level ${next}</span>
+            <span class="play-go__sub" id="play-go-sub">${esc(goSub)}</span>
+          </button>
+        </div>
       </div>`);
     root.appendChild(el);
 
@@ -153,13 +171,9 @@ export const playScreen: ScreenDef = {
         </section>
         ${pathMarkup(ch)}`;
       for (const t of el.querySelectorAll<HTMLElement>('[data-chapter]')) t.setAttribute('aria-selected', String(Number(t.dataset.chapter) === current));
-      // Bring the current level into view.
+      // Open on the level you're on: centered on screen, above the Play button.
       const cur = body.querySelector('.node--current');
-      if (cur)
-        scope.frame(() => {
-          const r = cur.getBoundingClientRect();
-          if (r.bottom > window.innerHeight - 90) cur.scrollIntoView({ block: 'center', behavior: 'auto' });
-        });
+      if (cur) scope.frame(() => cur.scrollIntoView({ block: 'center', behavior: 'auto' }));
     }
     renderChapter();
 
@@ -186,6 +200,10 @@ export const playScreen: ScreenDef = {
         return;
       }
       const a = actionOf(e);
+      if (a?.act === 'go') {
+        playMode(curMode);
+        return;
+      }
       if (a?.act === 'daily') {
         if (dailyDone) toast(`Today's board is done. A new one arrives tomorrow.`);
         else playMode({ kind: 'daily', dateKey: daily.dateKey });
