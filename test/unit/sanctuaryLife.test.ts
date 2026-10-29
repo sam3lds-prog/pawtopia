@@ -65,7 +65,7 @@ function setup(reducedMotion = false) {
 }
 
 describe('sanctuary ambient life', () => {
-  it('plays one small action every 5–12 s, never more than two at once, and ends each on time', () => {
+  it('plays one small action every few seconds, never more than the cap at once, and ends each on time', () => {
     const { clock, d, log, peak } = setup();
     d.setLive(true);
     clock.advance(10 * 60_000);
@@ -108,9 +108,9 @@ describe('sanctuary ambient life', () => {
 
   it('a tap plays even when paused, and makes room instead of exceeding the cap', () => {
     const { d, peak } = setup();
-    expect(d.trigger('mochi', 'love')).toBe(true);
-    expect(d.trigger('biscuit', 'wag')).toBe(true);
-    expect(d.trigger('pip', 'hop')).toBe(true);
+    const ids = ['mochi', 'biscuit', 'pip', 'nori', 'friend:ember'];
+    expect(ids.length).toBeGreaterThan(MAX_ACTIVE);
+    for (const id of ids) expect(d.trigger(id, id === 'mochi' ? 'love' : 'hop')).toBe(true);
     expect(d.activeCount).toBe(MAX_ACTIVE);
     expect(peak()).toBeLessThanOrEqual(MAX_ACTIVE);
     expect(d.trigger('nobody', 'love')).toBe(false);

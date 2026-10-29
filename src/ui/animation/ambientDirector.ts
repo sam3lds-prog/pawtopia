@@ -4,8 +4,8 @@
  *
  * Budget, by construction:
  *  - one pending "next action" timer, plus at most one end timer per running action;
- *  - at most `maxActive` (2) actors moving at once; an actor never overlaps itself;
- *  - the next action comes 5–12 s after the previous one started, from a seeded random sequence (no synchronized loops);
+ *  - at most `maxActive` (3) actors moving at once; an actor never overlaps itself;
+ *  - the next action comes 3.5–9 s after the previous one started, from a seeded random sequence (no synchronized loops);
  *  - nothing runs while paused (screen hidden or left) or under reduced motion, except actions the player triggers by
  *    tapping, which still play, as a face-only change, so the scene answers a touch without moving;
  *  - `dispose()` clears every timer.
@@ -33,7 +33,8 @@ export type AmbientAction =
   | 'shimmer'
   | 'sway'
   | 'flutter'
-  | 'greet';
+  | 'greet'
+  | 'stroll';
 
 /** How long each action plays, in ms. Kept short (≤ 1.8 s). */
 export const ACTION_MS: Record<AmbientAction, number> = {
@@ -53,13 +54,14 @@ export const ACTION_MS: Record<AmbientAction, number> = {
   sway: 1600,
   flutter: 1500,
   greet: 1400,
+  stroll: 1800,
 };
 
 /** Actions that only change a face (allowed under reduced motion when the player taps). */
 export const FACE_ONLY: ReadonlySet<AmbientAction> = new Set(['blink', 'look', 'yawn', 'love']);
 
-export const GAP_MS: readonly [number, number] = [5000, 12000];
-export const MAX_ACTIVE = 2;
+export const GAP_MS: readonly [number, number] = [3500, 9000];
+export const MAX_ACTIVE = 3;
 
 export interface AmbientActor {
   id: string;

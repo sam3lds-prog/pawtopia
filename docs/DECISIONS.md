@@ -331,3 +331,16 @@ Rainforest — each with animals from that region, tracked on a world map.
   butterflies drift, hammocks sway, one short action at a time, nothing looping, still under reduced motion. Animals
   say hello when you arrive (a bigger hello on the first visit of the day or right after a solve that helped), and a
   stage just reached grows in.
+
+## 2026-10-29 · D29 — Livelier sanctuaries, still calm
+Owner request: sanctuaries more animated, and animals excited when you visit.
+
+- **Arrival**: everyone in a sanctuary (Harmony or a region) says hello one after another when you arrive: a hop or a
+  wag, or a bigger hello (two happy hops, a smile and a heart) on the first visit of the day and right after a puzzle
+  that helped that place. A stage just reached grows in.
+- **Taps and care**: tapping an animal in the scene gets a happy hop and a heart. Feeding or patting from an animal's
+  card makes it react in the scene once the card closes, where you can see it.
+- **Ambient pacing** (revises D24's numbers, not its rules): up to three small actions at once (was two), one every
+  3.5–9 s (was 5–12 s), plus short strolls (a few steps, a turn, back to its spot). Every action is still ≤ 1.8 s, nothing
+  loops forever, everything pauses when the screen is hidden, and under reduced motion nothing moves by itself (a tap
+  still gets a smile and a heart). The puzzle board is unchanged: faces only (D11).

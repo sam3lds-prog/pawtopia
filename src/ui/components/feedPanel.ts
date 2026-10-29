@@ -20,6 +20,8 @@ export interface FeedEvents {
   /** The animal just ate (for a happy reaction in the garden). */
   onFed?: (food: FoodId, favorite: boolean) => void;
   onPat?: () => void;
+  /** The card closed (so the scene behind it can react where the player can see it). */
+  onClose?: () => void;
 }
 
 export function friendPanelMarkup(animal: string, name: string): string {

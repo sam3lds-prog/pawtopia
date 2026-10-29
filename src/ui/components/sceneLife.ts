@@ -15,20 +15,20 @@ import { applyFace } from '../art/pets';
 
 /** What each wildlife friend likes to do (the sleepy ones mostly blink and stretch). */
 const FRIEND_ACTIONS: Record<string, AmbientAction[]> = {
-  ember: ['blink', 'wag', 'hop', 'stretch'],
+  ember: ['blink', 'wag', 'hop', 'stretch', 'stroll'],
   maple: ['blink', 'wag', 'stretch'],
   gumnut: ['blink', 'stretch'],
-  skipper: ['blink', 'hop', 'wag', 'hop'],
-  dozer: ['blink', 'stretch', 'wag'],
-  zuri: ['blink', 'look', 'stretch'],
+  skipper: ['blink', 'hop', 'wag', 'hop', 'stroll'],
+  dozer: ['blink', 'stretch', 'wag', 'stroll'],
+  zuri: ['blink', 'look', 'stretch', 'stroll'],
   sunny: ['blink', 'look', 'hop'],
-  tembo: ['blink', 'wag', 'hop'],
+  tembo: ['blink', 'wag', 'hop', 'stroll'],
   luna: ['blink', 'look', 'stretch'],
-  frost: ['blink', 'hop', 'stretch'],
-  pebble: ['blink', 'stretch'],
+  frost: ['blink', 'hop', 'stretch', 'stroll'],
+  pebble: ['blink', 'stretch', 'wag'],
   rio: ['blink', 'hop', 'look'],
   mango: ['blink', 'stretch'],
-  pudding: ['blink', 'stretch'],
+  pudding: ['blink', 'stretch', 'stroll'],
 };
 
 /** Lively scene parts and the one action each plays. */
@@ -46,9 +46,9 @@ const PART_ACTIONS: Array<[string, AmbientAction]> = [
 ];
 
 export interface SceneLife {
-  /** A player's tap on a figure: a heart (face only under reduced motion). */
+  /** A player's tap on a figure: a happy hop and a heart (a heart and a smile only, under reduced motion). */
   tap(fig: HTMLElement): void;
-  /** Plays one action on a figure or part right away (arrival greetings). */
+  /** Plays one action on a figure or part right away (arrival greetings, a reaction to food). Under reduced motion only a face changes. */
   play(id: string, action: AmbientAction): boolean;
   /** Ids of every figure in the scene, residents first. */
   figures(): string[];
@@ -63,6 +63,12 @@ export function figureId(fig: HTMLElement): string {
   return fig.dataset.pet ?? `friend:${fig.dataset.friend}`;
 }
 
+/** Everyone in the scene says hello, one after another (a bigger hello when `big`). Nothing under reduced motion. */
+export function greetAll(life: SceneLife, schedule: (fn: () => void, ms: number) => void, big: boolean): void {
+  if (app.reducedMotion) return;
+  life.figures().forEach((f, i) => schedule(() => life.play(f, big ? 'greet' : i % 2 ? 'wag' : 'hop'), 450 + i * 480));
+}
+
 export function startSceneLife(svg: Element, seedKey: string): SceneLife {
   const actors = new Map<string, Element>();
   const baseMood = new Map<string, FaceMood>();
@@ -72,9 +78,9 @@ export function startSceneLife(svg: Element, seedKey: string): SceneLife {
     if (!node) return;
     const rig = node.querySelector('g.pet') as SVGElement | null;
     const petId = (node as HTMLElement).dataset?.pet as PetId | undefined;
-    if (rig && petId && (action === 'blink' || action === 'look' || action === 'yawn' || action === 'love')) {
+    if (rig && petId && (action === 'blink' || action === 'look' || action === 'yawn' || action === 'love' || action === 'greet')) {
       const base = baseMood.get(id) ?? 'idle';
-      const mood: FaceMood = action === 'yawn' ? 'sleepy' : action === 'look' ? 'curious' : action === 'love' ? 'happy' : base;
+      const mood: FaceMood = action === 'yawn' ? 'sleepy' : action === 'look' ? 'curious' : action === 'love' || action === 'greet' ? 'happy' : base;
       applyFace(rig, petId, { mood, blinking: action === 'blink', look: action === 'look' ? [hashString(id) % 2 ? 1.2 : -1.2, 0] : [0, 0] });
     }
     node.classList.add(`is-${action}`);
@@ -95,7 +101,7 @@ export function startSceneLife(svg: Element, seedKey: string): SceneLife {
     figs.push(id);
     baseMood.set(id, ((g.querySelector('g.pet') as HTMLElement | null)?.dataset.mood as FaceMood) ?? 'idle');
     const dog = PET_BY_ID[id].species === 'dog';
-    ambient.add({ id, actions: dog ? ['blink', 'look', 'wag', 'hop', 'stretch'] : ['blink', 'look', 'yawn', 'wag', 'stretch'] });
+    ambient.add({ id, actions: dog ? ['blink', 'look', 'wag', 'hop', 'stretch', 'stroll'] : ['blink', 'look', 'yawn', 'wag', 'stretch', 'stroll'] });
   }
   for (const g of svg.querySelectorAll('.sanctuary__friend[data-friend]')) {
     const f = (g as HTMLElement).dataset.friend!;
@@ -120,8 +126,10 @@ export function startSceneLife(svg: Element, seedKey: string): SceneLife {
   ambient.setLive(!document.hidden);
 
   return {
-    tap: (fig) => void ambient.trigger(figureId(fig), 'love'),
-    play: (id, action) => ambient.trigger(id, action),
+    tap: (fig) => {
+      if (!ambient.trigger(figureId(fig), 'greet')) ambient.trigger(figureId(fig), 'love');
+    },
+    play: (id, action) => ambient.trigger(id, action) || (action === 'greet' && ambient.trigger(id, 'love')),
     figures: () => [...figs],
     setLive: (on) => ambient.setLive(on),
     dispose: () => ambient.dispose(),

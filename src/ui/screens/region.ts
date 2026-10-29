@@ -17,7 +17,7 @@ import { track } from '../../services/analytics';
 import { sfx } from '../../services/audio';
 import { regionScene } from '../art/regions';
 import { decorIcon, SCENE_VIEWBOX } from '../art/sanctuary';
-import { startSceneLife, type SceneLife } from '../components/sceneLife';
+import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
 import { toast } from '../components/sheet';
 import { esc, h, plural } from '../dom';
 import { ICON } from '../icons';
@@ -147,15 +147,13 @@ export const regionScreen: ScreenDef = {
     }
     render();
 
-    // Arrival: a new stage pops in, then everyone says hello (a bigger hello after a solve that helped this place).
-    const greet = (big: boolean) => {
-      if (!life || app.reducedMotion) return;
+    // Arrival: a new stage grows in, then everyone says hello (a bigger hello on the first visit of the day, or right
+    // after a solve that helped this place).
+    if (isOpen(app.save, id) && life) {
       const svg = el.querySelector('.sanctuary__scene svg');
-      if (freshStage && svg) for (const g of svg.querySelectorAll(`.sp-stage[data-stage="${freshStage}"]`)) g.classList.add('is-new');
-      const figs = life.figures();
-      figs.forEach((f, i) => scope.timeout(() => life?.play(f, big ? 'greet' : i % 2 ? 'wag' : 'hop'), 450 + i * 520));
-    };
-    if (isOpen(app.save, id)) greet(route.fresh !== undefined || firstVisitToday);
+      if (freshStage && svg && !app.reducedMotion) for (const g of svg.querySelectorAll(`.sp-stage[data-stage="${freshStage}"]`)) g.classList.add('is-new');
+      greetAll(life, (fn, ms) => scope.timeout(fn, ms), route.fresh !== undefined || firstVisitToday);
+    }
 
     scope.on(el, 'click', (e) => {
       const t = e.target as HTMLElement;
@@ -167,9 +165,15 @@ export const regionScreen: ScreenDef = {
       const friendBtn = t.closest('[data-friend-card]') as HTMLElement | null;
       if (friendBtn) {
         const cid = friendBtn.dataset.friendCard as CompanionId;
+        let fed = false;
+        let patted = false;
         showFriendSheet(scope, cid, {
-          onFed: () => life?.play(`friend:${cid}`, 'greet'),
-          onPat: () => life?.play(`friend:${cid}`, 'love'),
+          onFed: () => (fed = true),
+          onPat: () => (patted = true),
+          // React in the scene once the card is out of the way.
+          onClose: () => {
+            if (fed || patted) scope.timeout(() => life?.play(`friend:${cid}`, fed ? 'greet' : 'love'), 220);
+          },
         });
         return;
       }

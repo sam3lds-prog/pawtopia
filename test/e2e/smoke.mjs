@@ -231,6 +231,14 @@ try {
   // Sanctuary life: a tap on a resident in the garden gets a small reaction; ambient actions come and go on their own
   await page.evaluate(() => window.__pt.go({ screen: 'sanctuary' }));
   await page.waitForSelector('.sanctuary__scene.is-live .sanctuary__pet');
+  const greeted = await page
+    .waitForFunction(() => document.querySelector('.sanctuary__scene .sanctuary__pet:is(.is-greet, .is-hop, .is-wag)'), null, { timeout: 3000 })
+    .then(
+      () => true,
+      () => false,
+    );
+  check('residents say hello when you arrive', greeted);
+  await page.waitForTimeout(3000);
   await page.evaluate(() => {
     window.__seen = new Set();
     new MutationObserver((ms) => {
@@ -238,11 +246,11 @@ try {
     }).observe(document.querySelector('.sanctuary__scene svg'), { subtree: true, attributes: true, attributeFilter: ['class'] });
   });
   await page.click('.sanctuary__scene .sanctuary__pet');
-  check('tapping a resident in the garden makes it react', await page.evaluate(() => window.__seen.has('is-love')));
-  await page.waitForTimeout(12_500);
+  check('tapping a resident in the garden makes it react', await page.evaluate(() => window.__seen.has('is-greet') || window.__seen.has('is-love')));
+  await page.waitForTimeout(10_000);
   const seen = await page.evaluate(() => [...window.__seen]);
-  check('the garden comes alive by itself within 12 seconds', seen.some((c) => c !== 'is-love'), seen.join(','));
-  check('no more than two figures move at once', await page.evaluate(() => document.querySelectorAll('.sanctuary__scene [class*="is-"]:not(.is-live)').length <= 2));
+  check('the garden comes alive by itself within 10 seconds', seen.some((c) => c !== 'is-love' && c !== 'is-greet'), seen.join(','));
+  check('no more than three figures move at once', await page.evaluate(() => document.querySelectorAll('.sanctuary__scene [class*="is-"]:not(.is-live)').length <= 3));
 
   // Paw Cup: an open attempt survives other play, resumes, and scores from its full move log
   await page.evaluate(() => window.__pt.go({ screen: 'league' }));

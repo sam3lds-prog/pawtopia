@@ -14,7 +14,8 @@ import { unlockedCompanions, unlockedPets } from '../../meta/rewards';
 import { COMPANIONS, COMPANION_BY_ID, type CompanionId } from '../../meta/catalogs/companions';
 import { SANCTUARY_BY_ID } from '../../meta/catalogs/sanctuaries';
 import { companionSvg } from '../art/companions';
-import { startSceneLife, type SceneLife } from '../components/sceneLife';
+import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
+import { localDateKey } from '../../game/dates';
 import { track } from '../../services/analytics';
 import { afterDecorChange, afterSanctuaryVisit } from '../../app/events';
 import { sfx } from '../../services/audio';
@@ -71,6 +72,19 @@ export const sanctuaryScreen: ScreenDef = {
       life?.dispose();
       const svg = el.querySelector('.sanctuary__scene svg');
       life = svg ? startSceneLife(svg, 'sanct') : null;
+    }
+
+    /** Feeding or patting from a card: the animal reacts in the garden once the card is closed. */
+    function reactions(figure: string): FeedEvents {
+      let fed = false;
+      let patted = false;
+      return {
+        onFed: () => (fed = true),
+        onPat: () => (patted = true),
+        onClose: () => {
+          if (fed || patted) scope.timeout(() => life?.play(figure, fed ? 'greet' : 'love'), 220);
+        },
+      };
     }
 
     function render(): void {
@@ -134,6 +148,13 @@ export const sanctuaryScreen: ScreenDef = {
     }
     render();
 
+    // Everyone says hello when you arrive: a bigger hello on the first visit of the day, or after a puzzle.
+    const today = localDateKey();
+    const firstToday = app.save.world.visited.harmony !== today;
+    app.save.world.visited.harmony = today;
+    app.persist();
+    if (life) greetAll(life, (fn, ms) => scope.timeout(fn, ms), firstToday || (route.screen === 'sanctuary' && route.welcome !== undefined));
+
     scope.on(el, 'click', (e) => {
       const t = e.target as HTMLElement;
       // A tap on someone in the garden: a small happy reaction (a heart; face only under reduced motion).
@@ -144,12 +165,14 @@ export const sanctuaryScreen: ScreenDef = {
       }
       const friendBtn = t.closest('[data-friend-card]') as HTMLElement | null;
       if (friendBtn) {
-        showFriendSheet(scope, friendBtn.dataset.friendCard as CompanionId);
+        const id = friendBtn.dataset.friendCard as CompanionId;
+        showFriendSheet(scope, id, reactions(`friend:${id}`));
         return;
       }
       const petBtn = t.closest('[data-pet]') as HTMLElement | null;
       if (petBtn) {
-        showPetSheet(scope, petBtn.dataset.pet as PetId, { showVisit: false });
+        const id = petBtn.dataset.pet as PetId;
+        showPetSheet(scope, id, { showVisit: false, ...reactions(id) });
         return;
       }
       const tog = t.closest('[data-toggle]') as HTMLElement | null;
@@ -199,6 +222,7 @@ export function showFriendSheet(scope: Scope, id: CompanionId, ev: FeedEvents = 
   const sh = openSheet(scope, {
     title: owned ? `${c.name} the ${c.kind.toLowerCase()}` : `A ${c.kind.toLowerCase()} (arriving soon)`,
     className: 'pet-sheet',
+    onClose: ev.onClose,
     body: `
       <div class="pet-sheet__hero">${friendPortrait(id, !owned)}</div>
       <p class="pet-sheet__trait">${esc(owned ? c.trait : c.sanctuary === 'harmony' ? 'Someone is watching the garden from the hedge.' : `Someone is waiting for a home in the ${SANCTUARY_BY_ID[c.sanctuary].place}.`)}</p>

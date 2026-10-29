@@ -68,6 +68,32 @@
   }
 }
 
+/* A short stroll: a few steps to one side with a bounce in each, then back to its spot. */
+.sanctuary__scene.is-live .sanctuary__pet.is-stroll {
+  animation: sp-stroll 1800ms ease-in-out;
+}
+@keyframes sp-stroll {
+  0%,
+  100% {
+    transform: none;
+  }
+  15% {
+    transform: translate(3px, -2px);
+  }
+  30% {
+    transform: translate(6px, 0);
+  }
+  45% {
+    transform: translate(9px, -2px) scaleX(-1);
+  }
+  60% {
+    transform: translate(6px, 0) scaleX(-1);
+  }
+  80% {
+    transform: translate(3px, -2px) scaleX(-1);
+  }
+}
+
 /* A tapped figure: a heart floats up. */
 .sanctuary__scene .sp-heart {
   opacity: 0;

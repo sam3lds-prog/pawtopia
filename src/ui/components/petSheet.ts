@@ -33,6 +33,7 @@ export function showPetSheet(scope: Scope, id: PetId, opts: { onChange?: () => v
   const sh = openSheet(scope, {
     title: owned ? p.name : `${p.name} (arriving soon)`,
     className: 'pet-sheet',
+    onClose: opts.onClose,
     body: `
       <div class="pet-sheet__hero">${portrait(id, owned ? 'happy' : 'idle', !owned)}</div>
       <p class="pet-sheet__trait">${esc(p.trait)}</p>
