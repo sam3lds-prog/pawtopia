@@ -24,6 +24,7 @@ import { haptic } from '../../services/haptics';
 import { GEM_PACKS, iap, PRODUCT_CATALOG, type ProductId, type ProductInfo } from '../../services/iap';
 import { ads } from '../../services/ads';
 import { decorIcon } from '../art/sanctuary';
+import { activityFor } from '../art/activities';
 import { foodIcon } from '../art/foods';
 import { openSheet, toast } from '../components/sheet';
 import { walletPills } from '../components/wallet';
@@ -318,6 +319,7 @@ function decorSheet(scope: Scope, id: DecorId, rerender: () => void): void {
       ${tier === 'video' || tier === 'premium' ? `<span class="chip ${tier === 'premium' ? 'chip--gem' : 'chip--video'}">${tier === 'premium' ? `${ICON.gem}Premium` : `${ICON.videoToken}Special`}</span>` : ''}
       <div class="decor-sheet__art">${decorIcon(id, d.name)}</div>
       <p class="sheet__lead">${esc(d.blurb)}</p>
+      ${activityFor(id) ? `<p class="decor-sheet__play">${ICON.sparkle}<span><b>${esc(activityFor(id)!.name)}.</b> Your animals take turns with it, and you can tap it in the sanctuary to start one.</span></p>` : ''}
       <div class="sheet__actions">${actions}<button class="btn btn--quiet" data-act="close">Not now</button></div>`,
   });
   let busy = false;

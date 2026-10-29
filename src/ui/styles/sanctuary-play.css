@@ -1,0 +1,461 @@
+/* Sanctuary play (D32, D33): decoration activities and tricks. Longer than ambient life (a whole little scene, at most
+   6.5 s including repeats) but the same rules: scoped to the live sanctuary scene, nothing loops forever, nothing moves
+   by itself under reduced motion, and the puzzle board is never touched (faces only there, D11).
+   test/unit/play.test.ts checks every rule here. */
+
+/* An animal steps away while its copy plays. */
+.sanctuary__scene .sanctuary__pet.is-away {
+  opacity: 0;
+  transition: opacity 250ms ease-out;
+  pointer-events: none;
+}
+.sanctuary__scene [data-decor].has-act {
+  cursor: pointer;
+}
+.sanctuary__scene .sp-act {
+  pointer-events: none;
+}
+.sanctuary__scene.is-live .sp-act {
+  animation: sp-act-in 400ms ease-out;
+}
+@keyframes sp-act-in {
+  from {
+    opacity: 0;
+  }
+}
+.sanctuary__scene .sp-act-rider,
+.sanctuary__scene .sp-act-sparkles,
+.sanctuary__scene .sp-act-notes,
+.sanctuary__scene .sp-act-z,
+.sanctuary__scene .sp-act-fly,
+.sanctuary__scene .sp-act-ripples,
+.sanctuary__scene .sp-act-steam,
+.sanctuary__scene .sp-act-stars,
+.sanctuary__scene .sp-act-splash,
+.sanctuary__scene .sp-flam-a,
+.sanctuary__scene .sp-flam-b {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+/* ------------------------------------------------------------------ Hot-air balloon: a ride across the sky */
+.sanctuary__scene.is-live [data-decor].is-act-balloon .sp-balloon {
+  animation: sp-act-balloon 6200ms ease-in-out;
+}
+@keyframes sp-act-balloon {
+  0%,
+  100% {
+    transform: none;
+  }
+  15% {
+    transform: translate(-14px, -6px);
+  }
+  40% {
+    transform: translate(42px, 4px);
+  }
+  62% {
+    transform: translate(76px, -4px);
+  }
+  85% {
+    transform: translate(22px, 3px);
+  }
+}
+
+/* ------------------------------------------------------------------ Kite: running with the string */
+.sanctuary__scene.is-live [data-decor].is-act-kite .sp-kite {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: sp-act-kite 5600ms ease-in-out;
+}
+@keyframes sp-act-kite {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translate(-6px, 4px) rotate(-9deg);
+  }
+  40% {
+    transform: translate(8px, -5px) rotate(11deg);
+  }
+  60% {
+    transform: translate(-4px, 2px) rotate(-7deg);
+  }
+  80% {
+    transform: translate(6px, -3px) rotate(7deg);
+  }
+}
+.sanctuary__scene.is-live .sp-act.is-act-kite .sp-act-rider {
+  animation: sp-act-run 5600ms ease-in-out;
+}
+@keyframes sp-act-run {
+  0%,
+  100% {
+    transform: none;
+  }
+  10%,
+  30%,
+  50%,
+  70% {
+    transform: translate(-6px, -3px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translate(6px, 0);
+  }
+}
+.sanctuary__scene.is-live .sp-act.is-act-kite .sp-act-string {
+  animation: sp-act-in 600ms ease-out;
+}
+
+/* ------------------------------------------------------------------ Golden fountain: splashing */
+.sanctuary__scene.is-live [data-decor].is-act-goldfountain .sp-water {
+  stroke-dasharray: 3 3;
+  animation: sp-sparkle 1600ms linear 3;
+}
+.sanctuary__scene.is-live .sp-act.is-act-goldfountain .sp-act-rider {
+  animation: sp-act-bob 4800ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-act.is-act-goldfountain .sp-act-drops {
+  animation: sp-act-burst 1600ms ease-out 3;
+}
+
+/* ------------------------------------------------------------------ String lights: a rooftop dance */
+.sanctuary__scene.is-live [data-decor].is-act-eavelights .sp-glow-bulbs {
+  animation: sp-glow-bulbs 1300ms ease-in-out 4;
+}
+.sanctuary__scene.is-live .sp-act.is-act-eavelights .sp-act-rider {
+  animation: sp-act-dance 5200ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-act.is-act-eavelights .sp-act-notes {
+  animation: sp-act-float 2600ms ease-out 2;
+}
+
+/* ------------------------------------------------------------------ Hammock: a long swing and a nap */
+.sanctuary__scene.is-live [data-decor].is-act-hammock .sp-sway {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: sp-act-swing 6000ms ease-in-out;
+}
+@keyframes sp-act-swing {
+  0%,
+  100% {
+    transform: none;
+  }
+  12.5%,
+  62.5% {
+    transform: rotate(5deg);
+  }
+  37.5%,
+  87.5% {
+    transform: rotate(-4deg);
+  }
+}
+.sanctuary__scene.is-live .sp-act.is-act-hammock .sp-act-z {
+  animation: sp-act-float 2000ms ease-out 3;
+}
+
+/* ------------------------------------------------------------------ Opal rock: climbing up to the shine */
+.sanctuary__scene.is-live [data-decor].is-act-opalrock .sp-glow {
+  animation: sp-glow 1500ms ease-in-out 3;
+}
+.sanctuary__scene.is-live .sp-act.is-act-opalrock .sp-act-rider {
+  animation: sp-act-hops 4600ms ease-out;
+}
+.sanctuary__scene.is-live .sp-act.is-act-opalrock .sp-act-sparkles {
+  transform-origin: 50% 50%;
+  animation: sp-act-burst 1500ms ease-out 3;
+}
+
+/* ------------------------------------------------------------------ Flamingos: a dance in the pool */
+.sanctuary__scene.is-live [data-decor].is-act-flamingos .sp-flam-a {
+  animation: sp-act-flam 1350ms ease-in-out 4;
+}
+.sanctuary__scene.is-live [data-decor].is-act-flamingos .sp-flam-b {
+  animation: sp-act-flam 1350ms ease-in-out 600ms 3;
+}
+@keyframes sp-act-flam {
+  0%,
+  100% {
+    transform: none;
+  }
+  40% {
+    transform: translateY(-3px) rotate(-6deg);
+  }
+  70% {
+    transform: translateY(0) rotate(4deg);
+  }
+}
+.sanctuary__scene.is-live .sp-act.is-act-flamingos .sp-act-rider {
+  animation: sp-act-dance 5400ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-act.is-act-flamingos .sp-act-ripples {
+  transform-origin: 50% 50%;
+  animation: sp-act-ripple 1800ms ease-out 3;
+}
+
+/* ------------------------------------------------------------------ Pavilion: tea time */
+.sanctuary__scene.is-live [data-decor].is-act-pavilion .sp-glow {
+  animation: sp-glow 1800ms ease-in-out 3;
+}
+.sanctuary__scene.is-live .sp-act.is-act-pavilion .sp-act-rider {
+  animation: sp-act-bob 5600ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-act.is-act-pavilion .sp-act-steam {
+  animation: sp-act-float 1800ms ease-out 3;
+}
+
+/* ------------------------------------------------------------------ Ice lanterns: a parade */
+.sanctuary__scene.is-live [data-decor].is-act-icelanterns .sp-glow {
+  animation: sp-glow 1500ms ease-in-out 4;
+}
+.sanctuary__scene.is-live .sp-act.is-act-icelanterns .sp-act-rider {
+  animation: sp-act-walk 6000ms ease-in-out;
+}
+@keyframes sp-act-walk {
+  0%,
+  100% {
+    transform: none;
+  }
+  10%,
+  30% {
+    transform: translate(12px, -2px);
+  }
+  20%,
+  40% {
+    transform: translate(24px, 0);
+  }
+  50% {
+    transform: translate(64px, 0);
+  }
+  55% {
+    transform: translate(64px, 0) scaleX(-1);
+  }
+  75% {
+    transform: translate(32px, -2px) scaleX(-1);
+  }
+  95% {
+    transform: translate(0, 0) scaleX(-1);
+  }
+}
+
+/* ------------------------------------------------------------------ Aurora: watching the lights */
+.sanctuary__scene.is-live [data-decor].is-act-aurora .sp-aurora {
+  animation: sp-shimmer 1800ms ease-in-out 3;
+}
+.sanctuary__scene.is-live .sp-act.is-act-aurora .sp-act-stars {
+  transform-origin: 50% 50%;
+  animation: sp-act-twinkle 1200ms ease-in-out 5;
+}
+.sanctuary__scene.is-live .sp-act.is-act-aurora .sp-act-rider {
+  animation: sp-act-lookup 6000ms ease-in-out;
+}
+@keyframes sp-act-lookup {
+  0%,
+  100% {
+    transform: none;
+  }
+  20%,
+  80% {
+    transform: rotate(-6deg) translateY(-1px);
+  }
+  50% {
+    transform: rotate(-8deg) translateY(-3px);
+  }
+}
+
+/* ------------------------------------------------------------------ Firefly jars: lights out to play */
+.sanctuary__scene.is-live [data-decor].is-act-fireflyjars .sp-glow {
+  animation: sp-glow 1800ms ease-in-out 3;
+}
+.sanctuary__scene.is-live .sp-act.is-act-fireflyjars .sp-act-fly {
+  opacity: 0;
+  animation: sp-act-fly 2600ms ease-in-out 2;
+}
+.sanctuary__scene.is-live .sp-act.is-act-fireflyjars .sp-act-fly--1 {
+  animation-delay: 200ms;
+}
+.sanctuary__scene.is-live .sp-act.is-act-fireflyjars .sp-act-fly--2 {
+  animation-delay: 400ms;
+}
+.sanctuary__scene.is-live .sp-act.is-act-fireflyjars .sp-act-fly--3 {
+  animation-delay: 600ms;
+}
+.sanctuary__scene.is-live .sp-act.is-act-fireflyjars .sp-act-fly--4 {
+  animation-delay: 800ms;
+}
+.sanctuary__scene.is-live .sp-act.is-act-fireflyjars .sp-act-fly--5 {
+  animation-delay: 1000ms;
+}
+@keyframes sp-act-fly {
+  0% {
+    opacity: 0;
+    transform: none;
+  }
+  20% {
+    opacity: 1;
+  }
+  45% {
+    transform: translate(14px, -22px);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(34px, -12px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(44px, -30px);
+  }
+}
+.sanctuary__scene.is-live .sp-act.is-act-fireflyjars .sp-act-rider {
+  animation: sp-act-lookup 5600ms ease-in-out;
+}
+
+/* ------------------------------------------------------------------ Waterfall: a slide and a splash */
+.sanctuary__scene.is-live [data-decor].is-act-waterfall .sp-water {
+  stroke-dasharray: 4 3;
+  animation: sp-sparkle 1600ms linear 3;
+}
+.sanctuary__scene.is-live .sp-act.is-act-waterfall .sp-act-rider {
+  animation: sp-act-slide 4800ms ease-in forwards;
+}
+@keyframes sp-act-slide {
+  0%,
+  12% {
+    transform: none;
+  }
+  60% {
+    transform: translate(5px, 72px) rotate(12deg);
+  }
+  68% {
+    transform: translate(5px, 70px) rotate(0deg);
+  }
+  76%,
+  100% {
+    transform: translate(5px, 74px);
+  }
+}
+.sanctuary__scene.is-live .sp-act.is-act-waterfall .sp-act-splash {
+  transform-origin: 50% 50%;
+  animation: sp-act-splash 4800ms ease-out;
+}
+@keyframes sp-act-splash {
+  0%,
+  58% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  66% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+
+/* ------------------------------------------------------------------ shared moves */
+@keyframes sp-act-bob {
+  0%,
+  100% {
+    transform: none;
+  }
+  15%,
+  45%,
+  75% {
+    transform: translateY(-4px);
+  }
+  30%,
+  60%,
+  90% {
+    transform: translateY(0) scale(1.03, 0.97);
+  }
+}
+@keyframes sp-act-dance {
+  0%,
+  100% {
+    transform: none;
+  }
+  12.5%,
+  62.5% {
+    transform: rotate(-9deg) translateY(-3px);
+  }
+  25%,
+  75% {
+    transform: none;
+  }
+  37.5%,
+  87.5% {
+    transform: rotate(9deg) translateY(-3px);
+  }
+}
+@keyframes sp-act-hops {
+  0% {
+    transform: translate(-14px, 18px);
+  }
+  20% {
+    transform: translate(-7px, 4px);
+  }
+  35%,
+  100% {
+    transform: none;
+  }
+  50%,
+  80% {
+    transform: translateY(-5px);
+  }
+  65%,
+  95% {
+    transform: none;
+  }
+}
+@keyframes sp-act-float {
+  0% {
+    opacity: 0;
+    transform: none;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(4px, -14px);
+  }
+}
+@keyframes sp-act-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25) translateY(-4px);
+  }
+}
+@keyframes sp-act-ripple {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+@keyframes sp-act-twinkle {
+  50% {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+}
+
+/* Reduced motion: the activity shows, still, for a moment. */
+:root[data-motion='reduce'] .sanctuary__scene .sp-act,
+:root[data-motion='reduce'] .sanctuary__scene .sp-act * {
+  animation: none !important;
+}

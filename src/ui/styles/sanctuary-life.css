@@ -335,6 +335,12 @@
   font-weight: 700;
   font-size: var(--t-sm);
 }
+.sanctuary__chat[hidden] {
+  display: none;
+}
+.sanctuary__chat.is-activity {
+  color: var(--ink);
+}
 .sanctuary__chat .ico {
   width: 18px;
   height: 18px;

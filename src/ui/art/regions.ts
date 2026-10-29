@@ -116,7 +116,7 @@ export const REGION_DECOR_ART: Record<RegionDecorId, DecorArt> = {
       return `
         <ellipse cx="44" cy="278" rx="35" ry="8" fill="#a7d3cf" stroke="#c9a46e" stroke-width="1.6"/>
         <g class="sp-water" stroke="#fff" stroke-width="1.2" fill="none" stroke-linecap="round" opacity="0.8"><path d="M22 278 q5 1.4 9 0"/><path d="M52 282 q5 1.4 9 0"/></g>
-        ${bird(32, 1)}${bird(56, -1)}`;
+        <g class="sp-flam-a">${bird(32, 1)}</g><g class="sp-flam-b">${bird(56, -1)}</g>`;
     },
   },
   pavilion: {

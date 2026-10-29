@@ -15,6 +15,7 @@ import { COMPANIONS, COMPANION_BY_ID, type CompanionId } from '../../meta/catalo
 import { SANCTUARY_BY_ID } from '../../meta/catalogs/sanctuaries';
 import { companionSvg } from '../art/companions';
 import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
+import { animalName, startSceneActivities, type ActivityRunner } from '../components/activities';
 import { localDateKey } from '../../game/dates';
 import { track } from '../../services/analytics';
 import { afterDecorChange, afterSanctuaryVisit } from '../../app/events';
@@ -65,13 +66,22 @@ export const sanctuaryScreen: ScreenDef = {
 
     // ---------------------------------------------------------------- ambient life (D24)
     let life: SceneLife | null = null;
-    scope.onDispose(() => life?.dispose());
-    scope.on(document, 'visibilitychange', () => life?.setLive(!document.hidden));
+    let acts: ActivityRunner | null = null;
+    scope.onDispose(() => {
+      life?.dispose();
+      acts?.dispose();
+    });
+    scope.on(document, 'visibilitychange', () => {
+      life?.setLive(!document.hidden);
+      acts?.setLive(!document.hidden);
+    });
 
     function wireLife(): void {
       life?.dispose();
-      const svg = el.querySelector('.sanctuary__scene svg');
+      acts?.dispose();
+      const svg = el.querySelector<SVGSVGElement>('.sanctuary__scene svg');
       life = svg ? startSceneLife(svg, 'sanct') : null;
+      acts = svg ? startSceneActivities(svg, el.querySelector('[data-chat]'), app.reducedMotion, animalName) : null;
     }
 
     /** Feeding or patting from a card: the animal reacts in the garden once the card is closed. */
@@ -102,7 +112,7 @@ export const sanctuaryScreen: ScreenDef = {
         <figure class="sanctuary__scene card is-live">
           <svg viewBox="${SCENE_VIEWBOX}" role="img" aria-label="${esc(sceneLabel(pets, ownedDecor.length))}">${sceneMarkup('sanct')}</svg>
         </figure>
-        ${chat ? `<p class="sanctuary__chat">${ICON.heart}<span>${esc(chat)}</span></p>` : ''}
+        <p class="sanctuary__chat" data-chat aria-live="polite" ${chat ? '' : 'hidden'}>${ICON.heart}<span>${esc(chat ?? '')}</span></p>
         <section aria-labelledby="res-title">
           <div class="section-head"><h2 id="res-title">Residents</h2><span class="muted num">${pets.length} of ${PETS.length}</span></div>
           <ul class="resident-row">
@@ -161,6 +171,12 @@ export const sanctuaryScreen: ScreenDef = {
       const fig = t.closest('.sanctuary__scene .sanctuary__pet') as HTMLElement | null;
       if (fig) {
         life?.tap(fig);
+        return;
+      }
+      // A tap on a decoration someone can use: they go and use it (ride the balloon, splash in the fountain…).
+      const dec = t.closest('.sanctuary__scene [data-decor].has-act') as HTMLElement | null;
+      if (dec) {
+        if (acts && !acts.busy && !acts.play(dec.dataset.decor!)) toast('Once someone lives here, they’ll love this.');
         return;
       }
       const friendBtn = t.closest('[data-friend-card]') as HTMLElement | null;

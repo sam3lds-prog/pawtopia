@@ -388,3 +388,17 @@ for the Journey (dailies keep it).
   progress resumes on the spec it was started on (spec 1 and 2 boards stay buildable), and the leaderboard counts a
   board only on the spec it's issued under today.
 - Tips moved with the sizes (7×7 at 6, 8×8 at 15, 9×9 at 40).
+
+## 2026-10-29 · D32 — Animals use the special and premium decorations
+Owner decision (2026-10-29): every gem and video-token decoration gets something animals do with it.
+
+- **Twelve activities** (`ui/art/activities.ts`): balloon rides, kite flying, splashing in the golden fountain, a
+  rooftop dance under the string lights, hammock naps, the opal rock's shine, dancing with the flamingos, tea under the
+  pavilion, a lantern parade, aurora watching, letting the fireflies out, and sliding down the waterfall.
+- **How it plays** (`ui/components/activities.ts`): tap the decoration, or wait — one starts by itself 5–9 s after you
+  arrive and then every 35–60 s while the screen is open. One at a time. A copy of an animal from that scene (a resident
+  or wildlife friend) takes part while its own figure steps away, and the line under the scene says what's happening.
+- **Motion policy** (extends D24/D29): a whole activity is one short scene of at most 6.5 s including repeats
+  (`styles/sanctuary-play.css`, checked by `test/unit/play.test.ts`); nothing loops forever; nothing starts by itself
+  under reduced motion, and a tap shows the animal in place, still. Paused when the screen is hidden.
+- The Shop's decoration card names the activity, so buying one says what it will do.

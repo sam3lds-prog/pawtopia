@@ -18,6 +18,7 @@ import { sfx } from '../../services/audio';
 import { regionScene } from '../art/regions';
 import { decorIcon, SCENE_VIEWBOX } from '../art/sanctuary';
 import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
+import { animalName, startSceneActivities, type ActivityRunner } from '../components/activities';
 import { toast } from '../components/sheet';
 import { esc, h, plural } from '../dom';
 import { ICON } from '../icons';
@@ -47,8 +48,15 @@ export const regionScreen: ScreenDef = {
     root.appendChild(el);
 
     let life: SceneLife | null = null;
-    scope.onDispose(() => life?.dispose());
-    scope.on(document, 'visibilitychange', () => life?.setLive(!document.hidden));
+    let acts: ActivityRunner | null = null;
+    scope.onDispose(() => {
+      life?.dispose();
+      acts?.dispose();
+    });
+    scope.on(document, 'visibilitychange', () => {
+      life?.setLive(!document.hidden);
+      acts?.setLive(!document.hidden);
+    });
 
     function progressCard(): string {
       const save = app.save;
@@ -108,7 +116,7 @@ export const regionScreen: ScreenDef = {
         <figure class="sanctuary__scene card is-live ${open ? '' : 'is-locked'}">
           <svg viewBox="${SCENE_VIEWBOX}" role="img" aria-label="${esc(sceneLabel(stage, welcomed))}">${regionScene(id, { stage: open ? stage : 0, companions: welcomed, decor, evening: isEvening() }, `rg-${id}`)}</svg>
         </figure>
-        ${chat ? `<p class="sanctuary__chat">${ICON.heart}<span>${esc(chat)}</span></p>` : ''}
+        <p class="sanctuary__chat" data-chat aria-live="polite" ${chat ? '' : 'hidden'}>${ICON.heart}<span>${esc(chat ?? '')}</span></p>
         ${progressCard()}
         <section aria-labelledby="animals-title">
           <div class="section-head"><h2 id="animals-title">Animals</h2><span class="muted num">${welcomed.length} of ${friendsHere.length}</span></div>
@@ -142,8 +150,10 @@ export const regionScreen: ScreenDef = {
           <button class="btn btn--secondary btn--block" data-act="shop">${ICON.bag}${esc(def.name.replace(/ Sanctuary$/, ''))} decorations</button>
         </section>`;
       life?.dispose();
-      const svg = el.querySelector('.sanctuary__scene svg');
+      acts?.dispose();
+      const svg = el.querySelector<SVGSVGElement>('.sanctuary__scene svg');
       life = svg ? startSceneLife(svg, `region-${id}`) : null;
+      acts = svg && open ? startSceneActivities(svg, el.querySelector('[data-chat]'), app.reducedMotion, animalName) : null;
     }
     render();
 
@@ -160,6 +170,11 @@ export const regionScreen: ScreenDef = {
       const fig = t.closest('.sanctuary__scene .sanctuary__pet') as HTMLElement | null;
       if (fig) {
         life?.tap(fig);
+        return;
+      }
+      const dec = t.closest('.sanctuary__scene [data-decor].has-act') as HTMLElement | null;
+      if (dec) {
+        if (acts && !acts.busy && !acts.play(dec.dataset.decor!)) toast('Once an animal lives here, they’ll love this.');
         return;
       }
       const friendBtn = t.closest('[data-friend-card]') as HTMLElement | null;

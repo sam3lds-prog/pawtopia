@@ -252,6 +252,24 @@ try {
   check('the garden comes alive by itself within 10 seconds', seen.some((c) => c !== 'is-love' && c !== 'is-greet'), seen.join(','));
   check('no more than three figures move at once', await page.evaluate(() => document.querySelectorAll('.sanctuary__scene [class*="is-"]:not(.is-live)').length <= 3));
 
+  // Decoration activities: tapping the hot-air balloon sends someone up in it, then brings them back
+  await page.evaluate(() => {
+    window.__pt.app.save.inventory.decor.balloon = { ownedAt: new Date().toISOString() };
+    window.__pt.app.persist();
+    window.__pt.go({ screen: 'sanctuary' });
+  });
+  await page.waitForSelector('.sanctuary__scene [data-decor="balloon"].has-act');
+  await page.evaluate(() => document.querySelector('.sanctuary__scene [data-decor="balloon"]').dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  await page.waitForTimeout(300);
+  const ride = await page.evaluate(() => ({
+    rider: !!document.querySelector('.sp-balloon .sp-act .sp-rider-fig'),
+    away: document.querySelectorAll('.sanctuary__scene .sanctuary__pet.is-away').length,
+    caption: document.querySelector('[data-chat] span')?.textContent ?? '',
+  }));
+  check('tapping the balloon sends an animal for a ride', ride.rider && ride.away === 1 && /balloon/.test(ride.caption), JSON.stringify(ride));
+  await page.waitForTimeout(6600);
+  check('the ride ends and the animal comes back', await page.evaluate(() => !document.querySelector('.sp-act') && !document.querySelector('.is-away')));
+
   // Paw Cup: an open attempt survives other play, resumes, and scores from its full move log
   await page.evaluate(() => window.__pt.go({ screen: 'league' }));
   await page.click('.segmented [data-tab="week"]');

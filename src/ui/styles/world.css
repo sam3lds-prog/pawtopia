@@ -482,3 +482,21 @@
 .win-world .reward-item__art {
   background: var(--canvas-deep);
 }
+.decor-sheet__play {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--gold-soft);
+  color: var(--gold-ink);
+  font-size: var(--t-sm);
+  text-align: left;
+}
+.decor-sheet__play .ico {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 1px;
+}

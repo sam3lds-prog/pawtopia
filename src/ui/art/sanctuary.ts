@@ -110,6 +110,7 @@ const DECOR_ART: Record<HarmonyDecorId, DecorArt> = {
         <path d="M151 14 C145 20 142 30 143 40 C144 50 147 58 149 64 H153 C155 58 158 50 159 40 C160 30 157 20 151 14 Z" fill="#f6d27a"/>
         <path d="M137 22 C134 30 134 42 140 52" stroke="#fff" stroke-width="1.6" fill="none" opacity="0.55" stroke-linecap="round"/>
         <path d="M130 36 H172" stroke="#f9c0b5" stroke-width="1"/>
+        <g class="sp-seat"></g>
         <rect x="143" y="75" width="16" height="8" rx="2" fill="#c99a68" stroke="${OUT}" stroke-width="0.9"/>
         <path d="M143 79 H159" stroke="#a87b4f" stroke-width="0.8"/>
       </g>`,
@@ -362,7 +363,7 @@ const PET_SPOTS: Record<PetId, PetSpot> = {
 };
 
 /** A static seated resident whose ground contact is (x, y). H = rig box size. */
-function petFigure(id: PetId, x: number, y: number, H: number, mood: FaceMood): string {
+export function residentFigure(id: PetId, x: number, y: number, H: number, mood: FaceMood): string {
   const P = PET_BY_ID[id];
   const pal = P.palette;
   const cat = P.species === 'cat';
@@ -432,7 +433,7 @@ export function sanctuaryScene(state: SceneState, id = 'sanct'): string {
     const x = on ? on.x : spot.x;
     const y = on ? on.y : spot.y;
     // Pets sit just in front of the thing they sit on.
-    items.push({ base: (on ? DECOR_ART[on.decor as HarmonyDecorId].base : y) + 0.5, svg: petFigure(p.id, x, y, 46, spot.mood) });
+    items.push({ base: (on ? DECOR_ART[on.decor as HarmonyDecorId].base : y) + 0.5, svg: residentFigure(p.id, x, y, 46, spot.mood) });
   }
   const friends = (state.companions ?? []).filter((c) => c in COMPANION_BY_ID && COMPANION_BY_ID[c].sanctuary === 'harmony');
   if (friends.some((c) => COMPANION_BY_ID[c].habitat === 'woodland')) items.push({ base: 220, svg: woodlandNook() });
