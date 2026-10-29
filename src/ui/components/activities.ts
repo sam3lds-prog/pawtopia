@@ -10,12 +10,13 @@ import { COMPANION_BY_ID, type CompanionId } from '../../meta/catalogs/companion
 import { PET_BY_ID, type PetId } from '../../meta/catalogs/pets';
 
 export interface ActivityRunnerOptions {
-  reducedMotion: boolean;
+  /** Read each time, so a change to the motion setting applies without leaving the screen. */
+  reducedMotion: boolean | (() => boolean);
   /** Animals in the scene who can take part (resident or companion ids). */
   cast: () => string[];
   nameOf: (id: string) => string;
-  /** Caption while an activity plays (null to clear). */
-  caption: (text: string | null) => void;
+  /** Caption while an activity plays (null to clear). `announce` is true only when the player started it. */
+  caption: (text: string | null, announce: boolean) => void;
   /** Deterministic choice in tests; Math.random otherwise. */
   random?: () => number;
 }
@@ -31,12 +32,15 @@ export class ActivityRunner {
   private disposed = false;
   private live = true;
   private readonly rand: () => number;
+  private readonly reduced: () => boolean;
 
   constructor(
     private readonly svg: SVGSVGElement,
     private readonly o: ActivityRunnerOptions,
   ) {
     this.rand = o.random ?? Math.random;
+    const rm = o.reducedMotion;
+    this.reduced = typeof rm === 'function' ? rm : () => rm;
     for (const g of svg.querySelectorAll<SVGGElement>('[data-decor]')) if (activityFor(g.dataset.decor ?? '')) g.classList.add('has-act');
   }
 
@@ -49,8 +53,12 @@ export class ActivityRunner {
     return !!this.running;
   }
 
-  /** Starts the activity of a decoration with someone from the scene (or `who`). Returns who took part, or null. */
-  play(decor: string, who?: string): string | null {
+  /**
+   * Starts the activity of a decoration with someone from the scene (or `who`). Returns who took part, or null when
+   * nothing started: something is already playing, or nobody is free (the cast leaves out anyone mid-trick).
+   * `auto` marks the ones that start by themselves: they aren't announced to screen readers.
+   */
+  play(decor: string, who?: string, auto = false): string | null {
     if (this.disposed || this.running) return null;
     const def = activityFor(decor);
     const host = this.svg.querySelector<SVGGElement>(`[data-decor="${decor}"]`);
@@ -58,7 +66,7 @@ export class ActivityRunner {
     if (!def || !host || !cast.length) return null;
     const rider = who && cast.includes(who) ? who : cast[Math.floor(this.rand() * cast.length) % cast.length];
     this.running = { decor, ...this.mount(def, host, rider) };
-    this.o.caption(def.line(this.o.nameOf(rider)));
+    this.o.caption(def.line(this.o.nameOf(rider)), !auto);
     return rider;
   }
 
@@ -68,16 +76,17 @@ export class ActivityRunner {
     const node = (seat ?? this.svg).querySelector(`.sp-act[data-activity="${def.decor}"]`);
     const own = this.svg.querySelector(`.sanctuary__pet[data-pet="${rider}"], .sanctuary__friend[data-friend="${rider}"]`);
     own?.classList.add('is-away');
-    const cls = this.o.reducedMotion ? 'is-act-still' : `is-act-${def.decor}`;
+    const still = this.reduced();
+    const cls = still ? 'is-act-still' : `is-act-${def.decor}`;
     host.classList.add(cls);
     node?.classList.add(cls);
     const cleanup = () => {
       node?.remove();
       host.classList.remove(cls);
       own?.classList.remove('is-away');
-      this.o.caption(null);
+      this.o.caption(null, false);
     };
-    const timer = window.setTimeout(() => this.finish(), this.o.reducedMotion ? STILL_MS : def.ms);
+    const timer = window.setTimeout(() => this.finish(), still ? STILL_MS : def.ms);
     return { cleanup, timer };
   }
 
@@ -100,7 +109,7 @@ export class ActivityRunner {
   /** Starts (or pauses, when hidden) the occasional activity that happens by itself. */
   setLive(on: boolean): void {
     if (this.disposed) return;
-    this.live = on && !this.o.reducedMotion;
+    this.live = on;
     if (this.auto !== null) clearTimeout(this.auto);
     this.auto = null;
     if (!on) this.stop();
@@ -114,7 +123,8 @@ export class ActivityRunner {
     this.auto = window.setTimeout(() => {
       this.auto = null;
       const ds = this.decors();
-      if (ds.length && !this.running) this.play(ds[Math.floor(this.rand() * ds.length) % ds.length]);
+      // Nothing starts by itself under reduced motion (checked now: the setting can change while the screen is open).
+      if (ds.length && !this.running && !this.reduced()) this.play(ds[Math.floor(this.rand() * ds.length) % ds.length], undefined, true);
       if (!this.running) this.scheduleAuto(AUTO_GAP_MS);
     }, lo + Math.floor(this.rand() * (hi - lo)));
   }
@@ -131,7 +141,7 @@ export class ActivityRunner {
  * Wires a runner to a live scene: the cast is every animal drawn in it, names come from the catalogs, and the
  * caption borrows the line under the scene (`[data-chat]`), putting the small talk back afterwards.
  */
-export function startSceneActivities(svg: SVGSVGElement, chat: HTMLElement | null, reducedMotion: boolean, nameOf: (id: string) => string): ActivityRunner {
+export function startSceneActivities(svg: SVGSVGElement, chat: HTMLElement | null, reducedMotion: boolean | (() => boolean), nameOf: (id: string) => string): ActivityRunner {
   const span = chat?.querySelector('span') ?? null;
   const base = span?.textContent ?? '';
   const runner = new ActivityRunner(svg, {
@@ -142,8 +152,12 @@ export function startSceneActivities(svg: SVGSVGElement, chat: HTMLElement | nul
       ...[...svg.querySelectorAll<SVGGElement>('.sanctuary__friend[data-friend]:not([data-trick])')].map((g) => g.dataset.friend!),
     ],
     nameOf,
-    caption: (text) => {
+    caption: (text, announce) => {
       if (!chat || !span) return;
+      // Only what the player started is announced; activities that start by themselves, and the small talk coming
+      // back afterwards, are not (they would otherwise be read out every minute).
+      if (announce) chat.setAttribute('aria-live', 'polite');
+      else chat.removeAttribute('aria-live');
       span.textContent = text ?? base;
       chat.hidden = !(text ?? base);
       chat.classList.toggle('is-activity', !!text);

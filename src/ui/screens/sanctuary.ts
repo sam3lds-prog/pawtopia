@@ -17,6 +17,7 @@ import { companionSvg } from '../art/companions';
 import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
 import { animalName, startSceneActivities, type ActivityRunner } from '../components/activities';
 import { mountTrickTray } from '../components/tricks';
+import { trickBadge } from '../art/tricks';
 import { localDateKey } from '../../game/dates';
 import { track } from '../../services/analytics';
 import { afterDecorChange, afterSanctuaryVisit } from '../../app/events';
@@ -67,7 +68,11 @@ export const sanctuaryScreen: ScreenDef = {
 
     // Tricks: a tray under the scene for the animal you tap (kept across re-renders).
     const trayHost = h(`<div class="trick-tray-slot" hidden></div>`);
-    const tray = mountTrickTray(scope, trayHost, () => el.querySelector<SVGSVGElement>('.sanctuary__scene svg'));
+    const tricksBtn = () => el.querySelector<HTMLElement>('[data-act="tricks"]');
+    const tray = mountTrickTray(scope, trayHost, () => el.querySelector<SVGSVGElement>('.sanctuary__scene svg'), {
+      returnFocus: tricksBtn,
+      onToggle: (open) => tricksBtn()?.setAttribute('aria-expanded', String(open)),
+    });
 
     // ---------------------------------------------------------------- ambient life (D24)
     let life: SceneLife | null = null;
@@ -86,8 +91,10 @@ export const sanctuaryScreen: ScreenDef = {
       acts?.dispose();
       const svg = el.querySelector<SVGSVGElement>('.sanctuary__scene svg');
       life = svg ? startSceneLife(svg, 'sanct') : null;
-      acts = svg ? startSceneActivities(svg, el.querySelector('[data-chat]'), app.reducedMotion, animalName) : null;
-      (el.querySelector('[data-chat]') ?? el.querySelector('.sanctuary__scene'))?.after(trayHost);
+      acts = svg ? startSceneActivities(svg, el.querySelector('[data-chat]'), () => app.reducedMotion, animalName) : null;
+      const btn = tricksBtn();
+      if (btn) btn.hidden = !svg?.querySelector('.sanctuary__pet');
+      el.querySelector('.sanctuary__under')?.after(trayHost);
       tray.refresh();
     }
 
@@ -119,7 +126,10 @@ export const sanctuaryScreen: ScreenDef = {
         <figure class="sanctuary__scene card is-live">
           <svg viewBox="${SCENE_VIEWBOX}" role="img" aria-label="${esc(sceneLabel(pets, ownedDecor.length))}">${sceneMarkup('sanct')}</svg>
         </figure>
-        <p class="sanctuary__chat" data-chat aria-live="polite" ${chat ? '' : 'hidden'}>${ICON.heart}<span>${esc(chat ?? '')}</span></p>
+        <div class="sanctuary__under">
+          <p class="sanctuary__chat" data-chat ${chat ? '' : 'hidden'}>${ICON.heart}<span>${esc(chat ?? '')}</span></p>
+          <button class="scene-tricks" data-act="tricks" aria-controls="${trayHost.id}" aria-expanded="${tray.isOpen}" hidden>${trickBadge('sparkle')}Tricks</button>
+        </div>
         <section aria-labelledby="res-title">
           <div class="section-head"><h2 id="res-title">Residents</h2><span class="muted num">${pets.length} of ${PETS.length}</span></div>
           <ul class="resident-row">
@@ -175,6 +185,11 @@ export const sanctuaryScreen: ScreenDef = {
     scope.on(el, 'click', (e) => {
       const t = e.target as HTMLElement;
       // A tap on someone in the garden: a small happy reaction (a heart; face only under reduced motion).
+      if (t.closest('[data-act="tricks"]')) {
+        if (tray.isOpen) tray.close();
+        else tray.openFor(undefined, true);
+        return;
+      }
       const fig = t.closest('.sanctuary__scene .sanctuary__pet') as HTMLElement | null;
       if (fig) {
         life?.tap(fig);
@@ -184,7 +199,10 @@ export const sanctuaryScreen: ScreenDef = {
       // A tap on a decoration someone can use: they go and use it (ride the balloon, splash in the fountain…).
       const dec = t.closest('.sanctuary__scene [data-decor].has-act') as HTMLElement | null;
       if (dec) {
-        if (acts && !acts.busy && !acts.play(dec.dataset.decor!)) toast('Once someone lives here, they’ll love this.');
+        if (acts && !acts.busy && !acts.play(dec.dataset.decor!)) {
+          const anyone = !!el.querySelector('.sanctuary__scene .sanctuary__pet');
+          toast(anyone ? 'Everyone’s busy with a trick. Try again in a moment.' : 'Once someone lives here, they’ll love this.');
+        }
         return;
       }
       const friendBtn = t.closest('[data-friend-card]') as HTMLElement | null;

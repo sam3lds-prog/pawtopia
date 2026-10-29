@@ -195,7 +195,7 @@ export const shopScreen: ScreenDef = {
 
     function tricksTab(): string {
       return `
-        <p class="muted shop__note">Tap any animal in a sanctuary and ask it to do a trick. Tricks are just for fun: they change nothing in your puzzles.</p>
+        <p class="muted shop__note">In a sanctuary, tap an animal (or the Tricks button) and ask for a trick. Tricks are just for fun: they change nothing in your puzzles.</p>
         ${trickSection('free', 'Everyone knows', 'Every resident and wildlife friend can do these.')}
         ${trickSection('video', 'Video-token tricks', 'Only for video tokens.', videoTokenCard())}
         ${trickSection('premium', 'Premium tricks', `The most animated tricks, for gems. ${iap.available ? '' : 'Gem packs are coming soon.'}`)}`;

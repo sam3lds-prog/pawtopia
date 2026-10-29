@@ -107,8 +107,9 @@ export function trickDir(b: Box, width: number): 1 | -1 {
   return Number.isFinite(width) && b.x + b.w / 2 > width / 2 ? -1 : 1;
 }
 
-export function trickOverlay(id: TrickId, glyphId: EmoteGlyph, b: Box, width = Infinity): string {
-  return `<g class="sp-trick sp-trick--${id}" aria-hidden="true">${trickProps(id, b, trickDir(b, width))}${emoteBubble(glyphId, b, width)}</g>`;
+/** A trick's emote and (unless `withProps` is false, as under reduced motion) its props. */
+export function trickOverlay(id: TrickId, glyphId: EmoteGlyph, b: Box, width = Infinity, withProps = true): string {
+  return `<g class="sp-trick sp-trick--${id}" aria-hidden="true">${withProps ? trickProps(id, b, trickDir(b, width)) : ''}${emoteBubble(glyphId, b, width)}</g>`;
 }
 
 /** A trick's badge for cards and the tray. */

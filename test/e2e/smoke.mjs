@@ -294,6 +294,12 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(250);
   check('looking at tricks charges nothing', (await page.evaluate(() => window.__pt.app.save.inventory.items.length)) === spent);
+  // Without a pointer: the Tricks button opens the same tray, focus goes into it and comes back when it closes
+  await page.click('[data-act="tray-close"]');
+  check('closing the tray returns focus to the Tricks button', await page.evaluate(() => document.activeElement?.dataset?.act === 'tricks' && document.querySelector('.trick-tray-slot').hidden));
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.trick-tray');
+  check('the Tricks button opens the tray from the keyboard', await page.evaluate(() => !!document.activeElement?.closest('.trick-tray') && document.querySelector('[data-act="tricks"]').getAttribute('aria-expanded') === 'true'));
   await page.evaluate(() => window.__pt.go({ screen: 'shop', tab: 'tricks' }));
   await page.waitForSelector('.trick-card');
   check('the Shop lists every trick', (await page.$$('.trick-card')).length === 10);

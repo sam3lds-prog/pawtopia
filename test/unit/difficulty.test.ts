@@ -17,6 +17,8 @@ import { captureSession, resumeSession } from '../../src/game/sessionPersistence
 import { recordWin } from '../../src/meta/progression';
 import { defaultSave } from '../../src/services/storage';
 
+const LEVEL_PACK_BY_LEVEL = (level: number) => decodePack(LEVEL_PACK).find((e) => e.level === level)!.puzzle;
+
 const pack2 = decodePack(JOURNEY_PACK_2);
 const pack3 = decodePack(JOURNEY_PACK_3);
 
@@ -208,6 +210,19 @@ describe('saved boards across the spec change', () => {
     expect(back.spec).toBe(1);
     expect(back.session.size).toBe(9);
     expect(back.session.cells[placed![0]][placed![1]]).toBe(legacy.solution[placed![0]][placed![1]]);
+  });
+
+  it('a launch-pack board (spec 1) started before D31 at levels 6–60 resumes on that exact board', () => {
+    for (const level of [6, 30, 60]) {
+      const mode = { kind: 'level' as const, level };
+      const old = puzzleFor(mode, 1);
+      expect(puzzleDigest(old)).toBe(puzzleDigest(LEVEL_PACK_BY_LEVEL(level)));
+      const saved = captureSession(mode, new Session(old, { maxHearts: 5 }), new Date(), 1)!;
+      const back = resumeSession(JSON.parse(JSON.stringify(saved)))!;
+      expect(back.spec, `level ${level}`).toBe(1);
+      expect(puzzleDigest(back.session.puzzle), `level ${level}`).toBe(puzzleDigest(old));
+      expect(puzzleDigest(puzzleFor(mode)), `level ${level}`).not.toBe(puzzleDigest(old));
+    }
   });
 
   it('new saves record their spec and resume on it; a board saved under spec 2 resumes on spec 2', () => {

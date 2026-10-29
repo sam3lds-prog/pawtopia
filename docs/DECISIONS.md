@@ -411,10 +411,14 @@ more animated tricks that can only be bought with gems.
   over and Happy dance cost 2–3 video tokens (which only come from reward videos the player chooses to watch). Backflip
   (a flip and a shower of stars), Bubble float (floats up in a bubble, then pop), Star juggling and Rainbow leap (over
   a rainbow that paints itself) cost 40–90 gems and can't be had any other way.
-- **How it plays**: tap any resident or wildlife friend in a sanctuary and a tray opens under the scene — "Ask Mochi
-  to…" — with every trick. A known one plays at once on that animal with an emote bubble beside its head; any other
-  opens its card with a live preview and how to get it. The Shop has a Tricks tab with the same cards. A trick learned
-  once works for every animal. An animal busy on a decoration, or already mid-trick, finishes first.
+- **How it plays**: tap any resident or wildlife friend in a sanctuary, or the Tricks button under the scene, and a
+  tray opens — "Ask Mochi to…" — with every trick and everyone in the scene to choose from (so it works with a
+  keyboard or screen reader too). A known trick plays at once on that animal with an emote bubble beside its head and
+  is announced to screen readers; any other opens its card with a live preview and how to get it. The Shop has a
+  Tricks tab with the same cards. A trick learned once works for every animal. An animal busy on a decoration, or
+  already mid-trick, finishes first; a trick takes over from a greeting or stroll in progress.
+- **Activities and screen readers** (revises D32): only an activity the player starts is announced; ones that start
+  by themselves are shown, not read out.
 - **Charged once** like decorations (`buy:trick:<id>` in the item ledger), saved in `inventory.tricks`.
 - **Motion policy** (extends D24/D32): each trick is 1.3–3.4 s and over by itself; props never outlast it; the board
   is never touched; under reduced motion only the emote shows, still. Ambient life and activities leave an animal

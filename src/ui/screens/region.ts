@@ -20,6 +20,7 @@ import { decorIcon, SCENE_VIEWBOX } from '../art/sanctuary';
 import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
 import { animalName, startSceneActivities, type ActivityRunner } from '../components/activities';
 import { mountTrickTray } from '../components/tricks';
+import { trickBadge } from '../art/tricks';
 import { toast } from '../components/sheet';
 import { esc, h, plural } from '../dom';
 import { ICON } from '../icons';
@@ -50,7 +51,11 @@ export const regionScreen: ScreenDef = {
 
     // Tricks: a tray under the scene for the animal you tap (kept across re-renders).
     const trayHost = h(`<div class="trick-tray-slot" hidden></div>`);
-    const tray = mountTrickTray(scope, trayHost, () => el.querySelector<SVGSVGElement>('.sanctuary__scene svg'));
+    const tricksBtn = () => el.querySelector<HTMLElement>('[data-act="tricks"]');
+    const tray = mountTrickTray(scope, trayHost, () => el.querySelector<SVGSVGElement>('.sanctuary__scene svg'), {
+      returnFocus: tricksBtn,
+      onToggle: (open) => tricksBtn()?.setAttribute('aria-expanded', String(open)),
+    });
     let life: SceneLife | null = null;
     let acts: ActivityRunner | null = null;
     scope.onDispose(() => {
@@ -120,7 +125,10 @@ export const regionScreen: ScreenDef = {
         <figure class="sanctuary__scene card is-live ${open ? '' : 'is-locked'}">
           <svg viewBox="${SCENE_VIEWBOX}" role="img" aria-label="${esc(sceneLabel(stage, welcomed))}">${regionScene(id, { stage: open ? stage : 0, companions: welcomed, decor, evening: isEvening() }, `rg-${id}`)}</svg>
         </figure>
-        <p class="sanctuary__chat" data-chat aria-live="polite" ${chat ? '' : 'hidden'}>${ICON.heart}<span>${esc(chat ?? '')}</span></p>
+        <div class="sanctuary__under">
+          <p class="sanctuary__chat" data-chat ${chat ? '' : 'hidden'}>${ICON.heart}<span>${esc(chat ?? '')}</span></p>
+          <button class="scene-tricks" data-act="tricks" aria-controls="${trayHost.id}" aria-expanded="${tray.isOpen}" hidden>${trickBadge('sparkle')}Tricks</button>
+        </div>
         ${progressCard()}
         <section aria-labelledby="animals-title">
           <div class="section-head"><h2 id="animals-title">Animals</h2><span class="muted num">${welcomed.length} of ${friendsHere.length}</span></div>
@@ -157,8 +165,10 @@ export const regionScreen: ScreenDef = {
       acts?.dispose();
       const svg = el.querySelector<SVGSVGElement>('.sanctuary__scene svg');
       life = svg ? startSceneLife(svg, `region-${id}`) : null;
-      acts = svg && open ? startSceneActivities(svg, el.querySelector('[data-chat]'), app.reducedMotion, animalName) : null;
-      (el.querySelector('[data-chat]') ?? el.querySelector('.sanctuary__scene'))?.after(trayHost);
+      acts = svg && open ? startSceneActivities(svg, el.querySelector('[data-chat]'), () => app.reducedMotion, animalName) : null;
+      const btn = tricksBtn();
+      if (btn) btn.hidden = !open || !svg?.querySelector('.sanctuary__pet');
+      el.querySelector('.sanctuary__under')?.after(trayHost);
       tray.refresh();
     }
     render();
@@ -173,6 +183,11 @@ export const regionScreen: ScreenDef = {
 
     scope.on(el, 'click', (e) => {
       const t = e.target as HTMLElement;
+      if (t.closest('[data-act="tricks"]')) {
+        if (tray.isOpen) tray.close();
+        else tray.openFor(undefined, true);
+        return;
+      }
       const fig = t.closest('.sanctuary__scene .sanctuary__pet') as HTMLElement | null;
       if (fig) {
         life?.tap(fig);
@@ -181,7 +196,10 @@ export const regionScreen: ScreenDef = {
       }
       const dec = t.closest('.sanctuary__scene [data-decor].has-act') as HTMLElement | null;
       if (dec) {
-        if (acts && !acts.busy && !acts.play(dec.dataset.decor!)) toast('Once an animal lives here, they’ll love this.');
+        if (acts && !acts.busy && !acts.play(dec.dataset.decor!)) {
+          const anyone = !!el.querySelector('.sanctuary__scene .sanctuary__pet');
+          toast(anyone ? 'Everyone’s busy with a trick. Try again in a moment.' : 'Once an animal lives here, they’ll love this.');
+        }
         return;
       }
       const friendBtn = t.closest('[data-friend-card]') as HTMLElement | null;

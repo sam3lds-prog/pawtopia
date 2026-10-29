@@ -30,6 +30,8 @@
 
 ## Leaderboard (Firebase, only when configured)
 - [ ] `npm run fb:test` passes against the emulator; `npm run fb:deploy` done for the release project
+- [ ] If this release changes a board spec (`game/specs.ts`), the functions were deployed *before* the app is
+      released (an older server rejects the new spec and the app drops rejected solves; functions/README.md)
 - [ ] App Check: only once a native App Attest provider is added and tested; until then `ENFORCE_APP_CHECK` stays unset
 - [ ] TestFlight: join → solve a level and the Daily → both tables show the points → edit name → leave (documents and
       auth user gone in the console); airplane mode while joined queues solves and sends them later

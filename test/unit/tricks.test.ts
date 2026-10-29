@@ -117,6 +117,9 @@ describe('trick art', () => {
       const svg = trickOverlay(t.id, t.emote, box, 360);
       expect(svg).toMatch(new RegExp(`^<g class="sp-trick sp-trick--${t.id}" aria-hidden="true">`));
       expect(svg).toMatch(/sp-trick-emote/);
+      // Under reduced motion: the emote alone.
+      const still = trickOverlay(t.id, t.emote, box, 360, false);
+      expect(still).not.toMatch(/sp-trick-(notes|burst|orb|pop|balls|rainbow)/);
     }
   });
 });

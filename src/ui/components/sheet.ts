@@ -26,10 +26,20 @@ export interface SheetHandle {
   close(): void;
 }
 
+/** A selector that finds an element's re-rendered copy: its tag and first identifying `data-*` attribute. */
+export function selectorFor(el: Element | null): string | null {
+  if (!el || el === document.body) return null;
+  if (el.id) return `#${CSS.escape(el.id)}`;
+  const attr = [...el.attributes].find((a) => a.name.startsWith('data-') && a.name !== 'data-autofocus' && a.value);
+  return attr ? `${el.tagName.toLowerCase()}[${attr.name}="${CSS.escape(attr.value)}"]` : null;
+}
+
 export function openSheet(parent: Scope, o: SheetOptions): SheetHandle {
   const scope = parent.child();
   const dismissible = o.dismissible ?? true;
   const prevFocus = document.activeElement as HTMLElement | null;
+  // If the screen re-renders while the sheet is open (after a purchase, say), focus goes back to the new copy.
+  const prevSelector = selectorFor(prevFocus);
   const titleId = `sheet-${Math.random().toString(36).slice(2, 8)}`;
   const overlay = h(`
     <div class="overlay${o.center ? ' overlay--center' : ''}">
@@ -55,7 +65,8 @@ export function openSheet(parent: Scope, o: SheetOptions): SheetHandle {
     closed = true;
     overlay.remove();
     o.onClose?.();
-    if (prevFocus && document.contains(prevFocus)) prevFocus.focus({ preventScroll: true });
+    const back = prevFocus && document.contains(prevFocus) ? prevFocus : prevSelector ? document.querySelector<HTMLElement>(prevSelector) : null;
+    back?.focus({ preventScroll: true });
   });
   if (dismissible) {
     scope.on(overlay, 'click', (e) => {

@@ -1,7 +1,8 @@
 /**
- * Tricks in a sanctuary (D33): tapping an animal opens a small tray under the scene — "Ask Mochi to…" — with every
- * trick; owned ones play right away, the others open their card (watch a video for tokens, or buy with gems). A trick
- * plays on the scene figure itself with an emote bubble over its head. Under reduced motion only the bubble shows.
+ * Tricks in a sanctuary (D33): tapping an animal (or the scene's Tricks button) opens a small tray under the scene —
+ * "Ask Mochi to…" — with every trick and everyone who can do one; owned tricks play right away, the others open their
+ * card (watch a video for tokens, or buy with gems). A trick plays on the scene figure itself with an emote bubble
+ * beside its head (`trickPlay.ts`). Under reduced motion only the bubble shows.
  */
 
 import { app } from '../../app/app';
@@ -14,7 +15,8 @@ import { track } from '../../services/analytics';
 import { sfx } from '../../services/audio';
 import { haptic } from '../../services/haptics';
 import { iap } from '../../services/iap';
-import { trickBadge, trickDir, trickOverlay } from '../art/tricks';
+import { trickBadge } from '../art/tricks';
+import { performTrick } from './trickPlay';
 import { residentFigure } from '../art/sanctuary';
 import { companionFigure } from '../art/companions';
 import { isCompanionId } from '../../meta/catalogs/companions';
@@ -28,35 +30,7 @@ import { avatarPortrait } from '../screens/leaderboardTab';
 
 const CURRENCY = { vtoken: { icon: () => ICON.videoToken, name: 'video tokens' }, gem: { icon: () => ICON.gem, name: 'gems' } } as const;
 
-/** Plays a trick on a scene figure. Returns false if that figure is already busy with one. */
-export function performTrick(svg: SVGSVGElement, fig: SVGGElement, id: TrickId, reducedMotion: boolean): boolean {
-  if (fig.dataset.trick || fig.classList.contains('is-away')) return false;
-  const t = TRICK_BY_ID[id];
-  let box = { x: 0, y: 0, w: 30, h: 30 };
-  // The animal's own outline: the hidden heart above its head would lift the emote bubble too high.
-  const hearts = [...fig.querySelectorAll<SVGElement>('.sp-heart')];
-  hearts.forEach((h) => (h.style.display = 'none'));
-  try {
-    const b = fig.getBBox();
-    box = { x: b.x, y: b.y, w: b.width, h: b.height };
-  } catch {
-    /* not rendered (tests) */
-  }
-  hearts.forEach((h) => (h.style.display = ''));
-  const width = svg.viewBox?.baseVal?.width || Infinity;
-  svg.insertAdjacentHTML('beforeend', trickOverlay(id, t.emote, box, width));
-  const overlay = svg.lastElementChild;
-  fig.dataset.trick = id;
-  fig.style.setProperty('--trick-dir', String(trickDir(box, width)));
-  if (!reducedMotion) fig.classList.add(`is-trick-${id}`);
-  window.setTimeout(() => {
-    overlay?.remove();
-    fig.classList.remove(`is-trick-${id}`);
-    fig.style.removeProperty('--trick-dir');
-    delete fig.dataset.trick;
-  }, reducedMotion ? Math.max(1800, t.ms) : t.ms);
-  return true;
-}
+export { performTrick };
 
 function priceTag(id: TrickId): string {
   const t = TRICK_BY_ID[id];
@@ -66,27 +40,73 @@ function priceTag(id: TrickId): string {
   return `<span class="trick-chip__price price price--${cur} ${short ? 'is-short' : ''}">${CURRENCY[cur].icon()}<span class="num">${t.price}</span></span>`;
 }
 
-/** The trick buttons: owned first, then video, then premium. */
-export function trickChips(): string {
-  return TRICKS.map((t) => {
-    const owned = ownsTrick(app.save, t.id);
-    const label = owned ? t.name : `${t.name}, ${t.price} ${CURRENCY[trickCurrency(t)!].name}`;
-    return `<li><button class="trick-chip ${owned ? '' : 'is-locked'} trick-chip--${t.tier}" data-trick="${t.id}" aria-label="${esc(label)}">
-      ${trickBadge(t.emote)}<span class="trick-chip__name">${esc(t.name)}</span>${owned ? '' : priceTag(t.id)}
-    </button></li>`;
-  }).join('');
+function chipLabel(id: TrickId): string {
+  const t = TRICK_BY_ID[id];
+  return ownsTrick(app.save, id) ? t.name : `${t.name}, ${t.price} ${CURRENCY[trickCurrency(t)!].name}`;
 }
+
+function chipInner(id: TrickId): string {
+  const t = TRICK_BY_ID[id];
+  const owned = ownsTrick(app.save, id);
+  return `${trickBadge(t.emote)}<span class="trick-chip__name">${esc(t.name)}</span>${owned ? '' : priceTag(id)}`;
+}
+
+function chipClass(id: TrickId): string {
+  const t = TRICK_BY_ID[id];
+  return `trick-chip ${ownsTrick(app.save, id) ? '' : 'is-locked'} trick-chip--${t.tier}`;
+}
+
+/** The trick buttons, in catalog order: free, then video, then premium. */
+export function trickChips(): string {
+  return TRICKS.map((t) => `<li><button class="${chipClass(t.id)}" data-trick="${t.id}" aria-label="${esc(chipLabel(t.id))}">${chipInner(t.id)}</button></li>`).join('');
+}
+
+/** Updates the chips in place (after a purchase), so focus and scroll stay where they are. */
+function updateChips(root: ParentNode): void {
+  for (const b of root.querySelectorAll<HTMLElement>('.trick-chip[data-trick]')) {
+    const id = b.dataset.trick as TrickId;
+    b.className = chipClass(id);
+    b.setAttribute('aria-label', chipLabel(id));
+    b.innerHTML = chipInner(id);
+  }
+}
+
+type Who = { kind: 'pet' | 'friend'; id: string };
+const whoKey = (w: Who) => `${w.kind}:${w.id}`;
 
 export interface TrickTray {
   /** Opens the tray for an animal in the scene (by its figure). */
   open(fig: SVGGElement): void;
+  /** Opens the tray for an animal by id (or the first one in the scene); `focus` moves focus into it. */
+  openFor(id?: string, focus?: boolean): void;
   close(): void;
   refresh(): void;
+  readonly isOpen: boolean;
 }
 
-/** Mounts the tray into `host` (a slot under the scene). `svg` returns the live scene. */
-export function mountTrickTray(scope: Scope, host: HTMLElement, svg: () => SVGSVGElement | null): TrickTray {
-  let target: { kind: 'pet' | 'friend'; id: string } | null = null;
+export interface TrickTrayOptions {
+  /** Where focus goes when the tray closes from inside (its close button). */
+  returnFocus?: () => HTMLElement | null;
+  /** Told when the tray opens or closes (to keep a toggle button's aria-expanded right). */
+  onToggle?: (open: boolean) => void;
+}
+
+/**
+ * Mounts the tray into `host` (a slot under the scene). `svg` returns the live scene. Anyone in the scene can be
+ * picked from the tray itself, so it works without tapping the scene (keyboard, screen readers).
+ */
+export function mountTrickTray(scope: Scope, host: HTMLElement, svg: () => SVGSVGElement | null, opts: TrickTrayOptions = {}): TrickTray {
+  let target: Who | null = null;
+  host.id ||= `trick-tray-${Math.random().toString(36).slice(2, 8)}`;
+
+  const cast = (): Who[] => {
+    const s = svg();
+    if (!s) return [];
+    return [
+      ...[...s.querySelectorAll<SVGGElement>('.sanctuary__pet[data-pet]')].map((g) => ({ kind: 'pet' as const, id: g.dataset.pet! })),
+      ...[...s.querySelectorAll<SVGGElement>('.sanctuary__friend[data-friend]')].map((g) => ({ kind: 'friend' as const, id: g.dataset.friend! })),
+    ];
+  };
 
   const figure = (): SVGGElement | null => {
     const s = svg();
@@ -94,7 +114,17 @@ export function mountTrickTray(scope: Scope, host: HTMLElement, svg: () => SVGSV
     return s.querySelector<SVGGElement>(target.kind === 'pet' ? `.sanctuary__pet[data-pet="${target.id}"]` : `.sanctuary__friend[data-friend="${target.id}"]`);
   };
 
+  function setTarget(w: Who | null): void {
+    const was = !!target;
+    target = w;
+    render();
+    if (was !== !!target) opts.onToggle?.(!!target);
+  }
+
   function render(): void {
+    const everyone = cast();
+    // Whoever the tray was for may have left the scene (a re-render): fall back to someone who's there.
+    if (target && !everyone.some((w) => whoKey(w) === whoKey(target!))) target = everyone[0] ?? null;
     if (!target) {
       host.hidden = true;
       host.innerHTML = '';
@@ -104,50 +134,80 @@ export function mountTrickTray(scope: Scope, host: HTMLElement, svg: () => SVGSV
     host.hidden = false;
     host.innerHTML = `<div class="trick-tray card" role="group" aria-label="${esc(`Tricks for ${name}`)}">
       <div class="trick-tray__head">
-        <span class="trick-tray__pic">${avatarPortrait(target.id)}</span>
+        ${everyone.length > 1 ? '' : `<span class="trick-tray__pic">${avatarPortrait(target.id)}</span>`}
         <b>Ask ${esc(name)} to…</b>
         <button class="icon-btn icon-btn--small" data-act="tray-close" aria-label="Close tricks">${ICON.close}</button>
       </div>
+      ${
+        everyone.length > 1
+          ? `<div class="trick-tray__who" role="group" aria-label="Who does the trick">${everyone
+              .map((w) => `<button class="trick-who" data-who="${whoKey(w)}" aria-pressed="${whoKey(w) === whoKey(target!)}" aria-label="${esc(animalName(w.id))}">${avatarPortrait(w.id)}</button>`)
+              .join('')}</div>`
+          : ''
+      }
       <ul class="trick-tray__list">${trickChips()}</ul>
+      <p class="sr-only" aria-live="polite" data-tray-status></p>
     </div>`;
   }
 
   scope.on(host, 'click', (e) => {
     const t = e.target as HTMLElement;
     if (t.closest('[data-act="tray-close"]')) {
-      target = null;
-      render();
+      setTarget(null);
+      opts.returnFocus?.()?.focus({ preventScroll: true });
+      return;
+    }
+    const who = t.closest('[data-who]') as HTMLElement | null;
+    if (who) {
+      const [kind, id] = who.dataset.who!.split(':') as ['pet' | 'friend', string];
+      setTarget({ kind, id });
+      host.querySelector<HTMLElement>(`[data-who="${kind}:${id}"]`)?.focus({ preventScroll: true });
       return;
     }
     const chip = t.closest('[data-trick]') as HTMLElement | null;
-    if (!chip) return;
+    if (!chip || !target) return;
     const id = chip.dataset.trick as TrickId;
     if (!ownsTrick(app.save, id)) {
-      showTrickSheet(scope, id, { who: target?.id, onBought: render });
+      showTrickSheet(scope, id, { who: target.id, onBought: () => updateChips(host) });
       return;
     }
     const s = svg();
     const fig = figure();
+    const status = host.querySelector('[data-tray-status]');
+    const name = animalName(target.id);
     if (s && fig && performTrick(s, fig, id, app.reducedMotion)) {
       sfx('place');
       haptic('tap');
       track('trick_played', { trick: id });
-    } else if (fig?.classList.contains('is-away')) toast(`${animalName(target!.id)} is busy right now. Ask again in a moment.`);
+      if (status) status.textContent = `${name}: ${TRICK_BY_ID[id].name}!`;
+    } else if (fig) {
+      const msg = fig.classList.contains('is-away') ? `${name} is busy right now. Ask again in a moment.` : `${name} is still finishing a trick.`;
+      if (fig.classList.contains('is-away')) toast(msg);
+      if (status) status.textContent = msg;
+    }
   });
 
   return {
     open(fig) {
       const pet = fig.dataset.pet;
       const friend = fig.dataset.friend;
-      target = pet ? { kind: 'pet', id: pet } : friend ? { kind: 'friend', id: friend } : null;
-      render();
+      setTarget(pet ? { kind: 'pet', id: pet } : friend ? { kind: 'friend', id: friend } : null);
       if (target) host.scrollIntoView?.({ block: 'nearest', behavior: app.reducedMotion ? 'auto' : 'smooth' });
     },
+    openFor(id, focus = false) {
+      const everyone = cast();
+      setTarget(everyone.find((w) => w.id === id) ?? everyone[0] ?? null);
+      if (!target) return;
+      host.scrollIntoView?.({ block: 'nearest', behavior: app.reducedMotion ? 'auto' : 'smooth' });
+      if (focus) host.querySelector<HTMLElement>('.trick-chip')?.focus({ preventScroll: true });
+    },
     close() {
-      target = null;
-      render();
+      setTarget(null);
     },
     refresh: render,
+    get isOpen() {
+      return !!target;
+    },
   };
 }
 
@@ -163,16 +223,16 @@ export function showTrickSheet(scope: Scope, id: TrickId, opts: { who?: string; 
     const have = cur ? itemBalance(app.save, cur) : 0;
     const short = cur ? Math.max(0, t.price - have) : 0;
     let actions = '';
-    if (owned || ownsTrick(app.save, id)) actions = `<p class="trick-sheet__owned">${ICON.check}Yours. Tap an animal in a sanctuary and ask for it.</p>`;
+    if (owned || ownsTrick(app.save, id)) actions = `<p class="trick-sheet__owned">${ICON.check}Yours. In a sanctuary, tap an animal or Tricks and ask for it.</p>`;
     else if (cur === 'vtoken')
       actions = short
-        ? `<button class="btn btn--block" disabled>${ICON.videoToken}<span class="num">${t.price}</span></button>
+        ? `<button class="btn btn--block" disabled aria-label="${esc(`Costs ${t.price} video tokens`)}">${ICON.videoToken}<span class="num">${t.price}</span></button>
            <p class="muted">You have ${plural(have, 'video token')}. Video tokens come only from short reward videos you choose to watch.</p>
            ${ads.available && canOfferVideo() ? `<button class="btn btn--secondary btn--block" data-act="watch">${ICON.videoToken}Watch a video: +1 token</button>` : ''}`
         : `<button class="btn btn--block" data-act="buy" data-autofocus>Get it for ${ICON.videoToken}<span class="num">${t.price}</span></button>`;
     else if (cur === 'gem')
       actions = short
-        ? `<button class="btn btn--block" disabled>${ICON.gem}<span class="num">${t.price}</span></button>
+        ? `<button class="btn btn--block" disabled aria-label="${esc(`Costs ${t.price} gems`)}">${ICON.gem}<span class="num">${t.price}</span></button>
            <p class="muted">You have ${plural(have, 'gem')}. ${iap.available ? 'Gem packs are in the Shop.' : 'Gem packs are coming soon.'}</p>
            ${iap.available ? `<button class="btn btn--secondary btn--block" data-act="gems">${ICON.gem}See gem packs</button>` : ''}`
         : `<button class="btn btn--block" data-act="buy" data-autofocus>Buy for ${ICON.gem}<span class="num">${t.price}</span></button>`;
@@ -229,7 +289,7 @@ export function showTrickSheet(scope: Scope, id: TrickId, opts: { who?: string; 
           sfx('coin');
           haptic('success');
           track('trick_bought', { trick: id, tier: t.tier, amount: t.price });
-          toast(`${t.name} learned! Tap an animal in a sanctuary to ask for it.`);
+          toast(`${t.name} learned! Ask for it in any sanctuary.`);
           opts.onBought?.();
           rerender();
           preview();

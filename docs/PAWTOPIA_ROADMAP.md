@@ -60,7 +60,7 @@ Defects confirmed in source and fixed in Sprint 0:
 - [x] **Sprint M** (D33) — tricks with emotes: two free, four for video tokens, four premium for gems
 - [ ] Game Center and online Paw Cup leagues — not started
 
-Test count: 297 unit tests + 63 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~163 kB JS gzipped for the app (incl. all three level packs); the Firebase SDK loads only when the leaderboard is used.
+Test count: 307 unit tests + 65 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~163 kB JS gzipped for the app (incl. all three level packs); the Firebase SDK loads only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.

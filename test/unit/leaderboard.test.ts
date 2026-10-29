@@ -102,6 +102,15 @@ describe('checking a solve', () => {
     const L80: BoardRef = { kind: 'level', level: 80 };
     expect(spec(L80)).toBe(3);
     expect(checkSolve({ mode: L80, spec: 2, events: play(L80).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
+    // Around the D31 boundary: levels 1–5 stay on spec 1; from 6 only spec 3 counts (a resumed launch-pack board doesn't).
+    expect(spec(L5)).toBe(1);
+    expect(checkSolve({ mode: L5, spec: 3, events: play(L5).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
+    const L6: BoardRef = { kind: 'level', level: 6 };
+    expect(spec(L6)).toBe(3);
+    expect(checkSolve({ mode: L6, spec: 3, events: play(L6).events }, NOW)).toMatchObject({ ok: true });
+    expect(checkSolve({ mode: L6, spec: 1, events: play(L6).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
+    const L60: BoardRef = { kind: 'level', level: 60 };
+    expect(checkSolve({ mode: L60, spec: 1, events: play(L60).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
     const { events } = play(L5);
     const flood: SessionEvent[] = [...events.slice(0, 1), ...Array.from({ length: 200 }, () => ({ t: events[0].t, type: 'hint' as const })), ...events.slice(1)];
     expect(checkSolve({ mode: L5, spec: spec(L5), events: flood }, NOW)).toMatchObject({ ok: false, reason: 'invalid-log' });

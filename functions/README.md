@@ -24,5 +24,11 @@ npm run fb:test                    # security-rules tests against the emulator
 npm run fb:deploy                  # build + deploy functions, rules and indexes
 ```
 
+**Deploy order when a board spec changes** (like D31's spec 3): deploy the functions *before* the app update ships.
+An older server rejects solves on a spec it doesn't know, and the app drops rejected solves (only "rate-limited" is
+retried), so an app that reaches players first loses their leaderboard points until the server catches up. Solves
+queued offline on a retired spec are rejected by design (`bad-spec`): the server counts a board only on the spec it
+is issued under today.
+
 `functions/.env` (optional, git-ignored): `FUNCTIONS_REGION` if not `us-central1`. `ENFORCE_APP_CHECK=true` only
 after the app sends App Check tokens (a native App Attest provider; not wired up yet), otherwise every call fails.
