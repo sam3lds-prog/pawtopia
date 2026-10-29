@@ -2,7 +2,7 @@
   "name": "pawtopia",
   "version": "0.2.0",
   "private": true,
-  "description": "Pawtopia \u2014 a cozy logic puzzle. One cat and one dog in every row, column and region; a sanctuary that grows as you solve.",
+  "description": "Pawtopia — a cozy logic puzzle. One cat and one dog in every row, column and region; a sanctuary that grows as you solve.",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -20,7 +20,7 @@
     "artifact": "node scripts/make-artifact.mjs"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.1.2",
+    "@capacitor/cli": "^8.5.3",
     "@types/node": "^26.6.5",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3",
@@ -28,10 +28,12 @@
     "vitest": "^2.1.4"
   },
   "dependencies": {
-    "@capacitor/core": "^6.1.2",
-    "@capacitor/haptics": "^6.0.3",
-    "@capacitor/ios": "^6.1.2",
+    "@capacitor-community/admob": "^8.2.1",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.5.3",
     "@fontsource-variable/fredoka": "^5.3.0",
-    "@fontsource-variable/nunito-sans": "^5.3.0"
+    "@fontsource-variable/nunito-sans": "^5.3.0",
+    "@revenuecat/purchases-capacitor": "^13.7.3"
   }
 }

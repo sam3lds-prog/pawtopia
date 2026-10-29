@@ -5,7 +5,7 @@ import { restartGame, startGame } from '../../app/gameFlow';
 import { CAT, DOG, type Species } from '../../engine/types';
 import { fmtClock } from '../../game/dates';
 import { CUP_HEARTS, modeKey, nextAfterWin, rulesFor, type ModeRef } from '../../game/modes';
-import { ITEM_CAP, grantItem, itemBalance, pawPoints, rankFor, useItem } from '../../meta/items';
+import { ITEM_CAP, itemBalance, pawPoints, rankFor, useItem } from '../../meta/items';
 import { modeShortTitle, modeTitle, type SpecVersion } from '../../game/puzzles';
 import { difficultyReason, profileOf } from '../../game/grading';
 import { MARK, type HintInfo, type MoveResult, type Session, type Tool, type UnitRef } from '../../game/session';
@@ -19,7 +19,8 @@ import { PET_BY_ID } from '../../meta/catalogs/pets';
 import { COMPANION_BY_ID } from '../../meta/catalogs/companions';
 import { companionSvg } from '../art/companions';
 import { decorIcon } from '../art/sanctuary';
-import { ads, shouldShowInterstitial } from '../../services/ads';
+import { ads, INTERSTITIALS_ENABLED, shouldShowInterstitial } from '../../services/ads';
+import { canOfferVideo, watchVideoFor, type WatchResult } from '../../app/rewarded';
 import { track } from '../../services/analytics';
 import { sfx } from '../../services/audio';
 import { haptic } from '../../services/haptics';
@@ -488,13 +489,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   function showNoTickets(): void {
     if (sheet) return;
     pauseBoard();
-    const canWatch = ads.available && !app.removeAds;
+    const canWatch = canOfferVideo();
     const ns = openSheet(scope, {
       title: 'No hints left',
       body: `
         <p class="sheet__lead">This board's free look is used. You earn a hint for every second new Journey level and from some of the day's errands. Zen Garden hints are always free.</p>
         <div class="sheet__actions">
-          ${canWatch ? `<button class="btn btn--block" data-act="watch">${ICON.bulb}Watch a short video for 1 hint</button>` : ''}
+          ${canWatch ? `<button class="btn btn--block" data-act="watch">${ICON.videoToken}Watch a short video: +1 hint</button>` : ''}
           <button class="btn ${canWatch ? 'btn--quiet' : 'btn--block'}" data-act="close" data-autofocus>Keep thinking</button>
         </div>`,
       onClose: () => {
@@ -509,16 +510,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       if (!a || busy) return;
       if (a.act === 'watch') {
         busy = true;
-        track('rewarded_ad_offer', { placement: 'hint' });
-        const ok = await ads.showRewarded('hint');
+        const r = await watchVideoFor('hint');
         busy = false;
+        if (r === 'granted') toast('+1 hint', ICON.bulb);
+        else toast(videoMessage(r));
         if (!scope.alive || !ns.scope.alive) return;
-        if (ok) {
-          track('rewarded_ad_complete', { placement: 'hint' });
-          grantItem(app.save, `ad:hint:${Date.now()}`, 'hint', 1, 'ad', new Date(), 'Rewarded video');
-          app.persist();
-          toast('+1 hint', ICON.bulb);
-        }
         ns.close();
         paint();
       } else ns.close();
@@ -531,13 +527,18 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     pauseBoard();
     const have = lives();
     const full = s.hearts >= s.maxHearts;
+    const watch = !full && have < 1 && canOfferVideo();
     const hs = openSheet(scope, {
       title: 'Hearts and extra lives',
       body: `
         <p class="sheet__lead">${plural(s.hearts, 'heart')} of ${s.maxHearts} left on this board. Hearts start fresh on every board; extra lives keep between boards.</p>
         <div class="pantry-row"><span class="pantry-chip">${ICON.lifePlus}<b class="num">${have}</b><small>of ${ITEM_CAP.life} extra lives</small></span><span class="pantry-chip">${ICON.bulb}<b class="num">${tickets()}</b><small>hints</small></span></div>
         <div class="sheet__actions">
-          <button class="btn btn--block" data-act="life" ${have < 1 || full ? 'disabled' : ''}>${ICON.lifePlus}${full ? 'Hearts are full' : have < 1 ? 'No extra lives yet' : 'Use an extra life: +1 heart'}</button>
+          ${
+            watch
+              ? `<button class="btn btn--block" data-act="watch">${ICON.videoToken}Watch a short video: +1 heart</button>`
+              : `<button class="btn btn--block" data-act="life" ${have < 1 || full ? 'disabled' : ''}>${ICON.lifePlus}${full ? 'Hearts are full' : have < 1 ? 'No extra lives yet' : 'Use an extra life: +1 heart'}</button>`
+          }
           <button class="btn btn--quiet" data-act="close" data-autofocus>Back to the board</button>
         </div>
         <p class="muted">Extra lives come from clearing new Journey levels and some errands.</p>`,
@@ -547,11 +548,20 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       },
     });
     sheet = hs;
-    hs.scope.on(hs.el, 'click', (e) => {
+    let busy = false;
+    hs.scope.on(hs.el, 'click', async (e) => {
       const a = actionOf(e);
-      if (!a) return;
+      if (!a || busy) return;
       if (a.act === 'life') {
         if (useLife()) coach(`An extra life! ${plural(s.hearts, 'heart')} left.`);
+      } else if (a.act === 'watch') {
+        busy = true;
+        const r = await watchVideoFor('life');
+        busy = false;
+        // The extra life is the player's either way; it's used right away if they're still on this board.
+        if (r === 'granted' && scope.alive && useLife()) coach(`Thanks for watching! ${plural(s.hearts, 'heart')} left.`);
+        else if (r !== 'granted') toast(videoMessage(r));
+        if (!hs.scope.alive) return;
       }
       hs.close();
     });
@@ -1003,6 +1013,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       cadence.shownToday = 0;
     }
     const ok =
+      INTERSTITIALS_ENABLED &&
       ads.available &&
       shouldShowInterstitial(
         { removeAds: app.removeAds, levelsCompleted: app.save.journey.nextLevel - 1, boardsSinceLast: cadence.boardsSinceLast, lastShownAt: cadence.lastShownAt, shownToday: cadence.shownToday },
@@ -1029,8 +1040,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     app.saveActive();
     track('puzzle_fail', { mode: mode.kind, size: n });
     haptic('error');
-    const canRevive = rules.revive && (app.removeAds || ads.available);
     const canLife = pantryOn && lives() > 0;
+    const canRevive = pantryOn && !canLife && canOfferVideo();
     const wrongs = `${numberWord(s.maxHearts)} wrong placements`;
     sheet = openSheet(scope, {
       title: mode.kind === 'cup' ? 'Attempt ended' : 'Out of hearts',
@@ -1040,7 +1051,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         <p class="sheet__lead">${mode.kind === 'cup' ? `${wrongs} end a Paw Cup attempt.` : canLife || canRevive ? `${wrongs}. Keep this board with a heart back, or start fresh.` : `${wrongs}. Start this board again with a fresh line of logic.`}</p>
         <div class="sheet__actions">
           ${canLife ? `<button class="btn btn--block" data-act="life">${ICON.lifePlus}Use an extra life: +1 heart<span class="btn__price">${lives()} left</span></button>` : ''}
-          ${canRevive ? `<button class="btn ${canLife ? 'btn--secondary' : ''} btn--block" data-act="revive">Refill hearts${app.removeAds ? '' : '<span class="btn__price">Watch ad</span>'}</button>` : ''}
+          ${canRevive ? `<button class="btn btn--block" data-act="revive">${ICON.videoToken}Watch a short video: +1 heart</button>` : ''}
           ${mode.kind === 'cup' ? '' : `<button class="btn ${canRevive || canLife ? 'btn--secondary' : ''} btn--block" data-act="restart">${ICON.restart}Try again</button>`}
           <button class="btn btn--quiet" data-act="leave">${mode.kind === 'cup' ? 'Back to Paw Cup' : 'Back home'}</button>
         </div>`,
@@ -1063,19 +1074,18 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       }
       if (a.act === 'revive') {
         busy = true;
-        track('rewarded_ad_offer', { placement: 'revive' });
-        const ok = app.removeAds ? true : await ads.showRewarded('revive');
+        const r = await watchVideoFor('life');
         busy = false;
-        if (!scope.alive || !ls.scope.alive) return; // left while the ad ran
-        if (!ok) return;
-        if (!app.removeAds) track('rewarded_ad_complete', { placement: 'revive' });
-        s.revive();
+        if (r !== 'granted') {
+          toast(videoMessage(r));
+          return;
+        }
+        // The extra life is kept in the pantry if the player left meanwhile; otherwise it brings this board back.
+        if (!scope.alive || !ls.scope.alive || !useLife()) return;
         ls.close();
         sheet = null;
-        coach('Hearts refilled. Your board is just as you left it.');
-        paint();
+        coach('Thanks for watching! One heart back, and your board is just as you left it.');
         resumeIfOnScreen();
-        app.saveActive();
       } else if (a.act === 'restart') {
         ls.close();
         restartGame();
@@ -1121,4 +1131,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 const NUMBER_WORDS = ['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
 function numberWord(n: number): string {
   return NUMBER_WORDS[n] ?? String(n);
+}
+
+function videoMessage(r: WatchResult): string {
+  if (r === 'cap') return "That's all the videos for today. More tomorrow.";
+  if (r === 'unavailable') return 'Videos are not available in this version.';
+  return 'No video is available right now. Nothing was used; try again in a little while.';
 }

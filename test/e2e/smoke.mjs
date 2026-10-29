@@ -210,6 +210,24 @@ try {
   await reload();
   check('purchased decor survives reload', await page.evaluate(() => !!window.__pt.app.save.inventory.decor.rug));
 
+  // Video tokens come only from a (test) reward video; food is bought with coins and fed to a resident
+  await page.evaluate(() => window.__pt.go({ screen: 'shop' }));
+  await page.waitForSelector('[data-act="watch-token"]');
+  const vt = () => page.evaluate(() => window.__pt.app.save.inventory.items.filter((e) => e.item === 'vtoken').reduce((a, e) => a + e.delta, 0));
+  const vt0 = await vt();
+  await page.click('[data-act="watch-token"]');
+  await page.waitForTimeout(1900);
+  check('a watched test video grants one video token', (await vt()) === vt0 + 1, `${vt0} → ${await vt()}`);
+  await page.click('[data-tab="food"]');
+  await page.click('[data-food="fishbites"]');
+  await page.click('[data-act="buy"]');
+  await page.click('[data-act="close"]');
+  await page.evaluate(() => window.__pt.go({ screen: 'sanctuary' }));
+  await page.click('.resident-row [data-pet="mochi"]');
+  await page.click('[data-feed="fishbites"]');
+  check('feeding a favorite food adds two hearts of affection', (await page.evaluate(() => window.__pt.app.save.sanctuary.affection.mochi)) === 2);
+  await page.keyboard.press('Escape');
+
   // Sanctuary life: a tap on a resident in the garden gets a small reaction; ambient actions come and go on their own
   await page.evaluate(() => window.__pt.go({ screen: 'sanctuary' }));
   await page.waitForSelector('.sanctuary__scene.is-live .sanctuary__pet');

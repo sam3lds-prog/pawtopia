@@ -14,7 +14,10 @@ import type { SpecVersion } from '../game/specs';
 import { captureSession } from '../game/sessionPersistence';
 import { reconcileRewards, type RewardSummary } from '../meta/rewards';
 import { balance } from '../meta/ledger';
-import { grantStarterItems } from '../meta/items';
+import { grantStarterItems, setTestEntriesCount } from '../meta/items';
+import { TEST_BUILD } from '../config/services';
+import { iap } from '../services/iap';
+import { reconcileGemPurchases } from '../meta/gems';
 import { packedLevelTier } from '../game/puzzles';
 
 type Listener = () => void;
@@ -24,7 +27,8 @@ class App {
   router!: Router;
   /** The board on screen (or last on screen), for saving on background. */
   active: { mode: ModeRef; session: Session; spec?: SpecVersion } | null = null;
-  readonly isDev = import.meta.env.DEV;
+  /** Development or tester build: test purchases and dev entitlements count here (never in release). */
+  readonly isDev = TEST_BUILD;
   private listeners = new Set<Listener>();
   private systemReduced = false;
 
@@ -32,6 +36,7 @@ class App {
   upgradeGift: RewardSummary | null = null;
 
   constructor() {
+    setTestEntriesCount(TEST_BUILD);
     this.save = loadSave().save;
     // Grant anything already earned but not yet recorded (v1 levels, Paw Points for clears made before points
     // existed). Idempotent, so it is a no-op after the first run.
@@ -50,6 +55,18 @@ class App {
     } catch {
       /* matchMedia unavailable */
     }
+  }
+
+  /**
+   * Grants any gem purchase the store has on record that the save doesn't (a crash between purchase and save).
+   * Called once after startup; does nothing without a real store.
+   */
+  async reconcilePurchases(): Promise<number> {
+    if (!iap.available || iap.isStub) return 0;
+    const txs = await iap.consumableTransactions();
+    const n = reconcileGemPurchases(this.save, txs);
+    if (n > 0) this.persist();
+    return n;
   }
 
   persist(): void {

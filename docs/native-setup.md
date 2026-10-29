@@ -1,0 +1,84 @@
+# Pawtopia — Native setup (iOS app, App Store, AdMob, RevenueCat, Firebase)
+
+Everything outside the game itself is **off until you configure it**. A build with no settings plays fully offline,
+sells nothing, shows no videos and makes no network calls. Turn services on one at a time.
+
+Settings go in `.env.local` at the repo root (git-ignored). Copy `.env.example` and fill in what you have.
+They are public client identifiers (they ship inside the app anyway), but keep them out of git so each machine and
+build can use its own.
+
+## 0. The iOS project (Capacitor 8)
+
+Capacitor was upgraded to 8 before the iOS project was first generated, so there is nothing to migrate.
+Requirements: Node 22+, Xcode 26+, CocoaPods or Swift Package Manager (Capacitor 8 defaults to SPM).
+
+```
+npm ci
+npm run build
+npx cap add ios        # once
+npx cap sync ios
+npx cap open ios
+```
+
+Set your Team in Xcode, keep the bundle id `com.sam3lds.catsvsdogs` (D9), and run on a device.
+
+## 1. Reward videos — Google AdMob (`@capacitor-community/admob`)
+
+Pawtopia only shows **reward videos the player asks for** (an extra life, a hint, a video token). No banners, no
+interstitials. Consent (Google UMP) and Apple's tracking prompt are asked the first time a player chooses a video.
+
+1. In `ios/App/App/Info.plist` add:
+   - `GADApplicationIdentifier` = your AdMob **app id**. Until you have one, use Google's test app id
+     `ca-app-pub-3940256099942544~1458002511`.
+   - `NSUserTrackingUsageDescription` = "Pawtopia asks so the optional reward videos can be more relevant. You can say
+     no and still get every reward."
+   - `SKAdNetworkItems` = the list from Google's iOS quick-start (copy it from the AdMob docs; it changes over time).
+2. In the AdMob console create a **Rewarded** ad unit for the iOS app; put its id in `.env.local`:
+   `VITE_ADMOB_REWARDED_IOS=ca-app-pub-…/…` (leave empty to keep Google's test videos).
+3. Only after step 1, set `VITE_ADMOB_ENABLED=1`. Without the Info.plist keys the Google SDK would crash the app on
+   the first video, which is why the switch exists.
+4. In AdMob, create the GDPR / US-state privacy messages (Privacy & messaging) so the consent form has something to
+   show. Players can reopen it from Settings → Ad privacy choices.
+5. App Store Connect privacy label: with AdMob live the app is **no longer "Data Not Collected"**. Declare what the
+   Google Mobile Ads SDK collects (identifiers, usage data, diagnostics; used for third-party advertising), and update
+   the privacy policy. If you ever submit to the Kids category, remove ads first.
+
+Daily cap: 10 reward videos per player per day, shared by all rewards (`src/app/rewarded.ts`).
+
+## 2. Gems and purchases — RevenueCat (`@revenuecat/purchases-capacitor`)
+
+1. In App Store Connect create the in-app purchases with exactly these product ids (`src/config/services.ts`):
+   | Product id | Type | Grants |
+   | --- | --- | --- |
+   | `pawtopia.gems.60` | Consumable | 60 gems |
+   | `pawtopia.gems.160` | Consumable | 160 gems |
+   | `pawtopia.gems.420` | Consumable | 420 gems |
+   | `pawtopia.removeads` | Non-consumable | entitlement `remove_ads` (for v1 owners; no forced ads exist) |
+   Suggested price tiers: $0.99 / $1.99 / $4.99. Prices always come from the store.
+2. Create a RevenueCat project, add the iOS app (App Store Connect shared secret / in-app purchase key), import the four
+   products, and create an entitlement `remove_ads` attached to `pawtopia.removeads`.
+3. Put RevenueCat's **public iOS SDK key** in `.env.local`: `VITE_REVENUECAT_IOS_KEY=appl_…`.
+4. In Xcode enable the **In-App Purchase** capability. Test with a sandbox account.
+
+How grants stay safe: gems are granted once per store transaction id; on launch the app asks RevenueCat for all
+consumable transactions and grants any it missed (a crash between paying and saving). Restore Purchases restores
+`remove_ads`. Gems only buy premium decorations — never hearts, hints or rankings.
+
+## 3. Leaderboards — Firebase (see `functions/README.md`)
+
+1. Create a Firebase project (Blaze plan, needed for Cloud Functions), add an **iOS app** with the bundle id above and a
+   **Web app** (the game runs in a web view and uses the JS SDK). Enable **Authentication → Anonymous**.
+2. From the Web app's config put in `.env.local`:
+   `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`
+   (and `VITE_FIREBASE_REGION` if you deploy functions outside `us-central1`).
+3. Deploy rules and functions: `npm --prefix functions ci && npm run fb:deploy` (needs `firebase login`).
+4. Before inviting players: run the rules tests with the emulator (`npm run fb:test`), enable App Check (App Attest)
+   and set it to enforce for Functions, and update the privacy label (Firebase stores a nickname and progress).
+
+Players are never signed in automatically: the leaderboard stays local until a player taps "Join the leaderboard" and
+picks a nickname. They can leave and delete their online data from Settings at any time.
+
+## 4. Tester builds
+
+`npm run artifact -- --qa` builds `artifact/pawtopia-qa.html`: a single-file web build with a **test store** (free,
+labeled gems), **test videos** and the Tester shortcuts in Settings. Test gems never count in a release build.

@@ -1,17 +1,26 @@
 /**
- * Ads. The game talks to `AdService` only; swapping in AdMob / AppLovin MAX is a one-file change.
+ * Ads. The game talks to `AdService` only.
  *
- * Policy (see `shouldShowInterstitial`): the celebration always comes first, interstitials only after the
- * player acknowledges results, never in onboarding, Paw Cup, or right after a loss, at most one per
- * 4 completed solo boards AND 8 minutes, capped at 3 a day. Rewarded ads are always optional.
+ * Pawtopia shows **reward videos only, and only when the player asks for one** (an extra life, a hint, or a video
+ * token). No banners, and no interstitials: `INTERSTITIALS_ENABLED` is false, so the cadence rule below is kept for the
+ * record but never reached. A reward is granted only when the ad network confirms the video was watched.
  *
- * The visual stub exists in dev builds only. Production builds get `UnavailableAdService` until a real
- * SDK is integrated, so a release can never show a fake ad or grant a reward that no ad paid for.
+ * Which service runs:
+ *  - iOS app with `VITE_ADMOB_ENABLED=1` (Info.plist set up, see docs/native-setup.md) → `AdMobAdService`, using Google's
+ *    test unit until `VITE_ADMOB_REWARDED_IOS` is set. Consent (UMP) and Apple's tracking prompt are asked the first time
+ *    the player chooses to watch a video, never at launch.
+ *  - Development and tester builds → `TestVideoAdService`: a clearly labeled stand-in so the whole flow can be tried.
+ *  - Anything else → `UnavailableAdService`: no video buttons are shown and nothing is granted.
  */
 
+import { Capacitor } from '@capacitor/core';
+import { ADMOB, TEST_BUILD } from '../config/services';
 import type { ModeKind } from '../game/modes';
 
-export type RewardedPlacement = 'revive' | 'hint';
+export type RewardedPlacement = 'life' | 'hint' | 'token';
+
+/** No forced ads between boards. */
+export const INTERSTITIALS_ENABLED = false;
 
 export interface AdService {
   /** True when a real (or, in dev, simulated) ad network is ready. */
@@ -58,7 +67,7 @@ export function shouldShowInterstitial(s: AdCadenceState, t: AdTrigger): boolean
   return true;
 }
 
-/** Production default until an SDK is wired: nothing to show, no rewards granted. */
+/** Nothing to show, no rewards granted. */
 export class UnavailableAdService implements AdService {
   readonly available = false;
   readonly isStub = false;
@@ -70,21 +79,79 @@ export class UnavailableAdService implements AdService {
   }
 }
 
-/** Dev-only simulation with a clearly labeled overlay. */
-export class DevStubAdService implements AdService {
+/** Test builds only: a clearly labeled stand-in video, so the reward flow can be tried end to end. */
+export class TestVideoAdService implements AdService {
   readonly available = true;
   readonly isStub = true;
+  constructor(private readonly ms = 1500) {}
   async showInterstitial(): Promise<boolean> {
-    await fakeAd('Interstitial (dev stub)', 1200);
-    return true;
+    return false;
   }
   async showRewarded(placement: RewardedPlacement): Promise<boolean> {
-    await fakeAd(`Rewarded · ${placement} (dev stub)`, 1500);
-    return true;
+    return fakeVideo(`Test video · ${placement}`, this.ms);
   }
 }
 
-function fakeAd(label: string, ms: number): Promise<void> {
+/** Kept for older imports and tests. */
+export const DevStubAdService = TestVideoAdService;
+
+/**
+ * Google AdMob reward videos. The SDK is started, and consent asked, on the first video the player chooses to watch.
+ * The reward counts only if the SDK reports it (the Rewarded event or the resolved show call).
+ */
+export class AdMobAdService implements AdService {
+  readonly available = true;
+  readonly isStub = false;
+  private ready: Promise<boolean> | null = null;
+  constructor(
+    private readonly adId: string,
+    private readonly testing: boolean,
+  ) {}
+
+  private start(): Promise<boolean> {
+    this.ready ??= (async () => {
+      try {
+        const { AdMob, AdmobConsentStatus } = await import('@capacitor-community/admob');
+        await AdMob.initialize({ initializeForTesting: this.testing });
+        // Privacy first: the consent form where the law requires it (UMP), then Apple's tracking question.
+        const info = await AdMob.requestConsentInfo();
+        if (info.isConsentFormAvailable && info.status === AdmobConsentStatus.REQUIRED) await AdMob.showConsentForm();
+        const att = await AdMob.trackingAuthorizationStatus();
+        if (att.status === 'notDetermined') await AdMob.requestTrackingAuthorization();
+        return true;
+      } catch {
+        this.ready = null; // try again next time
+        return false;
+      }
+    })();
+    return this.ready;
+  }
+
+  async showInterstitial(): Promise<boolean> {
+    return false;
+  }
+
+  async showRewarded(): Promise<boolean> {
+    if (!(await this.start())) return false;
+    const { AdMob, RewardAdPluginEvents } = await import('@capacitor-community/admob');
+    let rewarded = false;
+    const handle = await AdMob.addListener(RewardAdPluginEvents.Rewarded, () => {
+      rewarded = true;
+    });
+    try {
+      await AdMob.prepareRewardVideoAd({ adId: this.adId, isTesting: this.testing });
+      const item = await AdMob.showRewardVideoAd();
+      if (item && typeof item.type === 'string') rewarded = true;
+    } catch {
+      /* no fill, closed early, or a network error: no reward */
+    } finally {
+      await handle.remove();
+    }
+    return rewarded;
+  }
+}
+
+function fakeVideo(label: string, ms: number): Promise<boolean> {
   return new Promise((resolve) => {
     const el = document.createElement('div');
     el.className = 'fake-ad';
@@ -97,19 +164,27 @@ function fakeAd(label: string, ms: number): Promise<void> {
     l.textContent = label;
     const sub = document.createElement('div');
     sub.className = 'fake-ad__sub';
-    sub.textContent = 'Development build only — no real ad network';
+    sub.textContent = 'Test build: a stand-in for a reward video. No ad network.';
     box.append(l, sub);
     el.appendChild(box);
     document.body.appendChild(el);
     setTimeout(() => {
       el.remove();
-      resolve();
+      resolve(true);
     }, ms);
   });
 }
 
-export function createAdService(isDev: boolean): AdService {
-  return isDev ? new DevStubAdService() : new UnavailableAdService();
+export function createAdService(opts: { native: boolean; testBuild: boolean; admobEnabled: boolean; adId: string; testAdId: string }): AdService {
+  if (opts.native && opts.admobEnabled) return new AdMobAdService(opts.adId || opts.testAdId, !opts.adId);
+  if (opts.testBuild) return new TestVideoAdService();
+  return new UnavailableAdService();
 }
 
-export const ads: AdService = createAdService(import.meta.env.DEV);
+export const ads: AdService = createAdService({
+  native: Capacitor.isNativePlatform(),
+  testBuild: TEST_BUILD,
+  admobEnabled: ADMOB.enabled,
+  adId: ADMOB.rewardedIos,
+  testAdId: ADMOB.testRewardedIos,
+});

@@ -7,6 +7,8 @@
  * Only companions whose art is finished are listed here. Planned later: capybara, otter, axolotl, owl.
  */
 
+import type { AnimalKind } from './foods';
+
 export type CompanionId = 'ember' | 'maple';
 export type Habitat = 'woodland' | 'treetop';
 
@@ -15,6 +17,8 @@ export interface CompanionDefinition {
   name: string;
   /** What kind of animal, for the card ("Fox"). */
   kind: string;
+  /** Kind for food favorites. */
+  animal: AnimalKind;
   trait: string;
   bio: string;
   habitat: Habitat;
@@ -29,6 +33,7 @@ export const COMPANIONS: readonly CompanionDefinition[] = [
     id: 'ember',
     name: 'Ember',
     kind: 'Fox',
+    animal: 'fox',
     trait: 'Shy at first, then your shadow',
     bio: 'A little fox who watched the garden from the hedge for weeks before trotting in. Ember curls up by the woodland log and keeps one ear on every puzzle you solve.',
     habitat: 'woodland',
@@ -39,6 +44,7 @@ export const COMPANIONS: readonly CompanionDefinition[] = [
     id: 'maple',
     name: 'Maple',
     kind: 'Red panda',
+    animal: 'redpanda',
     trait: 'Sleepy, sunny and a little bit nosy',
     bio: 'Maple climbed into the blossom tree for a nap and decided to stay. From up there Maple can see every board you play, and approves of most of them.',
     habitat: 'treetop',

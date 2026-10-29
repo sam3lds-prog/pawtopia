@@ -91,11 +91,17 @@ export interface LedgerEntry {
  */
 export interface ItemEntry {
   id: string;
-  item: 'life' | 'hint' | 'points';
+  /**
+   * life / hint: the pantry. points: Paw Points. vtoken: video tokens (only from reward videos). gem: gems (only from the
+   * App Store, or the test store in test builds). food: sanctuary food and treats, one kind per `ref`.
+   */
+  item: 'life' | 'hint' | 'points' | 'vtoken' | 'gem' | 'food';
   delta: number;
   at: string;
-  source: 'journey' | 'daily' | 'mission' | 'gift' | 'use' | 'migration' | 'ad';
+  source: 'journey' | 'daily' | 'mission' | 'gift' | 'use' | 'migration' | 'ad' | 'store' | 'test' | 'shop';
   note?: string;
+  /** Which food (for item `food`). */
+  ref?: string;
 }
 
 export interface CupAttemptRecord {
@@ -148,7 +154,11 @@ export interface SaveV2 {
     affection: Record<string, number>;
     /** Resident id → local date of the last pat (one per day each). */
     patted: Record<string, string>;
+    /** Resident id → affection gained from food today (capped per day, so feeding stays a small daily pleasure). */
+    fed: Record<string, { day: string; n: number }>;
   };
+  /** Reward videos watched today (all placements share one gentle daily cap). */
+  ads: { day: string | null; rewarded: number };
   missions: { dayKey: string | null; weekKey: string | null; progress: Record<string, number>; claimed: Record<string, boolean> };
   achievements: Record<string, string>; // id → unlockedAt
   stats: {
@@ -218,7 +228,8 @@ export function defaultSave(now = new Date()): SaveV2 {
     zen: { solved: 0, nextSeed: 1 },
     cup: { attempts: {}, open: {} },
     inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {}, items: [], companions: {} },
-    sanctuary: { hidden: {}, visits: 0, affection: {}, patted: {} },
+    sanctuary: { hidden: {}, visits: 0, affection: {}, patted: {}, fed: {} },
+    ads: { day: null, rewarded: 0 },
     missions: { dayKey: null, weekKey: null, progress: {}, claimed: {} },
     achievements: {},
     stats: { solved: 0, clean: 0, hintFree: 0, losses: 0, comebacks: 0, bestBySize: {}, sizesThisWeek: {}, playDays: {}, lastWin: null },
@@ -285,8 +296,8 @@ function normLastWin(x: unknown): SaveV2['stats']['lastWin'] {
   };
 }
 
-const ITEM_KINDS = ['life', 'hint', 'points'] as const;
-const ITEM_SOURCES = ['journey', 'daily', 'mission', 'gift', 'use', 'migration', 'ad'] as const;
+const ITEM_KINDS = ['life', 'hint', 'points', 'vtoken', 'gem', 'food'] as const;
+const ITEM_SOURCES = ['journey', 'daily', 'mission', 'gift', 'use', 'migration', 'ad', 'store', 'test', 'shop'] as const;
 
 function normItems(x: unknown): ItemEntry[] {
   if (!Array.isArray(x)) return [];
@@ -306,6 +317,7 @@ function normItems(x: unknown): ItemEntry[] {
       at: str(e.at, ''),
       source: oneOf(e.source, ITEM_SOURCES, 'gift'),
       ...(typeof e.note === 'string' ? { note: e.note } : {}),
+      ...(typeof e.ref === 'string' ? { ref: e.ref } : {}),
     });
   }
   return out;
@@ -416,7 +428,9 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       visits: int(san.visits, 0, 0),
       affection: rec(san.affection, numItem),
       patted: rec(san.patted, strItem),
+      fed: rec(san.fed, (v) => (isObj(v) && typeof v.day === 'string' ? { day: v.day, n: int(v.n, 0, 0, 1000) } : undefined)),
     },
+    ads: { day: isObj(x.ads) ? strOrNull(x.ads.day) : null, rewarded: isObj(x.ads) ? int(x.ads.rewarded, 0, 0, 1000) : 0 },
     missions: {
       dayKey: strOrNull(mi.dayKey),
       weekKey: strOrNull(mi.weekKey),

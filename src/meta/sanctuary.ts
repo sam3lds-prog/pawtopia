@@ -1,7 +1,11 @@
-/** Sanctuary inventory: the free starter gift, buying decor with Paw Coins, and showing / hiding owned items. */
+/**
+ * Sanctuary inventory: the free starter gift, buying decor (Paw Coins, video tokens or gems), showing / hiding owned
+ * items, and the daily pat.
+ */
 
 import type { SaveV2 } from '../services/storage';
-import { DECOR_BY_ID, STARTER_DECOR, type DecorId } from './catalogs/decor';
+import { DECOR, DECOR_BY_ID, STARTER_DECOR, type DecorId } from './catalogs/decor';
+import { itemBalance, spendItem } from './items';
 import { balance, spend } from './ledger';
 import { PETS } from './catalogs/pets';
 import { COMPANIONS } from './catalogs/companions';
@@ -23,22 +27,59 @@ export function chooseStarter(save: SaveV2, id: DecorId, now = new Date()): bool
 
 export type BuyResult = 'ok' | 'owned' | 'not-for-sale' | 'insufficient';
 
-/** Buys a decoration with Paw Coins. Charges exactly once; a second tap returns 'owned'. */
+/** What a decoration costs, in the one currency it is sold for (null: not for sale, e.g. a chapter gift). */
+export function decorPrice(id: DecorId): { currency: 'coins' | 'vtoken' | 'gem'; amount: number } | null {
+  const d = DECOR_BY_ID[id];
+  if (!d || d.unlock.kind !== 'shop') return null;
+  if (d.gems) return { currency: 'gem', amount: d.gems };
+  if (d.tokens) return { currency: 'vtoken', amount: d.tokens };
+  if (d.cost !== null) return { currency: 'coins', amount: d.cost };
+  return null;
+}
+
+export function walletBalance(save: Pick<SaveV2, 'inventory'>, currency: 'coins' | 'vtoken' | 'gem'): number {
+  return currency === 'coins' ? balance(save) : itemBalance(save, currency);
+}
+
+/**
+ * Buys a decoration with its currency. Charges exactly once (the spend id is `buy:decor:<id>` in the coin or item
+ * ledger); a second tap returns 'owned'. A bought item comes straight out into the garden, replacing whatever shares
+ * its spot.
+ */
 export function buyDecor(save: SaveV2, id: DecorId, now = new Date()): BuyResult {
   const d = DECOR_BY_ID[id];
   if (!d) return 'not-for-sale';
   if (owns(save, id)) return 'owned';
-  if (d.unlock.kind !== 'shop' || d.cost === null) return 'not-for-sale';
-  const r = spend(save, `buy:decor:${id}`, d.cost, 'shop', now, d.name);
-  if (r === 'insufficient') return 'insufficient';
+  const price = decorPrice(id);
+  if (!price) return 'not-for-sale';
+  const spendId = `buy:decor:${id}`;
+  const r = price.currency === 'coins' ? spend(save, spendId, price.amount, 'shop', now, d.name) : spendItem(save, spendId, price.currency, price.amount, now, d.name);
+  if (r === 'insufficient' || r === 'none') return 'insufficient';
   // 'already' means a previous purchase was charged but not recorded as owned (e.g. a crash between writes): own it.
   save.inventory.decor[id] = { ownedAt: now.toISOString() };
+  setShown(save, id, true);
   return 'ok';
 }
 
 export function canAfford(save: Pick<SaveV2, 'inventory'>, id: DecorId): boolean {
-  const c = DECOR_BY_ID[id]?.cost;
-  return c !== null && c !== undefined && balance(save) >= c;
+  const p = decorPrice(id);
+  return !!p && walletBalance(save, p.currency) >= p.amount;
+}
+
+/** Owned decorations that are out in the garden, one per slot (a premium item wins its slot if both are out). */
+export function shownDecorIds(save: Pick<SaveV2, 'inventory' | 'sanctuary'>): DecorId[] {
+  const out: DecorId[] = [];
+  const taken = new Map<string, DecorId>();
+  const ordered = [...DECOR].sort((a, b) => Number(!!b.gems) - Number(!!a.gems));
+  for (const d of ordered) {
+    if (!isShown(save, d.id)) continue;
+    if (d.slot) {
+      if (taken.has(d.slot)) continue;
+      taken.set(d.slot, d.id);
+    }
+    out.push(d.id);
+  }
+  return DECOR.filter((d) => out.includes(d.id)).map((d) => d.id);
 }
 
 export function isShown(save: Pick<SaveV2, 'inventory' | 'sanctuary'>, id: DecorId): boolean {
@@ -47,8 +88,12 @@ export function isShown(save: Pick<SaveV2, 'inventory' | 'sanctuary'>, id: Decor
 
 export function setShown(save: SaveV2, id: DecorId, shown: boolean): void {
   if (!owns(save, id)) return;
-  if (shown) delete save.sanctuary.hidden[id];
-  else save.sanctuary.hidden[id] = true;
+  if (shown) {
+    delete save.sanctuary.hidden[id];
+    // Bringing an item out tucks away anything else that stands in the same spot.
+    const slot = DECOR_BY_ID[id].slot;
+    if (slot) for (const d of DECOR) if (d.slot === slot && d.id !== id && owns(save, d.id)) save.sanctuary.hidden[d.id] = true;
+  } else save.sanctuary.hidden[id] = true;
 }
 
 // ------------------------------------------------------------------ affection and small talk (cosmetic only)

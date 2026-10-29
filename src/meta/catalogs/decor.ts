@@ -5,6 +5,10 @@
  */
 
 export type DecorId =
+  | 'kite'
+  | 'eavelights'
+  | 'balloon'
+  | 'goldfountain'
   | 'cushion'
   | 'lamp'
   | 'bowls'
@@ -23,12 +27,21 @@ export type DecorId =
 
 export type DecorUnlock = { kind: 'shop' } | { kind: 'chapter'; chapter: number };
 
+/** How a decoration is paid for: Paw Coins (earned), video tokens (only from reward videos), gems (App Store). */
+export type DecorTier = 'coins' | 'video' | 'premium' | 'gift';
+
 export interface DecorDefinition {
   id: DecorId;
   name: string;
   blurb: string;
-  /** Paw Coins in the shop. Chapter gifts have no price. */
+  /** Paw Coins in the shop. Chapter gifts, video-token and gem items have no coin price. */
   cost: number | null;
+  /** Video tokens (special decorations). */
+  tokens?: number;
+  /** Gems (premium decorations). */
+  gems?: number;
+  /** Items sharing a slot stand in the same spot, so only one of them is out at a time (the Golden Fountain replaces the Stone Fountain). */
+  slot?: string;
   unlock: DecorUnlock;
   /** One of the two starter gifts offered after the first board. */
   starter?: boolean;
@@ -38,12 +51,16 @@ export interface DecorDefinition {
 }
 
 export const DECOR: readonly DecorDefinition[] = [
+  { id: 'kite', name: 'Rainbow Kite', blurb: 'A special decoration: a striped kite that dances over the blossom tree.', cost: null, tokens: 3, unlock: { kind: 'shop' }, layer: 0, season: 'any' },
+  { id: 'eavelights', name: 'Cottage String Lights', blurb: 'A special decoration: warm bulbs along the cottage roof.', cost: null, tokens: 4, unlock: { kind: 'shop' }, layer: 3, season: 'any' },
+  { id: 'balloon', name: 'Hot-Air Balloon', blurb: 'A premium decoration: a patchwork balloon drifting over the sanctuary.', cost: null, gems: 60, unlock: { kind: 'shop' }, layer: 0, season: 'any' },
+  { id: 'goldfountain', name: 'Golden Fountain', blurb: 'A premium decoration: a gilded fountain that takes the stone fountain’s spot.', cost: null, gems: 90, slot: 'fountain', unlock: { kind: 'shop' }, layer: 3, season: 'any' },
   { id: 'path', name: 'Paw-Print Path', blurb: 'Stepping stones from the cottage door, each with a little paw.', cost: 180, unlock: { kind: 'shop' }, layer: 1, season: 'any' },
   { id: 'fence', name: 'Flower Fence', blurb: 'A low picket fence with climbing sweet peas.', cost: 160, unlock: { kind: 'shop' }, layer: 2, season: 'spring' },
   { id: 'tree', name: 'Blossom Tree', blurb: 'A cherry tree for shade and petals. A gift for finishing Willow Lane.', cost: null, unlock: { kind: 'chapter', chapter: 2 }, layer: 2, season: 'spring' },
   { id: 'windowbox', name: 'Window Box', blurb: 'Bright geraniums under the cottage window.', cost: 150, unlock: { kind: 'shop' }, layer: 3, season: 'any' },
   { id: 'lamp', name: 'Paper Lamp', blurb: 'A warm paper lantern on a post, for cozy evenings.', cost: 60, unlock: { kind: 'shop' }, starter: true, layer: 3, season: 'any' },
-  { id: 'fountain', name: 'Stone Fountain', blurb: 'A gentle fountain for thirsty neighbors. A gift for finishing Meadow Gate.', cost: null, unlock: { kind: 'chapter', chapter: 1 }, layer: 3, season: 'any' },
+  { id: 'fountain', name: 'Stone Fountain', blurb: 'A gentle fountain for thirsty neighbors. A gift for finishing Meadow Gate.', cost: null, slot: 'fountain', unlock: { kind: 'chapter', chapter: 1 }, layer: 3, season: 'any' },
   { id: 'perch', name: 'Cat Perch', blurb: 'A tall scratching tower with a lookout at the top.', cost: 220, unlock: { kind: 'shop' }, layer: 4, season: 'any' },
   { id: 'fern', name: 'Potted Fern', blurb: 'A leafy fern in a terracotta pot by the door.', cost: 80, unlock: { kind: 'shop' }, layer: 4, season: 'any' },
   { id: 'rug', name: 'Woven Rug', blurb: 'A striped outdoor rug, warm from the sun.', cost: 110, unlock: { kind: 'shop' }, layer: 4, season: 'any' },
@@ -58,6 +75,13 @@ export const DECOR: readonly DecorDefinition[] = [
 export const DECOR_BY_ID: Record<DecorId, DecorDefinition> = Object.fromEntries(DECOR.map((d) => [d.id, d])) as Record<DecorId, DecorDefinition>;
 
 export const STARTER_DECOR: DecorId[] = DECOR.filter((d) => d.starter).map((d) => d.id);
+
+export function decorTier(d: DecorDefinition): DecorTier {
+  if (d.gems) return 'premium';
+  if (d.tokens) return 'video';
+  if (d.unlock.kind === 'chapter') return 'gift';
+  return 'coins';
+}
 
 export function isDecorId(x: unknown): x is DecorId {
   return typeof x === 'string' && x in DECOR_BY_ID;

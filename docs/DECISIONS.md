@@ -271,3 +271,35 @@ again; the release checklist now covers setting `DAILY_V2_FROM` to the rollout d
   as `life`). Hint tickets are just **hints** in the UI. "Treats" now means food for sanctuary animals (D27). Ledger
   ids keep their original `treat` wording (`starter:pantry:treat`, `treat:L12`, `mission:…:treat`) so nothing is ever
   granted twice.
+
+## 2026-10-29 · D27 — Three currencies, sanctuary food, optional reward videos (AdMob), gems (RevenueCat); Capacitor 8
+Owner decisions (2026-10-29): reward videos through Google AdMob, paid gems through RevenueCat. This revises D6
+("no ad SDK, nothing for sale") under the same principles: optional, honest, never pay-to-win.
+
+- **Currencies**: Paw Coins (earned by solving; everyday decor and food), **video tokens** (only from reward videos;
+  special decor and special treats), **gems** (App Store gem packs; premium decor only). Gems and tokens live in the
+  item ledger (`vtoken`, `gem`), spent with idempotent ids like coins. Nothing sold or earned by video affects puzzles,
+  Paw Cup or rankings; hearts and hints can be earned by playing or by a video, never bought with money.
+- **Decor**: each item has exactly one price. New for Harmony: Rainbow Kite and Cottage String Lights (video tokens),
+  Hot-Air Balloon and Golden Fountain (gems). Items can share a **slot** (the Golden Fountain stands where the Stone
+  Fountain does); bringing one out tucks the other away, and a bought item comes straight out.
+- **Food & treats**: 8 foods for coins, 3 special treats for video tokens, kept in the pantry (max 30 each) and fed from
+  an animal's card. Favorites count double; special treats are everyone's favorite. An animal takes up to 6 hearts of
+  affection from food a day, then politely declines (the food stays). Affection gives a friendship level (New friend →
+  Family). Cosmetic only.
+- **Reward videos** (`services/ads.ts`, `app/rewarded.ts`): only when the player taps "Watch a short video" for an extra
+  life (when out of extra lives, incl. on the loss sheet, where it brings the board back), a hint (when out of hints)
+  or a video token (Shop). 10 a day, shared. Granted only when the SDK confirms the reward, and kept even if the player
+  left the screen. **No interstitials** (`INTERSTITIALS_ENABLED = false`) and no banners. The old "refill all hearts"
+  revive is gone; a video gives one heart, like an extra life. AdMob runs only on the iOS app with `VITE_ADMOB_ENABLED=1`
+  (Info.plist must be set up first, or the SDK crashes); consent (UMP) and Apple's tracking prompt are asked on the first
+  video the player chooses, never at launch. Google's test unit is used until a real one is configured.
+- **Gems** (`services/iap.ts`, `meta/gems.ts`): RevenueCat on the iOS app when `VITE_REVENUECAT_IOS_KEY` is set. Each
+  purchase is granted once per store transaction id, and on launch any recorded consumable the save lacks is granted.
+  Release builds without a key show gem packs as "coming soon". The never-built bundles (starter decor, cozy theme,
+  portraits, supporter) were removed from the catalog; Remove interruptions stays for v1 owners.
+- **Test builds** (dev and the tester preview) use a labeled test store and test videos. Test gems carry source `test`
+  and never count in a release build (`setTestEntriesCount`), mirroring D6's dev entitlements.
+- **Capacitor 6 → 8** (plus `@capacitor/haptics` 8), done before the iOS project was first generated, because both
+  plugins require Capacitor 8. Setup steps for Info.plist, App Store Connect products, RevenueCat and AdMob are in
+  `docs/native-setup.md`; keys go in `.env.local` (`.env.example` lists them).

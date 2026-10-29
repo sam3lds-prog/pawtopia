@@ -10,4 +10,5 @@ ios/DerivedData/
 *.log
 .env
 .env.*
+!.env.example
 artifact/

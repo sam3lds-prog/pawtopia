@@ -1,25 +1,40 @@
 /**
- * Shop. Cosmetics first: sanctuary decor bought with free Paw Coins (earned only by playing). Below it, optional
- * real-money items, which are shown honestly as unavailable until a verified store is connected. No countdowns,
- * no fake discounts, no random packs, and nothing here affects puzzles or rankings.
+ * Shop, in three tabs:
+ *  - **Decor**: everyday decorations for Paw Coins (earned by solving), special ones for video tokens (earned only by
+ *    choosing to watch a reward video), premium ones for gems (bought on the App Store).
+ *  - **Food & treats**: food for Paw Coins, special treats for video tokens. Fed to animals from their cards.
+ *  - **Gems**: gem packs with store prices, honestly "coming soon" until a store is connected.
+ * Nothing here changes puzzles or rankings; there are no countdowns, fake discounts or random packs.
  */
 
 import { app } from '../../app/app';
-import { DECOR, DECOR_BY_ID, type DecorId } from '../../meta/catalogs/decor';
+import { DECOR, DECOR_BY_ID, decorTier, type DecorId, type DecorTier } from '../../meta/catalogs/decor';
+import { FOODS, FOOD_BY_ID, type FoodId } from '../../meta/catalogs/foods';
 import { chapterAt } from '../../meta/chapters';
-import { balance } from '../../meta/ledger';
-import { buyDecor, owns } from '../../meta/sanctuary';
+import { buyDecor, decorPrice, owns, walletBalance } from '../../meta/sanctuary';
+import { buyFood, foodCount, FOOD_CAP_EACH } from '../../meta/feeding';
+import { grantGemPurchase, isGemPack } from '../../meta/gems';
 import { track } from '../../services/analytics';
 import { afterDecorChange } from '../../app/events';
+import { canOfferVideo, videosLeftToday, watchVideoFor } from '../../app/rewarded';
 import { sfx } from '../../services/audio';
 import { haptic } from '../../services/haptics';
-import { iap, PRODUCT_CATALOG, type ProductId, type ProductInfo } from '../../services/iap';
+import { GEM_PACKS, iap, PRODUCT_CATALOG, type ProductId, type ProductInfo } from '../../services/iap';
+import { ads } from '../../services/ads';
 import { decorIcon } from '../art/sanctuary';
+import { foodIcon } from '../art/foods';
 import { openSheet, toast } from '../components/sheet';
-import { actionOf, esc, h } from '../dom';
+import { walletPills } from '../components/wallet';
+import { actionOf, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { Scope, ScreenDef } from '../router';
-import { coinPill } from './home';
+
+type Tab = 'decor' | 'food' | 'gems';
+/** The tab the player last looked at, for this app session. */
+let lastTab: Tab = 'decor';
+
+const CURRENCY_ICON = { coins: ICON.coin, vtoken: ICON.videoToken, gem: ICON.gem } as const;
+const CURRENCY_NAME = { coins: 'Paw Coins', vtoken: 'video tokens', gem: 'gems' } as const;
 
 export const shopScreen: ScreenDef = {
   tab: 'shop',
@@ -27,75 +42,161 @@ export const shopScreen: ScreenDef = {
   mount(root, scope) {
     const el = h(`<div class="shop"></div>`);
     root.appendChild(el);
+    let tab: Tab = lastTab;
     let products: ProductInfo[] = PRODUCT_CATALOG.map((p) => ({ ...p, price: null }));
     void iap.products().then((ps) => {
       if (!scope.alive) return;
       products = ps;
-      render();
+      if (tab === 'gems') render();
     });
+
+    function priceTag(currency: 'coins' | 'vtoken' | 'gem', amount: number): string {
+      const short = walletBalance(app.save, currency) < amount;
+      return `<span class="price price--${currency} ${short ? 'is-short' : ''}">${CURRENCY_ICON[currency]}<span class="num">${amount}</span></span>`;
+    }
 
     function decorCard(id: DecorId): string {
       const d = DECOR_BY_ID[id];
       const have = owns(app.save, id);
-      const coins = balance(app.save);
+      const price = decorPrice(id);
       let action: string;
       if (have) action = `<span class="shop-card__state">${ICON.check}Owned</span>`;
       else if (d.unlock.kind === 'chapter') action = `<span class="shop-card__state shop-card__state--gift">${ICON.gift}Finish ${esc(chapterAt(d.unlock.chapter - 1).name)}</span>`;
-      else if (d.cost !== null && coins >= d.cost) action = `<span class="price">${ICON.coin}<span class="num">${d.cost}</span></span>`;
-      else action = `<span class="price is-short">${ICON.coin}<span class="num">${d.cost}</span></span>`;
-      const label = have ? `${d.name}, owned` : d.unlock.kind === 'chapter' ? `${d.name}, chapter gift` : `${d.name}, ${d.cost} Paw Coins`;
-      return `<li><button class="shop-card card card--tap ${have ? 'is-owned' : ''}" data-decor="${id}" aria-label="${esc(label)}">
+      else action = price ? priceTag(price.currency, price.amount) : '';
+      const label = have ? `${d.name}, owned` : d.unlock.kind === 'chapter' ? `${d.name}, chapter gift` : price ? `${d.name}, ${price.amount} ${CURRENCY_NAME[price.currency]}` : d.name;
+      return `<li><button class="shop-card card card--tap ${have ? 'is-owned' : ''} shop-card--${decorTier(d)}" data-decor="${id}" aria-label="${esc(label)}">
         <span class="shop-card__art">${decorIcon(id)}</span>
         <span class="shop-card__name">${esc(d.name)}</span>
         ${action}
       </button></li>`;
     }
 
-    function render(): void {
-      const owned = DECOR.filter((d) => owns(app.save, d.id)).length;
-      el.innerHTML = `
-        <header class="screen-head">
-          <h1 data-autofocus>Shop</h1>
-          <div class="screen-head__end">${coinPill()}</div>
-        </header>
-        <section aria-labelledby="decor-h">
-          <div class="section-head"><h2 id="decor-h">Sanctuary decor</h2><span class="muted num">${owned} of ${DECOR.length} owned</span></div>
-          <p class="muted shop__note">Paid for with Paw Coins, which you earn by solving puzzles. Never sold for money.</p>
-          <ul class="shop-grid">${DECOR.map((d) => decorCard(d.id)).join('')}</ul>
+    function decorSection(tier: DecorTier | 'everyday', title: string, note: string, extra = ''): string {
+      const items = DECOR.filter((d) => (tier === 'everyday' ? decorTier(d) === 'coins' || decorTier(d) === 'gift' : decorTier(d) === tier));
+      if (!items.length) return '';
+      const owned = items.filter((d) => owns(app.save, d.id)).length;
+      return `<section class="shop-section shop-section--${tier}">
+        <div class="section-head"><h2>${esc(title)}</h2><span class="muted num">${owned} of ${items.length} owned</span></div>
+        <p class="muted shop__note">${note}</p>
+        ${extra}
+        <ul class="shop-grid">${items.map((d) => decorCard(d.id)).join('')}</ul>
+      </section>`;
+    }
+
+    function videoTokenCard(): string {
+      if (!ads.available) return `<p class="notice">${ICON.info}Video tokens come from short reward videos, which this version doesn't show yet.</p>`;
+      const left = videosLeftToday(app.save);
+      return `<div class="earn-card card">
+        <span class="earn-card__icon">${ICON.videoToken}</span>
+        <span class="earn-card__body"><b>Earn a video token</b><small>${left ? `Watch a short video when you like. ${plural(left, 'video')} left today.` : 'That’s all the videos for today. More tomorrow.'}</small></span>
+        <button class="btn btn--small" data-act="watch-token" ${left && canOfferVideo() ? '' : 'disabled'}>Watch</button>
+      </div>`;
+    }
+
+    function decorTab(): string {
+      return `
+        ${decorSection('everyday', 'Sanctuary decor', 'Paid for with Paw Coins, which you earn by solving puzzles.')}
+        ${decorSection('video', 'Special decor', 'Only for video tokens.', videoTokenCard())}
+        ${decorSection('premium', 'Premium decor', `For gems. ${iap.available ? '' : 'Gem packs are coming soon.'}`)}`;
+    }
+
+    function foodCard(id: FoodId): string {
+      const f = FOOD_BY_ID[id];
+      const have = foodCount(app.save, id);
+      const currency = f.coins ? 'coins' : 'vtoken';
+      const amount = (f.coins ?? f.tokens)!;
+      return `<li><button class="shop-card card card--tap food-card" data-food="${id}" aria-label="${esc(`${f.name}, ${amount} ${CURRENCY_NAME[currency]}, ${have} in your pantry`)}">
+        <span class="shop-card__art food-card__art">${foodIcon(id)}${have ? `<span class="food-card__have num">×${have}</span>` : ''}</span>
+        <span class="shop-card__name">${esc(f.name)}</span>
+        ${priceTag(currency, amount)}
+      </button></li>`;
+    }
+
+    function foodTab(): string {
+      const everyday = FOODS.filter((f) => f.coins);
+      const special = FOODS.filter((f) => f.tokens);
+      return `
+        <section class="shop-section">
+          <div class="section-head"><h2>Food</h2></div>
+          <p class="muted shop__note">Feed residents and wildlife friends from their cards. Favorites count double.</p>
+          <ul class="shop-grid">${everyday.map((f) => foodCard(f.id)).join('')}</ul>
         </section>
-        <section aria-labelledby="support-h" class="shop__support">
-          <div class="section-head"><h2 id="support-h">Support Pawtopia</h2></div>
-          ${
-            iap.available
-              ? iap.isStub
-                ? `<p class="notice notice--dev">${ICON.info}Development test store. Nothing is charged and test items don't carry into release builds.</p>`
-                : ''
-              : `<p class="notice">${ICON.info}Purchases aren't connected in this version, so nothing can be bought yet. The game is complete without them.</p>`
-          }
-          <ul class="rows">
-            ${products
+        <section class="shop-section shop-section--video">
+          <div class="section-head"><h2>Special treats</h2></div>
+          <p class="muted shop__note">Only for video tokens. Every animal loves them.</p>
+          ${videoTokenCard()}
+          <ul class="shop-grid">${special.map((f) => foodCard(f.id)).join('')}</ul>
+        </section>`;
+    }
+
+    function gemsTab(): string {
+      const packs = products.filter((p) => isGemPack(p.id));
+      const removeAds = products.find((p) => p.id === 'remove_ads');
+      const status = iap.available
+        ? iap.isStub
+          ? `<p class="notice notice--dev">${ICON.info}Test store: nothing is charged, and test gems never carry into a release build.</p>`
+          : ''
+        : `<p class="notice">${ICON.info}Gem packs are coming soon. Everything else in Pawtopia is earned by playing.</p>`;
+      return `
+        <section class="shop-section">
+          <div class="section-head"><h2>Gems</h2><span class="muted num">${ICON.gem}${walletBalance(app.save, 'gem')}</span></div>
+          <p class="muted shop__note">Gems buy premium decorations. They never buy hearts, hints or anything that helps win.</p>
+          ${status}
+          <ul class="gem-packs">
+            ${packs
               .map(
-                (p) => `<li class="row product">
-                  <span class="row__label">${esc(p.title)}<small>${esc(p.description)}</small></span>
-                  ${
-                    iap.available && p.price
-                      ? `<button class="btn btn--secondary product__buy" data-buy="${p.id}" ${app.save.purchases.owned[p.id] ? 'disabled' : ''}>${app.save.purchases.owned[p.id] ? 'Owned' : esc(p.price)}</button>`
-                      : `<span class="chip chip--preview">Not available</span>`
-                  }
+                (p) => `<li class="gem-pack card">
+                  <span class="gem-pack__art" aria-hidden="true">${ICON.gem.repeat(p.id === 'gems_60' ? 1 : p.id === 'gems_160' ? 2 : 3)}</span>
+                  <span class="gem-pack__body"><b>${esc(p.title)}</b><small>${GEM_PACKS[p.id as keyof typeof GEM_PACKS]} gems</small></span>
+                  ${iap.available && p.price ? `<button class="btn btn--small" data-buy="${p.id}">${esc(p.price)}</button>` : `<span class="chip chip--preview">Coming soon</span>`}
                 </li>`,
               )
               .join('')}
           </ul>
-          ${iap.available ? `<button class="btn btn--quiet" data-act="restore">Restore purchases</button>` : ''}
-        </section>`;
+        </section>
+        ${
+          iap.available
+            ? `<section class="shop-section">
+                <ul class="rows">
+                  ${removeAds && app.save.purchases.owned.remove_ads ? `<li class="row"><span class="row__label">${esc(removeAds.title)}<small>Owned. Thank you!</small></span></li>` : ''}
+                </ul>
+                <button class="btn btn--quiet" data-act="restore">Restore purchases</button>
+              </section>`
+            : ''
+        }`;
+    }
+
+    function render(): void {
+      el.innerHTML = `
+        <header class="screen-head">
+          <h1 data-autofocus>Shop</h1>
+          <div class="screen-head__end">${walletPills()}</div>
+        </header>
+        <div class="seg" role="tablist" aria-label="Shop sections">
+          ${(['decor', 'food', 'gems'] as Tab[])
+            .map((t) => `<button role="tab" class="seg__btn" data-tab="${t}" aria-selected="${t === tab}">${t === 'decor' ? 'Decor' : t === 'food' ? 'Food & treats' : `${ICON.gem}Gems`}</button>`)
+            .join('')}
+        </div>
+        <div class="shop__body">${tab === 'decor' ? decorTab() : tab === 'food' ? foodTab() : gemsTab()}</div>`;
     }
     render();
 
     scope.on(el, 'click', async (e) => {
       const t = e.target as HTMLElement;
+      const tb = t.closest('[data-tab]') as HTMLElement | null;
+      if (tb && tb.closest('.seg')) {
+        tab = lastTab = tb.dataset.tab as Tab;
+        render();
+        return;
+      }
       const card = t.closest('[data-decor]') as HTMLElement | null;
       if (card) {
         decorSheet(scope, card.dataset.decor as DecorId, render);
+        return;
+      }
+      const fc = t.closest('[data-food]') as HTMLElement | null;
+      if (fc) {
+        foodSheet(scope, fc.dataset.food as FoodId, render);
         return;
       }
       const buy = t.closest('[data-buy]') as HTMLButtonElement | null;
@@ -104,29 +205,40 @@ export const shopScreen: ScreenDef = {
         track('iap_started', { product: id });
         buy.disabled = true;
         const r = await iap.purchase(id);
-        if (!scope.alive) return;
         if (r.ok) {
-          app.save.purchases.owned[id] = { source: r.source, at: new Date().toISOString() };
-          if (id === 'remove_ads') app.save.purchases.removeAds = { active: true, source: r.source, verifiedAt: new Date().toISOString() };
+          // Granted by transaction id, once, even if the player already left the shop.
+          const gems = grantGemPurchase(app.save, r.id, r.transactionId, r.source === 'store' ? 'store' : 'test');
+          if (r.id === 'remove_ads') {
+            app.save.purchases.owned.remove_ads = { source: r.source, at: new Date().toISOString() };
+            app.save.purchases.removeAds = { active: true, source: r.source, verifiedAt: new Date().toISOString() };
+          }
           app.persist();
           track('iap_success', { product: id });
-          toast('Thank you for supporting Pawtopia!');
+          toast(gems ? `+${gems} gems. Thank you for supporting Pawtopia!` : 'Thank you for supporting Pawtopia!', ICON.gem);
         } else {
           track('iap_failed', { product: id, reason: r.reason });
           if (r.reason !== 'cancelled') toast('The purchase did not go through. You were not charged.');
         }
-        render();
+        if (scope.alive) render();
         return;
       }
       const a = actionOf(e);
-      if (a?.act === 'restore') {
+      if (a?.act === 'watch-token') {
+        const b = t.closest('button') as HTMLButtonElement;
+        b.disabled = true;
+        const r = await watchVideoFor('vtoken');
+        if (r === 'granted') toast('+1 video token', ICON.videoToken);
+        else toast(r === 'cap' ? "That's all the videos for today. More tomorrow." : 'No video is available right now. Try again in a little while.');
+        if (scope.alive) render();
+      } else if (a?.act === 'restore') {
         const r = await iap.restore();
         if (!scope.alive) return;
         if (r.ok && r.source) {
           for (const id of r.owned) app.save.purchases.owned[id] = { source: r.source, at: new Date().toISOString() };
           if (r.owned.includes('remove_ads')) app.save.purchases.removeAds = { active: true, source: r.source, verifiedAt: new Date().toISOString() };
+          const gems = await app.reconcilePurchases();
           app.persist();
-          toast(r.owned.length ? 'Purchases restored.' : 'No purchases to restore.');
+          toast(r.owned.length || gems ? 'Purchases restored.' : 'No purchases to restore.');
           render();
         } else toast('The store is not available right now.');
       }
@@ -137,17 +249,31 @@ export const shopScreen: ScreenDef = {
 function decorSheet(scope: Scope, id: DecorId, rerender: () => void): void {
   const d = DECOR_BY_ID[id];
   const have = owns(app.save, id);
-  const coins = balance(app.save);
-  const short = d.cost !== null ? d.cost - coins : 0;
+  const price = decorPrice(id);
+  const tier = decorTier(d);
   let actions: string;
   if (have) actions = `<button class="btn btn--block" data-act="visit">See it in the sanctuary</button>`;
   else if (d.unlock.kind === 'chapter') actions = `<p class="muted">A gift for finishing ${esc(chapterAt(d.unlock.chapter - 1).name)} (level ${d.unlock.chapter * 20}).</p>`;
-  else if (short > 0) actions = `<button class="btn btn--block" disabled>${ICON.coin}<span class="num">${d.cost}</span></button><p class="muted">You need ${short} more Paw Coins. Solving a new level earns 35.</p>`;
-  else actions = `<button class="btn btn--block" data-act="buy" data-autofocus>Buy for ${ICON.coin}<span class="num">${d.cost}</span></button>`;
+  else if (price) {
+    const short = price.amount - walletBalance(app.save, price.currency);
+    const how =
+      price.currency === 'coins'
+        ? 'Solving a new level earns 35.'
+        : price.currency === 'vtoken'
+          ? 'Video tokens come from short reward videos, one per video, in the Shop.'
+          : iap.available
+            ? 'Gem packs are in the Gems tab.'
+            : 'Gem packs are coming soon.';
+    actions =
+      short > 0
+        ? `<button class="btn btn--block" disabled>${CURRENCY_ICON[price.currency]}<span class="num">${price.amount}</span></button><p class="muted">You need ${short} more ${CURRENCY_NAME[price.currency]}. ${how}</p>`
+        : `<button class="btn btn--block" data-act="buy" data-autofocus>Buy for ${CURRENCY_ICON[price.currency]}<span class="num">${price.amount}</span></button>`;
+  } else actions = '';
   const sh = openSheet(scope, {
     title: d.name,
     className: 'decor-sheet',
     body: `
+      ${tier === 'video' || tier === 'premium' ? `<span class="chip ${tier === 'premium' ? 'chip--gem' : 'chip--video'}">${tier === 'premium' ? `${ICON.gem}Premium` : `${ICON.videoToken}Special`}</span>` : ''}
       <div class="decor-sheet__art">${decorIcon(id, d.name)}</div>
       <p class="sheet__lead">${esc(d.blurb)}</p>
       <div class="sheet__actions">${actions}<button class="btn btn--quiet" data-act="close">Not now</button></div>`,
@@ -168,14 +294,74 @@ function decorSheet(scope: Scope, id: DecorId, rerender: () => void): void {
         app.persist();
         sfx('coin');
         haptic('success');
-        track('decor_bought', { item: id, cost: d.cost ?? 0 });
+        track('decor_bought', { item: id, tier, amount: price?.amount ?? 0 });
         sh.close();
         rerender();
         toast(news.achievements.length ? `${d.name} is in the garden. Badge unlocked: ${news.achievements[0].name}!` : `${d.name} is in the garden.`);
       } else {
         busy = false;
-        toast(r === 'insufficient' ? 'Not enough Paw Coins yet.' : r === 'owned' ? 'Already yours.' : 'This one is a chapter gift.');
+        toast(r === 'insufficient' ? `Not enough ${price ? CURRENCY_NAME[price.currency] : 'coins'} yet.` : r === 'owned' ? 'Already yours.' : 'This one is a chapter gift.');
       }
     }
   });
 }
+
+function foodSheet(scope: Scope, id: FoodId, rerender: () => void): void {
+  const f = FOOD_BY_ID[id];
+  const currency = f.coins ? 'coins' : 'vtoken';
+  const amount = (f.coins ?? f.tokens)!;
+  const favs = f.favorites === 'all' ? 'Everyone' : f.favorites.map((k) => KIND_NAME[k] ?? k).join(', ');
+  const sh = openSheet(scope, {
+    title: f.name,
+    className: 'decor-sheet',
+    body: `
+      <div class="decor-sheet__art food-sheet__art">${foodIcon(id)}</div>
+      <p class="sheet__lead">${esc(f.blurb)}</p>
+      <dl class="pet-sheet__facts">
+        <div><dt>Favorite of</dt><dd>${esc(favs)}</dd></div>
+        <div><dt>In your pantry</dt><dd class="num" data-have>${foodCount(app.save, id)} of ${FOOD_CAP_EACH}</dd></div>
+      </dl>
+      <div class="sheet__actions">
+        <button class="btn btn--block" data-act="buy" data-autofocus>Buy one for ${CURRENCY_ICON[currency]}<span class="num">${amount}</span></button>
+        <button class="btn btn--quiet" data-act="close">Done</button>
+      </div>`,
+    onClose: rerender,
+  });
+  sh.scope.on(sh.el, 'click', (e) => {
+    const a = actionOf(e);
+    if (!a) return;
+    if (a.act === 'close') sh.close();
+    else if (a.act === 'buy') {
+      const r = buyFood(app.save, id);
+      if (r === 'ok') {
+        app.persist();
+        sfx('coin');
+        haptic('tap');
+        track('food_bought', { food: id });
+        const have = sh.el.querySelector('[data-have]');
+        if (have) have.textContent = `${foodCount(app.save, id)} of ${FOOD_CAP_EACH}`;
+        toast(`${f.name} added to your pantry.`);
+      } else toast(r === 'full' ? 'Your pantry is full of these.' : `Not enough ${CURRENCY_NAME[currency]} yet.`);
+    }
+  });
+}
+
+/** Display names for animal kinds on food cards. */
+const KIND_NAME: Record<string, string> = {
+  cat: 'cats',
+  dog: 'dogs',
+  fox: 'foxes',
+  redpanda: 'red pandas',
+  koala: 'koalas',
+  kangaroo: 'kangaroos',
+  wombat: 'wombats',
+  elephant: 'elephants',
+  giraffe: 'giraffes',
+  meerkat: 'meerkats',
+  polarbear: 'polar bears',
+  seal: 'seals',
+  owl: 'owls',
+  sloth: 'sloths',
+  capybara: 'capybaras',
+  toucan: 'toucans',
+};

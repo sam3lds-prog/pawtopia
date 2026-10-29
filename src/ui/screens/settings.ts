@@ -87,7 +87,7 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
       </div>
       <div class="rows-title">Purchases</div>
       <div class="rows">
-        <div class="row"><span class="row__label">Store<small>${iap.available ? (iap.isStub ? 'Development test store' : 'Connected') : 'Not connected in this build. Nothing can be bought yet.'}</small></span></div>
+        <div class="row"><span class="row__label">Gem packs<small>${iap.available ? (iap.isStub ? 'Test store: nothing is charged, and test gems never carry into a release build.' : 'App Store connected. Gems only buy premium decorations.') : 'Coming soon. Nothing can be bought in this version.'}</small></span></div>
         ${iap.available ? `<button class="row" data-act="restore"><span class="row__label">Restore purchases</span></button>` : ''}
       </div>
       ${purchaseState}
@@ -95,7 +95,8 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
       <div class="rows">
         <div class="row"><span class="row__label">Saved on this device<small>Pawtopia plays fully offline. No account, no sign-in.</small></span></div>
         <div class="row"><span class="row__label">Analytics<small>None are sent in this version. Gameplay events stay in memory on your device and are never linked to you.</small></span></div>
-        <div class="row"><span class="row__label">Ads<small>${ads.available ? (ads.isStub ? 'Development test ads only, clearly labeled.' : 'At most one short ad after several boards. Never during play, Paw Cup, or before your results.') : 'This version shows no ads.'}</small></span></div>
+        <div class="row"><span class="row__label">Reward videos<small>${ads.available ? (ads.isStub ? 'Test videos only, clearly labeled.' : 'Only when you choose one, for an extra life, a hint or a video token. Never between boards, never in Paw Cup.') : 'This version shows no videos and no ads.'}</small></span></div>
+        ${ads.available && !ads.isStub ? `<button class="row" data-act="ad-privacy"><span class="row__label">Ad privacy choices<small>Change what the video network may use</small></span>${ICON.chevron}</button>` : ''}
         <button class="row" data-act="reset"><span class="row__label" style="color:var(--error)">Erase progress<small>Purchases and settings are kept</small></span></button>
       </div>
       ${
@@ -162,6 +163,15 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
     }
     const a = actionOf(e);
     if (!a) return;
+    if (a.act === 'ad-privacy') {
+      try {
+        const { AdMob } = await import('@capacitor-community/admob');
+        await AdMob.showPrivacyOptionsForm();
+      } catch {
+        toast('Privacy choices open after your first video.');
+      }
+      return;
+    }
     if (a.act === 'restore') {
       const res = await iap.restore();
       if (!sh.scope.alive) return;

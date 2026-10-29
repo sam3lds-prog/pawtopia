@@ -101,13 +101,18 @@ describe('v1 players', () => {
 });
 
 describe('sanctuary decor', () => {
-  it('ships 15 items with sensible prices and three chapter gifts', () => {
-    expect(DECOR).toHaveLength(15);
+  it('prices each item in exactly one currency, coin prices stay sensible, and there are three chapter gifts', () => {
+    // 15 original coin / gift items, plus special (video-token) and premium (gem) items from D27.
+    expect(DECOR.filter((d) => !d.tokens && !d.gems)).toHaveLength(15);
     for (const d of DECOR) {
+      const currencies = [d.cost !== null, !!d.tokens, !!d.gems].filter(Boolean).length;
       if (d.unlock.kind === 'shop') {
-        expect(d.cost).toBeGreaterThanOrEqual(60);
-        expect(d.cost).toBeLessThanOrEqual(400);
-      } else expect(d.cost).toBeNull();
+        expect(currencies, d.id).toBe(1);
+        if (d.cost !== null) {
+          expect(d.cost).toBeGreaterThanOrEqual(60);
+          expect(d.cost).toBeLessThanOrEqual(400);
+        }
+      } else expect(currencies, d.id).toBe(0);
     }
     expect(DECOR.filter((d) => d.unlock.kind === 'chapter')).toHaveLength(3);
     expect(STARTER_DECOR).toHaveLength(2);

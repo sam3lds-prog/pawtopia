@@ -26,6 +26,8 @@ export type AnalyticsEvent =
   | 'mission_claimed'
   | 'achievement_unlocked'
   | 'extra_life_used'
+  | 'food_bought'
+  | 'animal_fed'
   | 'companion_unlocked';
 
 export type EventProps = Record<string, string | number | boolean>;

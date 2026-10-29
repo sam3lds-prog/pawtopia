@@ -8,7 +8,8 @@ import { app } from '../../app/app';
 import { startGame } from '../../app/gameFlow';
 import { DECOR, DECOR_BY_ID, STARTER_DECOR, type DecorId } from '../../meta/catalogs/decor';
 import { PET_BY_ID, PETS, type PetId } from '../../meta/catalogs/pets';
-import { chooseStarter, isShown, owns, patFriend, pattedToday, sanctuaryChat, setShown } from '../../meta/sanctuary';
+import { chooseStarter, isShown, owns, sanctuaryChat, setShown, shownDecorIds } from '../../meta/sanctuary';
+import { bindFriendPanel, friendPanelMarkup, type FeedEvents } from '../components/feedPanel';
 import { unlockedCompanions, unlockedPets } from '../../meta/rewards';
 import { COMPANIONS, COMPANION_BY_ID, type CompanionId } from '../../meta/catalogs/companions';
 import { companionSvg } from '../art/companions';
@@ -30,7 +31,7 @@ import type { Route, Scope, ScreenDef } from '../router';
 import { coinPill } from './home';
 
 export function shownDecor(): DecorId[] {
-  return DECOR.filter((d) => isShown(app.save, d.id)).map((d) => d.id);
+  return shownDecorIds(app.save);
 }
 
 /** Local evening (7 pm to 6 am): a dusk wash and fireflies. */
@@ -241,11 +242,9 @@ function sceneLabel(pets: PetId[], decorCount: number): string {
 }
 
 /** A wildlife friend's card, with the once-a-day pat. */
-export function showFriendSheet(scope: Scope, id: CompanionId): void {
+export function showFriendSheet(scope: Scope, id: CompanionId, ev: FeedEvents = {}): void {
   const c = COMPANION_BY_ID[id];
   const owned = !!app.save.inventory.companions[id];
-  const affection = app.save.sanctuary.affection[id] ?? 0;
-  const done = pattedToday(app.save, id);
   const sh = openSheet(scope, {
     title: owned ? `${c.name} the ${c.kind.toLowerCase()}` : `A ${c.kind.toLowerCase()} (arriving soon)`,
     className: 'pet-sheet',
@@ -256,27 +255,19 @@ export function showFriendSheet(scope: Scope, id: CompanionId): void {
       ${
         owned
           ? `<dl class="pet-sheet__facts">
-              <div><dt>Lives</dt><dd>${c.habitat === 'woodland' ? 'By the woodland log' : 'In the blossom tree (when it is out)'}</dd></div>
-              <div><dt>Affection</dt><dd><span class="affection" data-affection>${ICON.heart}<span class="num">${affection}</span></span></dd></div>
+              <div><dt>Lives</dt><dd>${esc(habitatLabel(id))}</dd></div>
               <div><dt>Kind</dt><dd>${esc(c.kind)} · Wildlife friend</dd></div>
             </dl>
-            <div class="sheet__actions"><button class="btn btn--secondary btn--block" data-act="pat" ${done ? 'disabled' : ''}>${ICON.heart}${done ? 'Patted today' : `Give ${esc(c.name)} a pat`}</button></div>
-            <p class="muted">A pat a day adds a heart of affection. It's just for fun and changes nothing in your puzzles.</p>`
+            ${friendPanelMarkup(id, c.name)}
+            <p class="muted">Pats and food are just for fun. They make friends happy and change nothing in your puzzles.</p>`
           : ''
       }`,
   });
-  sh.scope.on(sh.el, 'click', (e) => {
-    const b = (e.target as HTMLElement).closest('[data-act="pat"]') as HTMLButtonElement | null;
-    if (!b || b.disabled) return;
-    if (patFriend(app.save, id)) {
-      app.persist();
-      sfx('coin');
-      b.disabled = true;
-      b.innerHTML = `${ICON.heart}Patted today`;
-      const a = sh.el.querySelector('[data-affection] .num');
-      if (a) a.textContent = String(app.save.sanctuary.affection[id] ?? 0);
-    }
-  });
+  if (owned) bindFriendPanel(sh.scope, sh.el, id, c.name, ev);
+}
+
+function habitatLabel(id: CompanionId): string {
+  return COMPANION_BY_ID[id].habitat === 'woodland' ? 'By the woodland log' : 'In the blossom tree (when it is out)';
 }
 
 /** "New residents" sheet. */

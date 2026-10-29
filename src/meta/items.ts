@@ -37,15 +37,35 @@ export const HINT_EVERY = 2;
 
 type Items = Pick<SaveV2, 'inventory'>;
 
+/**
+ * Whether entries from the test store (source `test`) count. True in development and tester builds, false in a
+ * release build (set once at startup), so test gems can never be spent in a real build (same rule as D6's dev grants).
+ */
+let testEntriesCount = true;
+export function setTestEntriesCount(on: boolean): void {
+  testEntriesCount = on;
+}
+
+const counts = (e: ItemEntry) => testEntriesCount || e.source !== 'test';
+
 export function itemBalance(save: Items, kind: ItemKind): number {
   let sum = 0;
-  for (const e of save.inventory.items) if (e.item === kind) sum += e.delta;
+  for (const e of save.inventory.items) if (e.item === kind && counts(e)) sum += e.delta;
+  return Math.max(0, sum);
+}
+
+/** Balance of one kind of food (or any item kept per reference). */
+export function refBalance(save: Items, kind: ItemKind, ref: string): number {
+  let sum = 0;
+  for (const e of save.inventory.items) if (e.item === kind && e.ref === ref && counts(e)) sum += e.delta;
   return Math.max(0, sum);
 }
 
 export function hasItemEntry(save: Items, id: string): boolean {
   return save.inventory.items.some((e) => e.id === id);
 }
+
+const isCapped = (kind: ItemKind): kind is PantryItem => kind === 'life' || kind === 'hint';
 
 export interface ItemGrant {
   kind: ItemKind;
@@ -59,13 +79,13 @@ export interface ItemGrant {
  * Grants `n` of an item once per id. Extra lives and hints stop at their cap; the rest is converted to coins (also once).
  * Returns null if this id was already applied.
  */
-export function grantItem(save: Items, id: string, kind: ItemKind, n: number, source: ItemSource, now = new Date(), note?: string): ItemGrant | null {
+export function grantItem(save: Items, id: string, kind: ItemKind, n: number, source: ItemSource, now = new Date(), note?: string, ref?: string): ItemGrant | null {
   if (!Number.isFinite(n) || n <= 0 || hasItemEntry(save, id)) return null;
   const want = Math.round(n);
-  const room = kind === 'points' ? want : Math.max(0, ITEM_CAP[kind] - itemBalance(save, kind));
+  const room = isCapped(kind) ? Math.max(0, ITEM_CAP[kind] - itemBalance(save, kind)) : want;
   const granted = Math.min(want, room);
   // The entry is written even when nothing fit, so the id is spent and can't be granted later.
-  save.inventory.items.push({ id, item: kind, delta: granted, at: now.toISOString(), source, ...(note ? { note } : {}) });
+  save.inventory.items.push({ id, item: kind, delta: granted, at: now.toISOString(), source, ...(note ? { note } : {}), ...(ref ? { ref } : {}) });
   let overflowCoins = 0;
   if (granted < want) {
     const coins = (want - granted) * OVERFLOW_COINS;
@@ -81,6 +101,20 @@ export function useItem(save: Items, id: string, kind: PantryItem, now = new Dat
   if (hasItemEntry(save, id)) return 'already';
   if (itemBalance(save, kind) < 1) return 'none';
   save.inventory.items.push({ id, item: kind, delta: -1, at: now.toISOString(), source: 'use', ...(note ? { note } : {}) });
+  return 'ok';
+}
+
+/**
+ * Spends `amount` of a currency or a referenced item (video tokens, gems, a food) once per id. Never goes below zero.
+ * Test-store entries only count where the test store exists (see `setTestEntriesCount`).
+ */
+export function spendItem(save: Items, id: string, kind: ItemKind, amount: number, now = new Date(), note?: string, ref?: string): UseResult {
+  if (hasItemEntry(save, id)) return 'already';
+  const n = Math.round(amount);
+  if (!Number.isFinite(n) || n <= 0) return 'none';
+  const have = ref ? refBalance(save, kind, ref) : itemBalance(save, kind);
+  if (have < n) return 'none';
+  save.inventory.items.push({ id, item: kind, delta: -n, at: now.toISOString(), source: 'use', ...(note ? { note } : {}), ...(ref ? { ref } : {}) });
   return 'ok';
 }
 

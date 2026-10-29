@@ -37,6 +37,7 @@ mountNav(router);
 router.onChange((r) => track('screen_view', { screen: r.screen }));
 
 app.save.onboarding.sessions++;
+void app.reconcilePurchases();
 catchUpAchievements();
 app.persist();
 track('app_open', { sessions: app.save.onboarding.sessions });

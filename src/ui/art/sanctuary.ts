@@ -99,6 +99,67 @@ const paw = (x: number, y: number, c = '#c8ae84') =>
   `<g fill="${c}"><ellipse cx="${x}" cy="${y + 0.7}" rx="2.4" ry="1.7"/><circle cx="${x - 2.3}" cy="${y - 1.3}" r="0.85"/><circle cx="${x}" cy="${y - 2.1}" r="0.85"/><circle cx="${x + 2.3}" cy="${y - 1.3}" r="0.85"/></g>`;
 
 const DECOR_ART: Record<DecorId, DecorArt> = {
+  kite: {
+    base: -20,
+    box: [16, 4, 72, 72],
+    draw: () => `
+      <path class="sp-kite-line" d="M50 40 C44 56 52 62 46 74" stroke="#8a6a4f" stroke-width="0.8" fill="none" opacity="0.7"/>
+      <g class="sp-kite">
+        <path d="M50 8 L64 24 L50 42 L36 24 Z" fill="#f2b2c2" stroke="${OUT}" stroke-width="1"/>
+        <path d="M50 8 L64 24 L50 24 Z" fill="#f6d27a"/><path d="M36 24 L50 42 L50 24 Z" fill="#9fd3c7"/><path d="M50 24 L64 24 L50 42 Z" fill="#b8a6f0"/>
+        <path d="M50 8 V42 M36 24 H64" stroke="#fff" stroke-width="0.8" opacity="0.8"/>
+        <path d="M50 42 C46 48 54 52 48 58" stroke="#e58a7d" stroke-width="1.1" fill="none"/>
+        <g fill="#f6d27a"><path d="M47 47 l3 1 -3 1z"/><path d="M51 52 l-3 1 3 1z"/></g>
+      </g>`,
+  },
+  balloon: {
+    base: -19,
+    box: [128, 10, 46, 76],
+    draw: () => `
+      <g class="sp-balloon">
+        <path d="M151 64 L144 76 M151 64 L158 76" stroke="#8a6a4f" stroke-width="0.9"/>
+        <path d="M151 14 C137 14 130 26 130 36 C130 48 142 58 147 64 H155 C160 58 172 48 172 36 C172 26 165 14 151 14 Z" fill="#f08a7d" stroke="${OUT}" stroke-width="1"/>
+        <path d="M151 14 C145 20 142 30 143 40 C144 50 147 58 149 64 H153 C155 58 158 50 159 40 C160 30 157 20 151 14 Z" fill="#f6d27a"/>
+        <path d="M137 22 C134 30 134 42 140 52" stroke="#fff" stroke-width="1.6" fill="none" opacity="0.55" stroke-linecap="round"/>
+        <path d="M130 36 H172" stroke="#f9c0b5" stroke-width="1"/>
+        <rect x="143" y="75" width="16" height="8" rx="2" fill="#c99a68" stroke="${OUT}" stroke-width="0.9"/>
+        <path d="M143 79 H159" stroke="#a87b4f" stroke-width="0.8"/>
+      </g>`,
+  },
+  eavelights: {
+    base: 119,
+    box: [200, 56, 100, 52],
+    draw: () => {
+      const bulbs: string[] = [];
+      const colors = ['#f6d27a', '#f2a6bd', '#9fd3c7', '#c9b4f0'];
+      const edge = (x0: number, y0: number, x1: number, y1: number, n: number, k0: number) => {
+        for (let i = 1; i < n; i++) {
+          const t = i / n;
+          const x = x0 + (x1 - x0) * t;
+          const y = y0 + (y1 - y0) * t + Math.sin(Math.PI * t) * 3 + 2.5;
+          bulbs.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="${colors[(i + k0) % 4]}" opacity="0.35"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.7" fill="${colors[(i + k0) % 4]}"/>`);
+        }
+      };
+      edge(206, 97, 250, 62, 7, 0);
+      edge(250, 62, 294, 97, 7, 2);
+      return `<path d="M206 99 Q228 84 250 64 Q272 84 294 99" stroke="#5b4a3a" stroke-width="0.7" fill="none" opacity="0.6"/><g class="sp-glow-bulbs">${bulbs.join('')}</g>`;
+    },
+  },
+  goldfountain: {
+    base: 182,
+    box: [116, 126, 66, 60],
+    draw: () => `
+      <ellipse cx="149" cy="181" rx="30" ry="5.5" fill="${SHADOW}"/>
+      <path d="M121 166 C121 180 177 180 177 166 V170 C177 184 121 184 121 170 Z" fill="#d9a83c"/>
+      <ellipse cx="149" cy="166" rx="28" ry="8" fill="#f2cf72" stroke="#b8862a" stroke-width="1.1"/>
+      <ellipse cx="149" cy="166" rx="23" ry="5.6" fill="#bfe3ea"/>
+      <rect x="145" y="148" width="8" height="18" rx="2" fill="#f0c55e" stroke="#b8862a" stroke-width="0.9"/>
+      <ellipse cx="149" cy="148" rx="12" ry="3.6" fill="#f7dc8c" stroke="#b8862a" stroke-width="1"/>
+      <path d="M143 144 l6 -9 6 9z" fill="#f2cf72" stroke="#b8862a" stroke-width="0.8"/>
+      <path d="M149 134 C149 130 149 129 149 127" stroke="#bfe3ea" stroke-width="2.4" stroke-linecap="round"/>
+      <g class="sp-water" fill="none" stroke="#a9d8e1" stroke-width="1.6" stroke-linecap="round"><path d="M149 128 C140 131 136 140 134 152"/><path d="M149 128 C158 131 162 140 164 152"/><path d="M139 149 C134 152 131 158 130 163"/><path d="M159 149 C164 152 167 158 168 163"/></g>
+      <g fill="#fff8d6"><path d="M128 158 l1 -3 1 3 3 1 -3 1 -1 3 -1 -3 -3 -1z"/><path d="M170 160 l.8 -2.4 .8 2.4 2.4 .8 -2.4 .8 -.8 2.4 -.8 -2.4 -2.4 -.8z"/></g>`,
+  },
   path: {
     base: 144,
     box: [186, 140, 76, 158],
