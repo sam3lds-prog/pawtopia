@@ -19,6 +19,7 @@ import { regionScene } from '../art/regions';
 import { decorIcon, SCENE_VIEWBOX } from '../art/sanctuary';
 import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
 import { animalName, startSceneActivities, type ActivityRunner } from '../components/activities';
+import { mountTrickTray } from '../components/tricks';
 import { toast } from '../components/sheet';
 import { esc, h, plural } from '../dom';
 import { ICON } from '../icons';
@@ -47,6 +48,9 @@ export const regionScreen: ScreenDef = {
     const el = h(`<div class="sanctuary region" style="--accent:${def.accent}"></div>`);
     root.appendChild(el);
 
+    // Tricks: a tray under the scene for the animal you tap (kept across re-renders).
+    const trayHost = h(`<div class="trick-tray-slot" hidden></div>`);
+    const tray = mountTrickTray(scope, trayHost, () => el.querySelector<SVGSVGElement>('.sanctuary__scene svg'));
     let life: SceneLife | null = null;
     let acts: ActivityRunner | null = null;
     scope.onDispose(() => {
@@ -154,6 +158,8 @@ export const regionScreen: ScreenDef = {
       const svg = el.querySelector<SVGSVGElement>('.sanctuary__scene svg');
       life = svg ? startSceneLife(svg, `region-${id}`) : null;
       acts = svg && open ? startSceneActivities(svg, el.querySelector('[data-chat]'), app.reducedMotion, animalName) : null;
+      (el.querySelector('[data-chat]') ?? el.querySelector('.sanctuary__scene'))?.after(trayHost);
+      tray.refresh();
     }
     render();
 
@@ -170,6 +176,7 @@ export const regionScreen: ScreenDef = {
       const fig = t.closest('.sanctuary__scene .sanctuary__pet') as HTMLElement | null;
       if (fig) {
         life?.tap(fig);
+        tray.open(fig as unknown as SVGGElement);
         return;
       }
       const dec = t.closest('.sanctuary__scene [data-decor].has-act') as HTMLElement | null;

@@ -1,8 +1,9 @@
 /**
- * Shop, in three tabs:
+ * Shop, in four tabs:
  *  - **Decor**: everyday decorations for Paw Coins (earned by solving), special ones for video tokens (earned only by
  *    choosing to watch a reward video), premium ones for gems (bought on the App Store).
- *  - **Food & treats**: food for Paw Coins, special treats for video tokens. Fed to animals from their cards.
+ *  - **Food**: food for Paw Coins, special treats for video tokens. Fed to animals from their cards.
+ *  - **Tricks**: two free, everyday ones for video tokens, the most animated ones for gems (D33).
  *  - **Gems**: gem packs with store prices, honestly "coming soon" until a store is connected.
  * Nothing here changes puzzles or rankings; there are no countdowns, fake discounts or random packs.
  */
@@ -26,13 +27,18 @@ import { ads } from '../../services/ads';
 import { decorIcon } from '../art/sanctuary';
 import { activityFor } from '../art/activities';
 import { foodIcon } from '../art/foods';
+import { trickBadge } from '../art/tricks';
+import { TRICKS, trickCurrency, type TrickId, type TrickTier } from '../../meta/catalogs/tricks';
+import { ownsTrick } from '../../meta/tricks';
+import { showTrickSheet } from '../components/tricks';
 import { openSheet, toast } from '../components/sheet';
 import { walletPills } from '../components/wallet';
 import { actionOf, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { Scope, ScreenDef } from '../router';
 
-type Tab = 'decor' | 'food' | 'gems';
+type Tab = 'decor' | 'food' | 'tricks' | 'gems';
+const TAB_LABEL: Record<Tab, string> = { decor: 'Decor', food: 'Food', tricks: 'Tricks', gems: 'Gems' };
 /** The tab and sanctuary the player last looked at, for this app session. */
 let lastTab: Tab = 'decor';
 let lastPlace: SanctuaryId = 'harmony';
@@ -63,6 +69,7 @@ export const shopScreen: ScreenDef = {
       tab = lastTab = 'decor';
       lastPlace = route.sanctuary;
     }
+    if (route.screen === 'shop' && route.tab) tab = lastTab = route.tab;
     let place: SanctuaryId = lastPlace;
     let products: ProductInfo[] = PRODUCT_CATALOG.map((p) => ({ ...p, price: null }));
     void iap.products().then((ps) => {
@@ -162,6 +169,38 @@ export const shopScreen: ScreenDef = {
         </section>`;
     }
 
+    function trickCard(id: TrickId): string {
+      const t = TRICKS.find((x) => x.id === id)!;
+      const have = ownsTrick(app.save, id);
+      const cur = trickCurrency(t);
+      const state = have ? `<span class="shop-card__state">${ICON.check}${t.tier === 'free' ? 'Free' : 'Yours'}</span>` : cur ? priceTag(cur, t.price) : '';
+      const label = have ? `${t.name}, yours` : `${t.name}, ${t.price} ${cur ? CURRENCY_NAME[cur] : ''}`;
+      return `<li><button class="shop-card card card--tap trick-card ${have ? 'is-owned' : ''} shop-card--${t.tier === 'premium' ? 'premium' : t.tier === 'video' ? 'video' : 'coins'}" data-trick-card="${id}" aria-label="${esc(label)}">
+        <span class="shop-card__art trick-card__art">${trickBadge(t.emote)}</span>
+        <span class="shop-card__name">${esc(t.name)}</span>
+        ${state}
+      </button></li>`;
+    }
+
+    function trickSection(tier: TrickTier, title: string, note: string, extra = ''): string {
+      const items = TRICKS.filter((t) => t.tier === tier);
+      const owned = items.filter((t) => ownsTrick(app.save, t.id)).length;
+      return `<section class="shop-section shop-section--${tier === 'free' ? 'everyday' : tier}">
+        <div class="section-head"><h2>${esc(title)}</h2>${tier === 'free' ? '' : `<span class="muted num">${owned} of ${items.length} learned</span>`}</div>
+        <p class="muted shop__note">${note}</p>
+        ${extra}
+        <ul class="shop-grid">${items.map((t) => trickCard(t.id)).join('')}</ul>
+      </section>`;
+    }
+
+    function tricksTab(): string {
+      return `
+        <p class="muted shop__note">Tap any animal in a sanctuary and ask it to do a trick. Tricks are just for fun: they change nothing in your puzzles.</p>
+        ${trickSection('free', 'Everyone knows', 'Every resident and wildlife friend can do these.')}
+        ${trickSection('video', 'Video-token tricks', 'Only for video tokens.', videoTokenCard())}
+        ${trickSection('premium', 'Premium tricks', `The most animated tricks, for gems. ${iap.available ? '' : 'Gem packs are coming soon.'}`)}`;
+    }
+
     function gemsTab(): string {
       const packs = products.filter((p) => isGemPack(p.id));
       const removeAds = products.find((p) => p.id === 'remove_ads');
@@ -173,7 +212,7 @@ export const shopScreen: ScreenDef = {
       return `
         <section class="shop-section">
           <div class="section-head"><h2>Gems</h2><span class="muted num">${ICON.gem}${walletBalance(app.save, 'gem')}</span></div>
-          <p class="muted shop__note">Gems buy premium decorations. They never buy hearts, hints or anything that helps win.</p>
+          <p class="muted shop__note">Gems buy premium decorations and tricks. They never buy hearts, hints or anything that helps win.</p>
           ${status}
           <ul class="gem-packs">
             ${packs
@@ -206,11 +245,11 @@ export const shopScreen: ScreenDef = {
           <div class="screen-head__end">${walletPills()}</div>
         </header>
         <div class="seg" role="tablist" aria-label="Shop sections">
-          ${(['decor', 'food', 'gems'] as Tab[])
-            .map((t) => `<button role="tab" class="seg__btn" data-tab="${t}" aria-selected="${t === tab}">${t === 'decor' ? 'Decor' : t === 'food' ? 'Food & treats' : `${ICON.gem}Gems`}</button>`)
+          ${(['decor', 'food', 'tricks', 'gems'] as Tab[])
+            .map((t) => `<button role="tab" class="seg__btn" data-tab="${t}" aria-selected="${t === tab}">${t === 'gems' ? ICON.gem : ''}${TAB_LABEL[t]}</button>`)
             .join('')}
         </div>
-        <div class="shop__body">${tab === 'decor' ? decorTab() : tab === 'food' ? foodTab() : gemsTab()}</div>`;
+        <div class="shop__body">${tab === 'decor' ? decorTab() : tab === 'food' ? foodTab() : tab === 'tricks' ? tricksTab() : gemsTab()}</div>`;
     }
     render();
 
@@ -237,6 +276,11 @@ export const shopScreen: ScreenDef = {
       const fc = t.closest('[data-food]') as HTMLElement | null;
       if (fc) {
         foodSheet(scope, fc.dataset.food as FoodId, render);
+        return;
+      }
+      const tc = t.closest('[data-trick-card]') as HTMLElement | null;
+      if (tc) {
+        showTrickSheet(scope, tc.dataset.trickCard as TrickId, { onBought: render });
         return;
       }
       const buy = t.closest('[data-buy]') as HTMLButtonElement | null;

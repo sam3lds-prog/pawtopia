@@ -76,6 +76,8 @@ export function startSceneLife(svg: Element, seedKey: string): SceneLife {
   const play = (id: string, action: AmbientAction) => {
     const node = actors.get(id);
     if (!node) return;
+    // Busy with a trick (D33) or away on a decoration (D32): ambient life waits its turn.
+    if ((node as HTMLElement).dataset?.trick || node.classList.contains('is-away')) return;
     const rig = node.querySelector('g.pet') as SVGElement | null;
     const petId = (node as HTMLElement).dataset?.pet as PetId | undefined;
     if (rig && petId && (action === 'blink' || action === 'look' || action === 'yawn' || action === 'love' || action === 'greet')) {

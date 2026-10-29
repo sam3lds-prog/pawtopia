@@ -270,6 +270,34 @@ try {
   await page.waitForTimeout(6600);
   check('the ride ends and the animal comes back', await page.evaluate(() => !document.querySelector('.sp-act') && !document.querySelector('.is-away')));
 
+  // Tricks: tap an animal, ask for a free trick; a locked one opens its card instead
+  await page.click('.sanctuary__scene .sanctuary__pet');
+  await page.waitForSelector('.trick-tray');
+  check('tapping an animal offers its tricks', /^Ask .+ to…$/.test((await page.textContent('.trick-tray__head b'))?.trim() ?? ''));
+  await page.click('.trick-chip[data-trick="wave"]');
+  const trick = await page.evaluate(() => ({ on: document.querySelector('.sanctuary__scene .sanctuary__pet[data-trick]')?.dataset.trick, emote: !!document.querySelector('.sanctuary__scene .sp-trick .sp-trick-emote') }));
+  check('a free trick plays with its emote', trick.on === 'wave' && trick.emote, JSON.stringify(trick));
+  await page.waitForTimeout(1800);
+  check('the trick ends by itself', await page.evaluate(() => !document.querySelector('.sp-trick') && !document.querySelector('.sanctuary__scene [data-trick]')));
+  await page.click('.trick-chip[data-trick="backflip"]');
+  await page.waitForSelector('.trick-sheet');
+  check('a premium trick opens its card, bought with gems only', /gem/i.test(await page.textContent('.trick-sheet')) && !(await page.$('.trick-sheet [data-act="watch"]')));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  const spent = await page.evaluate(() => {
+    const s = window.__pt.app.save;
+    return s.inventory.items.length;
+  });
+  await page.click('.trick-chip[data-trick="spin"]');
+  await page.waitForSelector('.trick-sheet');
+  check('a video-token trick can’t be bought without tokens', !!(await page.$('.trick-sheet button[disabled]')) && !(await page.$('.trick-sheet [data-act="buy"]')));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  check('looking at tricks charges nothing', (await page.evaluate(() => window.__pt.app.save.inventory.items.length)) === spent);
+  await page.evaluate(() => window.__pt.go({ screen: 'shop', tab: 'tricks' }));
+  await page.waitForSelector('.trick-card');
+  check('the Shop lists every trick', (await page.$$('.trick-card')).length === 10);
+
   // Paw Cup: an open attempt survives other play, resumes, and scores from its full move log
   await page.evaluate(() => window.__pt.go({ screen: 'league' }));
   await page.click('.segmented [data-tab="week"]');

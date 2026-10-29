@@ -55,9 +55,12 @@ Defects confirmed in source and fixed in Sprint 0:
   regional animals; 16 regional decorations; Animal album
 - [x] **Sprint I** (D29) — animals greet you, react to food and taps, stroll; livelier, still calm
 - [x] **Sprint J** (D30) — opt-in Paw Points leaderboard on Firebase, every solve replayed by the server
+- [x] **Sprint K** (D31) — steeper Journey: 7×7 from level 6, 8×8 from 15, 9×9 from 40 (spec 3, pack 3 for 6–150)
+- [x] **Sprint L** (D32) — animals use the special and premium decorations (balloon rides, kite flying, hammock naps…)
+- [x] **Sprint M** (D33) — tricks with emotes: two free, four for video tokens, four premium for gems
 - [ ] Game Center and online Paw Cup leagues — not started
 
-Test count: 275 unit tests + 54 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~150 kB JS gzipped for the app (incl. both level packs); the Firebase SDK loads only when the leaderboard is used.
+Test count: 297 unit tests + 63 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~163 kB JS gzipped for the app (incl. all three level packs); the Firebase SDK loads only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.

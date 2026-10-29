@@ -459,3 +459,377 @@
 :root[data-motion='reduce'] .sanctuary__scene .sp-act * {
   animation: none !important;
 }
+
+/* ================================================================== Tricks (D33) */
+.sanctuary__scene .sp-trick {
+  pointer-events: none;
+}
+.sanctuary__scene .sp-trick-emote,
+.sanctuary__scene .sp-trick-orb,
+.sanctuary__scene .sp-trick-pop,
+.sanctuary__scene .sp-trick-burst,
+.sanctuary__scene .sp-trick-ball,
+.sanctuary__scene .sp-trick-notes {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+.sanctuary__scene.is-live .sp-trick--wave .sp-trick-emote {
+  animation: sp-emote 1600ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sp-trick--hop .sp-trick-emote {
+  animation: sp-emote 1300ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sp-trick--spin .sp-trick-emote {
+  animation: sp-emote 1700ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sp-trick--bow .sp-trick-emote {
+  animation: sp-emote 1900ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sp-trick--rollover .sp-trick-emote {
+  animation: sp-emote 1900ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sp-trick--dance .sp-trick-emote {
+  animation: sp-emote 2400ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sp-trick--backflip .sp-trick-emote {
+  animation: sp-emote 2200ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sp-trick--bubble .sp-trick-emote {
+  animation: sp-emote 3400ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sp-trick--juggle .sp-trick-emote {
+  animation: sp-emote 3200ms ease-out forwards;
+}
+.sanctuary__scene.is-live .sp-trick--rainbow .sp-trick-emote {
+  animation: sp-emote 3400ms ease-out forwards;
+}
+@keyframes sp-emote {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  20% {
+    transform: none;
+  }
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* Wave: a friendly sway. */
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-wave {
+  animation: sp-trick-wave 1600ms ease-in-out;
+}
+@keyframes sp-trick-wave {
+  0%,
+  100% {
+    transform: none;
+  }
+  15%,
+  45% {
+    transform: rotate(-7deg);
+  }
+  30%,
+  60% {
+    transform: rotate(6deg);
+  }
+  75% {
+    transform: rotate(-3deg);
+  }
+}
+
+/* Hop: two happy hops. */
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-hop {
+  animation: sp-trick-hop 1300ms ease-out;
+}
+@keyframes sp-trick-hop {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translateY(-10px);
+  }
+  40% {
+    transform: scale(1.05, 0.95);
+  }
+  62% {
+    transform: translateY(-8px);
+  }
+  82% {
+    transform: scale(1.03, 0.97);
+  }
+}
+
+/* Spin: turning round twice. */
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-spin {
+  animation: sp-trick-spin 1700ms ease-in-out;
+}
+@keyframes sp-trick-spin {
+  0%,
+  50%,
+  100% {
+    transform: none;
+  }
+  25%,
+  75% {
+    transform: scaleX(-1) translateY(-3px);
+  }
+}
+
+/* Bow: a slow, proud bow. */
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-bow {
+  animation: sp-trick-bow 1900ms ease-in-out;
+}
+@keyframes sp-trick-bow {
+  0%,
+  100% {
+    transform: none;
+  }
+  30%,
+  70% {
+    transform: rotate(14deg) translateY(2px);
+  }
+}
+
+/* Roll over: a full roll. */
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-rollover {
+  transform-origin: 50% 60%;
+  animation: sp-trick-roll 1900ms ease-in-out;
+}
+@keyframes sp-trick-roll {
+  0% {
+    transform: none;
+  }
+  15% {
+    transform: translate(-4px, 2px) rotate(-20deg);
+  }
+  70% {
+    transform: translate(6px, 0) rotate(360deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Happy dance, with music notes. */
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-dance {
+  animation: sp-act-dance 2400ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-trick--dance .sp-trick-notes {
+  animation: sp-act-float 1200ms ease-out 2;
+}
+
+/* Backflip: a crouch, a big flip, a landing in a shower of stars. */
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-backflip {
+  transform-origin: 50% 50%;
+  animation: sp-trick-flip 2200ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+@keyframes sp-trick-flip {
+  0% {
+    transform: none;
+  }
+  15% {
+    transform: translateY(2px) scale(1.06, 0.9);
+  }
+  52% {
+    transform: translateY(-36px) rotate(-360deg);
+  }
+  70% {
+    transform: translateY(0) rotate(-360deg) scale(1.08, 0.88);
+  }
+  82%,
+  100% {
+    transform: rotate(-360deg);
+  }
+}
+.sanctuary__scene.is-live .sp-trick--backflip .sp-trick-burst {
+  transform-origin: 50% 50%;
+  animation: sp-trick-burst 2200ms ease-out forwards;
+}
+@keyframes sp-trick-burst {
+  0%,
+  66% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  78% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35) translateY(-4px);
+  }
+}
+
+/* Bubble float: up inside a bubble, then pop. */
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-bubble {
+  animation: sp-trick-float 3400ms ease-in-out;
+}
+@keyframes sp-trick-float {
+  0%,
+  100% {
+    transform: none;
+  }
+  15% {
+    transform: translateY(-4px);
+  }
+  40% {
+    transform: translate(-4px, -22px);
+  }
+  62% {
+    transform: translate(4px, -28px);
+  }
+  86% {
+    transform: translate(0, -26px);
+  }
+}
+.sanctuary__scene.is-live .sp-trick--bubble .sp-trick-orb {
+  transform-origin: 50% 50%;
+  animation: sp-trick-orb 3400ms ease-in-out forwards;
+}
+@keyframes sp-trick-orb {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+  40% {
+    transform: translate(-4px, -22px);
+  }
+  62% {
+    transform: translate(4px, -28px);
+  }
+  84% {
+    opacity: 1;
+    transform: translate(0, -26px);
+  }
+  90%,
+  100% {
+    opacity: 0;
+    transform: translate(0, -26px) scale(1.3);
+  }
+}
+.sanctuary__scene.is-live .sp-trick--bubble .sp-trick-pop {
+  transform-origin: 50% 50%;
+  animation: sp-trick-pop 3400ms ease-out forwards;
+}
+@keyframes sp-trick-pop {
+  0%,
+  84% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* Star juggling: three stars up and over, one after another. */
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-juggle {
+  animation: sp-act-bob 3200ms ease-in-out;
+}
+.sanctuary__scene.is-live .sp-trick--juggle .sp-trick-ball {
+  opacity: 0;
+  animation: sp-trick-ball 840ms ease-in-out 3 alternate;
+}
+.sanctuary__scene.is-live .sp-trick--juggle .sp-trick-ball--1 {
+  animation-delay: 330ms;
+}
+.sanctuary__scene.is-live .sp-trick--juggle .sp-trick-ball--2 {
+  animation-delay: 660ms;
+}
+@keyframes sp-trick-ball {
+  0% {
+    opacity: 1;
+    transform: translate(-8px, 6px);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(0, -16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(8px, 6px);
+  }
+}
+
+/* Rainbow leap: a rainbow paints itself and the animal leaps over it, then trots back. It leaps toward the middle of
+   the scene (--trick-dir, set on the figure: 1 = right, -1 = left). */
+.sanctuary__scene.is-live .sanctuary__pet.is-trick-rainbow {
+  animation: sp-trick-leap 3400ms ease-in-out;
+}
+@keyframes sp-trick-leap {
+  0% {
+    transform: none;
+  }
+  12% {
+    transform: translateY(2px) scale(1.05, 0.92);
+  }
+  40% {
+    transform: translate(calc(22px * var(--trick-dir, 1)), -32px);
+  }
+  62% {
+    transform: translate(calc(44px * var(--trick-dir, 1)), 0);
+  }
+  70% {
+    transform: translate(calc(44px * var(--trick-dir, 1)), 0) scale(1.05, 0.94);
+  }
+  76% {
+    transform: translate(calc(44px * var(--trick-dir, 1)), 0) scaleX(-1);
+  }
+  96% {
+    transform: translate(0, 0) scaleX(-1);
+  }
+  100% {
+    transform: none;
+  }
+}
+.sanctuary__scene.is-live .sp-trick--rainbow .sp-trick-rainbow path {
+  stroke-dasharray: 100;
+  animation: sp-trick-paint 3400ms ease-out forwards;
+}
+@keyframes sp-trick-paint {
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 1;
+  }
+  40% {
+    stroke-dashoffset: 0;
+  }
+  85% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+.sanctuary__scene.is-live .sp-trick--rainbow .sp-trick-burst {
+  transform-origin: 50% 50%;
+  animation: sp-trick-burst 3400ms ease-out forwards;
+}
+
+/* Reduced motion: the emote shows, still; the animal doesn't move. */
+:root[data-motion='reduce'] .sanctuary__scene .sp-trick,
+:root[data-motion='reduce'] .sanctuary__scene .sp-trick * {
+  animation: none !important;
+}

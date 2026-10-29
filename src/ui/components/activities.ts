@@ -137,8 +137,9 @@ export function startSceneActivities(svg: SVGSVGElement, chat: HTMLElement | nul
   const runner = new ActivityRunner(svg, {
     reducedMotion,
     cast: () => [
-      ...[...svg.querySelectorAll<SVGGElement>('.sanctuary__pet[data-pet]')].map((g) => g.dataset.pet!),
-      ...[...svg.querySelectorAll<SVGGElement>('.sanctuary__friend[data-friend]')].map((g) => g.dataset.friend!),
+      // Not someone in the middle of a trick (D33).
+      ...[...svg.querySelectorAll<SVGGElement>('.sanctuary__pet[data-pet]:not([data-trick])')].map((g) => g.dataset.pet!),
+      ...[...svg.querySelectorAll<SVGGElement>('.sanctuary__friend[data-friend]:not([data-trick])')].map((g) => g.dataset.friend!),
     ],
     nameOf,
     caption: (text) => {

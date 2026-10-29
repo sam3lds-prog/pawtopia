@@ -16,6 +16,7 @@ import { SANCTUARY_BY_ID } from '../../meta/catalogs/sanctuaries';
 import { companionSvg } from '../art/companions';
 import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
 import { animalName, startSceneActivities, type ActivityRunner } from '../components/activities';
+import { mountTrickTray } from '../components/tricks';
 import { localDateKey } from '../../game/dates';
 import { track } from '../../services/analytics';
 import { afterDecorChange, afterSanctuaryVisit } from '../../app/events';
@@ -64,6 +65,10 @@ export const sanctuaryScreen: ScreenDef = {
     const el = h(`<div class="sanctuary"></div>`);
     root.appendChild(el);
 
+    // Tricks: a tray under the scene for the animal you tap (kept across re-renders).
+    const trayHost = h(`<div class="trick-tray-slot" hidden></div>`);
+    const tray = mountTrickTray(scope, trayHost, () => el.querySelector<SVGSVGElement>('.sanctuary__scene svg'));
+
     // ---------------------------------------------------------------- ambient life (D24)
     let life: SceneLife | null = null;
     let acts: ActivityRunner | null = null;
@@ -82,6 +87,8 @@ export const sanctuaryScreen: ScreenDef = {
       const svg = el.querySelector<SVGSVGElement>('.sanctuary__scene svg');
       life = svg ? startSceneLife(svg, 'sanct') : null;
       acts = svg ? startSceneActivities(svg, el.querySelector('[data-chat]'), app.reducedMotion, animalName) : null;
+      (el.querySelector('[data-chat]') ?? el.querySelector('.sanctuary__scene'))?.after(trayHost);
+      tray.refresh();
     }
 
     /** Feeding or patting from a card: the animal reacts in the garden once the card is closed. */
@@ -171,6 +178,7 @@ export const sanctuaryScreen: ScreenDef = {
       const fig = t.closest('.sanctuary__scene .sanctuary__pet') as HTMLElement | null;
       if (fig) {
         life?.tap(fig);
+        tray.open(fig as unknown as SVGGElement);
         return;
       }
       // A tap on a decoration someone can use: they go and use it (ride the balloon, splash in the fountain…).

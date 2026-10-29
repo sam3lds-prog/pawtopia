@@ -93,6 +93,13 @@ plays arrival greetings; `styles/sanctuary-life.css` holds all sanctuary motion,
 friends (`meta/catalogs/companions.ts`, `ui/art/companions.ts`) are separate from the cat/dog residents. Regional
 scenes (`ui/art/regions.ts`) are built from stage features, regional decor and their three animals. D24, D28, D29.
 
+**Play.** Special and premium decorations have activities (`ui/art/activities.ts` for the rider and props,
+`ui/components/activities.ts` → `ActivityRunner` for when and who): a copy of an animal rides the balloon or naps in
+the hammock while its own figure steps away. Tricks (`meta/catalogs/tricks.ts`, `meta/tricks.ts` for owning and
+buying, `ui/art/tricks.ts` for emotes and props, `ui/components/tricks.ts` for the tray under the scene, the trick card
+and `performTrick`) play on the tapped figure itself. Their motion lives in `styles/sanctuary-play.css` (≤ 6.5 s, no
+loops, reduced motion = still), checked by `test/unit/play.test.ts` and `test/unit/tricks.test.ts`. D32, D33.
+
 ## World map
 
 `ui/art/worldMap.data.ts` is generated once by `scripts/build-world-map.ts` (Natural Earth via world-atlas, Natural

@@ -101,7 +101,7 @@ export type Route =
   | { screen: 'play'; chapter?: number }
   | { screen: 'pets' }
   | { screen: 'league'; tab?: 'leaderboard' | 'week' | 'daily' }
-  | { screen: 'shop'; sanctuary?: SanctuaryId }
+  | { screen: 'shop'; sanctuary?: SanctuaryId; tab?: 'decor' | 'tricks' | 'food' | 'gems' }
   | { screen: 'sanctuary'; welcome?: PetId[] }
   | { screen: 'world' }
   | { screen: 'region'; id: RegionId; fresh?: number }

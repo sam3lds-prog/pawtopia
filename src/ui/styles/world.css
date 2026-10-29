@@ -500,3 +500,161 @@
   flex: none;
   margin-top: 1px;
 }
+
+/* ------------------------------------------------------------------ Tricks (D33) */
+.trick-tray-slot {
+  margin-top: var(--s3);
+}
+.trick-tray-slot[hidden] {
+  display: none;
+}
+.trick-tray {
+  padding: var(--s2) var(--s3) var(--s3);
+  animation: trick-tray-in var(--dur-fade) ease-out;
+}
+@keyframes trick-tray-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+:root[data-motion='reduce'] .trick-tray {
+  animation: none;
+}
+.trick-tray__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.trick-tray__head b {
+  flex: 1;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--t-md);
+}
+.trick-tray__pic {
+  width: 36px;
+  height: 36px;
+  flex: none;
+}
+.trick-tray__pic .portrait {
+  width: 100%;
+  height: 100%;
+}
+.trick-tray__list {
+  list-style: none;
+  margin: var(--s2) calc(-1 * var(--s3)) 0;
+  padding: 2px var(--s3) 4px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 84px;
+  gap: var(--s2);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--s3);
+  scrollbar-width: none;
+}
+.trick-tray__list::-webkit-scrollbar {
+  display: none;
+}
+.trick-tray__list li {
+  display: flex;
+  scroll-snap-align: start;
+}
+.trick-chip {
+  width: 100%;
+  min-height: 72px;
+  padding: 6px 4px;
+  border-radius: var(--r-inner);
+  border: 1.5px solid var(--line);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--ink);
+  transition: transform var(--dur-press) ease-out;
+}
+.trick-chip:active {
+  transform: scale(0.96);
+}
+.trick-chip .trick-badge {
+  width: 28px;
+  height: 28px;
+}
+.trick-chip__name {
+  font-weight: 800;
+  font-size: 12px;
+  line-height: 1.15;
+  text-align: center;
+}
+.trick-chip.is-locked {
+  background: var(--surface);
+  border-style: dashed;
+}
+.trick-chip.is-locked .trick-badge {
+  opacity: 0.55;
+}
+.trick-chip.is-locked .trick-chip__name {
+  color: var(--muted-ink);
+}
+.trick-chip--video.is-locked {
+  border-color: #cfc4f6;
+}
+.trick-chip--premium.is-locked {
+  border-color: #a9dfeb;
+}
+.trick-chip__price {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted-ink);
+}
+.trick-chip__price .ico {
+  width: 13px;
+  height: 13px;
+}
+.trick-card__art .trick-badge {
+  width: 100%;
+  height: 100%;
+}
+.trick-sheet__stage {
+  width: 240px;
+  max-width: 100%;
+  margin: var(--s2) auto 0;
+  border-radius: var(--r-card);
+}
+.trick-sheet__stage,
+.trick-sheet__stage svg {
+  overflow: visible;
+}
+.trick-sheet__stage svg {
+  aspect-ratio: 4 / 3;
+}
+.trick-sheet__again {
+  display: flex;
+  margin: var(--s2) auto 0;
+}
+.trick-sheet__owned {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--brand-tint);
+  color: var(--brand-dark);
+  font-weight: 700;
+}
+.trick-sheet__owned .ico {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.trick-sheet__note {
+  text-align: center;
+  font-size: var(--t-xs);
+}
+.trick-sheet .chip {
+  align-self: center;
+}

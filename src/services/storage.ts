@@ -146,6 +146,8 @@ export interface SaveV2 {
     items: ItemEntry[];
     /** Sanctuary-only wildlife friends (src/meta/catalogs/companions.ts). */
     companions: Record<string, { unlockedAt: string }>;
+    /** Tricks bought (the free ones are always known). */
+    tricks: Record<string, { ownedAt: string }>;
   };
   sanctuary: {
     hidden: Record<string, boolean>;
@@ -284,7 +286,7 @@ export function defaultSave(now = new Date()): SaveV2 {
     daily: { done: {}, bestTimes: {}, streak: 0, bestStreak: 0, lastDate: null, cozyDays: {} },
     zen: { solved: 0, nextSeed: 1 },
     cup: { attempts: {}, open: {} },
-    inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {}, items: [], companions: {} },
+    inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {}, items: [], companions: {}, tricks: {} },
     sanctuary: { hidden: {}, visits: 0, affection: {}, patted: {}, fed: {} },
     ads: { day: null, rewarded: 0 },
     world: { active: null, growth: {}, visited: {} },
@@ -481,6 +483,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       decor: rec(inv.decor, (v) => (isObj(v) ? { ownedAt: str(v.ownedAt, '') } : undefined)),
       items: normItems(inv.items),
       companions: rec(inv.companions, (v) => (isObj(v) ? { unlockedAt: str(v.unlockedAt, '') } : undefined)),
+      tricks: rec(inv.tricks, (v) => (isObj(v) ? { ownedAt: str(v.ownedAt, '') } : undefined)),
     },
     sanctuary: {
       hidden: rec(san.hidden, boolItem),

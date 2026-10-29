@@ -402,3 +402,20 @@ Owner decision (2026-10-29): every gem and video-token decoration gets something
   (`styles/sanctuary-play.css`, checked by `test/unit/play.test.ts`); nothing loops forever; nothing starts by itself
   under reduced motion, and a tap shows the animal in place, still. Paused when the screen is hidden.
 - The Shop's decoration card names the activity, so buying one says what it will do.
+
+## 2026-10-29 · D33 — Tricks: ask an animal to perform, with an emote
+Owner decision (2026-10-29): two free tricks, then everyday tricks for video tokens earned by watching videos, then
+more animated tricks that can only be bought with gems.
+
+- **Ten tricks** (`meta/catalogs/tricks.ts`): Wave and Hop are free and known by everyone. Spin, Take a bow, Roll
+  over and Happy dance cost 2–3 video tokens (which only come from reward videos the player chooses to watch). Backflip
+  (a flip and a shower of stars), Bubble float (floats up in a bubble, then pop), Star juggling and Rainbow leap (over
+  a rainbow that paints itself) cost 40–90 gems and can't be had any other way.
+- **How it plays**: tap any resident or wildlife friend in a sanctuary and a tray opens under the scene — "Ask Mochi
+  to…" — with every trick. A known one plays at once on that animal with an emote bubble beside its head; any other
+  opens its card with a live preview and how to get it. The Shop has a Tricks tab with the same cards. A trick learned
+  once works for every animal. An animal busy on a decoration, or already mid-trick, finishes first.
+- **Charged once** like decorations (`buy:trick:<id>` in the item ledger), saved in `inventory.tricks`.
+- **Motion policy** (extends D24/D32): each trick is 1.3–3.4 s and over by itself; props never outlast it; the board
+  is never touched; under reduced motion only the emote shows, still. Ambient life and activities leave an animal
+  alone while it performs. Tricks change nothing in puzzles, rankings or rewards.
