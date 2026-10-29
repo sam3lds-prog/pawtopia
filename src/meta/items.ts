@@ -14,7 +14,6 @@
  * with an id that already exists does nothing, so replays, double taps and re-runs can't mint or charge twice.
  */
 
-import type { Difficulty } from '../engine/types';
 import type { ItemEntry, SaveV2 } from '../services/storage';
 import { grant } from './ledger';
 
@@ -129,13 +128,8 @@ export function grantStarterItems(save: Items, now = new Date()): boolean {
 
 // ------------------------------------------------------------------ Paw Points & Paw Rank
 
-export const POINTS = {
-  journeyBase: 100,
-  dailyBase: 60,
-  difficulty: { easy: 0, medium: 25, hard: 50, expert: 100 } as Record<Difficulty, number>,
-  clean: 25,
-  hintFree: 25,
-} as const;
+// The point table lives in its own pure module so the leaderboard server can use exactly the same numbers.
+export { POINTS } from './points';
 
 export interface Rank {
   index: number;

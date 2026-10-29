@@ -254,6 +254,7 @@ try {
 
   // Paw Cup: an open attempt survives other play, resumes, and scores from its full move log
   await page.evaluate(() => window.__pt.go({ screen: 'league' }));
+  await page.click('.segmented [data-tab="week"]');
   await page.click('[data-act="ok"]').catch(() => {});
   await page.click('[data-board="0"]');
   await page.click('[data-act="go"]');
@@ -318,6 +319,51 @@ try {
   check('the win sheet says how the sanctuary grew', /Outback/.test((await page.textContent('.win-sheet')) ?? ''));
   await page.evaluate(() => window.__pt.go({ screen: 'shop', sanctuary: 'amazon' }));
   check('a locked sanctuary’s decorations cannot be bought yet', !!(await page.$('.shop-card.is-locked[data-decor="waterfall"]')));
+
+  // Leaderboard (on-device in development builds): opt-in, points only from server-checked solves, leaving deletes all
+  await page.evaluate(() => window.__pt.go({ screen: 'league' }));
+  await page.click('.segmented [data-tab="leaderboard"]');
+  await page.waitForSelector('.lb-join');
+  check('the leaderboard is opt-in and starts with a suggested name', ((await page.inputValue('input[name="nickname"]')) ?? '').length >= 3);
+  await page.fill('input[name="nickname"]', 'no');
+  await page.click('[data-act="join"]');
+  await page.waitForTimeout(300);
+  check('a too-short name is refused with a reason', /characters/.test((await page.textContent('.lb-field__error')) ?? ''));
+  await page.fill('input[name="nickname"]', 'Cozy Otter 77');
+  await page.click('[data-act="join"]');
+  await page.waitForSelector('.lb-me');
+  check('joining shows you on the leaderboard', /Cozy Otter 77/.test((await page.textContent('.lb-me')) ?? ''));
+  await page.evaluate(() => window.__pt.start({ kind: 'level', level: 2 }));
+  await page.waitForSelector('.board');
+  await page.waitForTimeout(400);
+  if (await page.$('.overlay')) await page.evaluate(() => document.querySelector('.overlay [data-act]')?.click());
+  {
+    // At a person's pace: the server doesn't count boards solved faster than a person can place pets.
+    const sol = await page.evaluate(() => window.__pt.app.active.session.puzzle.solution);
+    for (let r = 0; r < sol.length; r++)
+      for (let c = 0; c < sol.length; c++) {
+        const cells = await page.evaluate(() => window.__pt.app.active?.session.cells);
+        if (!cells || !sol[r][c] || cells[r][c] === sol[r][c]) continue;
+        await page.waitForTimeout(320);
+        await page.click(`[data-tool="${sol[r][c] === 1 ? 'cat' : 'dog'}"]`);
+        await page.click(`.cell[data-r="${r}"][data-c="${c}"]`);
+      }
+    await page.waitForSelector('.win-sheet', { timeout: 5000 });
+  }
+  const lbTotal = await page
+    .waitForFunction(() => {
+      const l = window.__pt.app.save.leaderboard;
+      return l.pending.length === 0 && (l.last?.total ?? 0) > 0 && l.last.total;
+    }, null, { timeout: 8000 })
+    .then((h) => h.jsonValue(), () => 0);
+  check('a solved level adds server-checked points to the leaderboard', lbTotal > 100, String(lbTotal));
+  await page.evaluate(() => window.__pt.go({ screen: 'league' }));
+  await page.waitForSelector('.lb-row.is-you');
+  check('the table shows your points', Number(((await page.textContent('.lb-row.is-you .lb-pts')) ?? '0').replace(/\D/g, '')) === lbTotal);
+  await page.click('.lb-actions [data-act="leave"]');
+  await page.click('.overlay [data-act="leave"]');
+  await page.waitForSelector('.lb-join');
+  check('leaving the leaderboard deletes your entry', await page.evaluate(() => !window.__pt.app.save.leaderboard.joined && !(localStorage.getItem('pawtopia.lb.device') ?? '').includes('Cozy Otter 77')));
 
   // Scoped reset
   await page.evaluate(() => window.__pt.go({ screen: 'home' }));

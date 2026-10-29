@@ -13,7 +13,7 @@
 import { type KV, platformKV, safeParse } from './kv';
 import type { ModeRef } from '../game/modes';
 import { isValidModeRef } from '../game/modes';
-import type { SessionSnapshot } from '../game/session';
+import type { SessionEvent, SessionSnapshot } from '../game/session';
 import { dailySpec, levelSpec } from '../engine/levels';
 
 // ------------------------------------------------------------------ keys
@@ -161,6 +161,8 @@ export interface SaveV2 {
   ads: { day: string | null; rewarded: number };
   /** The world map: which regional sanctuary you're building, and how much each has grown (puzzles solved there). */
   world: { active: string | null; growth: Record<string, number>; visited: Record<string, string> };
+  /** The online leaderboard (opt-in). Solved boards wait here until the server has checked them. */
+  leaderboard: LeaderboardSave;
   missions: { dayKey: string | null; weekKey: string | null; progress: Record<string, number>; claimed: Record<string, boolean> };
   achievements: Record<string, string>; // id → unlockedAt
   stats: {
@@ -220,6 +222,59 @@ export function defaultSettings(): Settings {
   };
 }
 
+export interface PendingSolve {
+  key: string;
+  mode: { kind: 'level'; level: number } | { kind: 'daily'; dateKey: string };
+  spec: 1 | 2;
+  events: SessionEvent[];
+  at: string;
+}
+
+export interface LeaderboardSave {
+  joined: boolean;
+  nickname: string;
+  avatar: string;
+  joinedAt: string | null;
+  /** Solved boards not yet sent (newest last, capped). */
+  pending: PendingSolve[];
+  /** Award ids the server has confirmed, so a board that can't earn anything more isn't sent again. */
+  awarded: Record<string, boolean>;
+  /** The latest totals the server returned. */
+  last: { total: number; week: number; weekKey: string; at: string } | null;
+}
+
+/** Most solved boards kept waiting to be sent (the oldest are dropped first). */
+export const LB_PENDING_MAX = 30;
+
+export function defaultLeaderboard(): LeaderboardSave {
+  return { joined: false, nickname: '', avatar: 'mochi', joinedAt: null, pending: [], awarded: {}, last: null };
+}
+
+function normLeaderboard(x: unknown): LeaderboardSave {
+  const d = defaultLeaderboard();
+  if (!isObj(x)) return d;
+  const pending: PendingSolve[] = [];
+  if (Array.isArray(x.pending))
+    for (const p of x.pending) {
+      if (!isObj(p) || !isObj(p.mode) || !Array.isArray(p.events) || (p.spec !== 1 && p.spec !== 2) || typeof p.key !== 'string') continue;
+      const m = p.mode;
+      const mode = m.kind === 'level' && Number.isInteger(m.level) ? { kind: 'level' as const, level: m.level as number } : m.kind === 'daily' && typeof m.dateKey === 'string' ? { kind: 'daily' as const, dateKey: m.dateKey } : null;
+      if (!mode) continue;
+      pending.push({ key: p.key, mode, spec: p.spec, events: p.events.slice(0, 4000) as SessionEvent[], at: str(p.at, '') });
+    }
+  pending.splice(0, Math.max(0, pending.length - LB_PENDING_MAX));
+  const l = isObj(x.last) ? x.last : null;
+  return {
+    joined: x.joined === true,
+    nickname: str(x.nickname, ''),
+    avatar: str(x.avatar, 'mochi'),
+    joinedAt: strOrNull(x.joinedAt),
+    pending,
+    awarded: rec(x.awarded, boolItem),
+    last: l && typeof l.weekKey === 'string' ? { total: int(l.total, 0, 0), week: int(l.week, 0, 0), weekKey: l.weekKey, at: str(l.at, '') } : null,
+  };
+}
+
 export function defaultSave(now = new Date()): SaveV2 {
   return {
     progressVersion: 2,
@@ -233,6 +288,7 @@ export function defaultSave(now = new Date()): SaveV2 {
     sanctuary: { hidden: {}, visits: 0, affection: {}, patted: {}, fed: {} },
     ads: { day: null, rewarded: 0 },
     world: { active: null, growth: {}, visited: {} },
+    leaderboard: defaultLeaderboard(),
     missions: { dayKey: null, weekKey: null, progress: {}, claimed: {} },
     achievements: {},
     stats: { solved: 0, clean: 0, hintFree: 0, losses: 0, comebacks: 0, bestBySize: {}, sizesThisWeek: {}, playDays: {}, lastWin: null },
@@ -439,6 +495,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       growth: isObj(x.world) ? rec(x.world.growth, numItem) : {},
       visited: isObj(x.world) ? rec(x.world.visited, strItem) : {},
     },
+    leaderboard: normLeaderboard(x.leaderboard),
     missions: {
       dayKey: strOrNull(mi.dayKey),
       weekKey: strOrNull(mi.weekKey),

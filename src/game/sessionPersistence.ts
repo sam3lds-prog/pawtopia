@@ -16,8 +16,9 @@ export function captureSession(mode: ModeRef, session: Session, now = new Date()
     generatorVersion: GENERATOR_VERSION,
     specVersion: spec,
     savedAt: now.toISOString(),
-    // Paw Cup keeps its full input log so the attempt is scored by replaying every move, across resumes.
-    snap: session.snapshot(mode.kind === 'cup'),
+    // Paw Cup keeps its full input log so the attempt is scored by replaying every move, across resumes; Journey and
+    // Daily keep theirs too, so a resumed board can still be checked by the leaderboard server.
+    snap: session.snapshot(mode.kind !== 'zen'),
   };
 }
 

@@ -2,7 +2,7 @@
   "name": "pawtopia",
   "version": "0.2.0",
   "private": true,
-  "description": "Pawtopia — a cozy logic puzzle. One cat and one dog in every row, column and region; a sanctuary that grows as you solve.",
+  "description": "Pawtopia \u2014 a cozy logic puzzle. One cat and one dog in every row, column and region; a sanctuary that grows as you solve.",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -17,15 +17,21 @@
     "pack:build": "tsx scripts/build-level-pack.ts --write && tsx scripts/build-journey-pack.ts --write",
     "pack:check": "tsx scripts/build-level-pack.ts && tsx scripts/build-journey-pack.ts",
     "e2e": "node test/e2e/smoke.mjs",
-    "artifact": "node scripts/make-artifact.mjs"
+    "artifact": "node scripts/make-artifact.mjs",
+    "fb:build": "node scripts/build-functions.mjs",
+    "fb:test": "firebase emulators:exec --only firestore --project demo-pawtopia \"FIREBASE_RULES_TEST=1 vitest run test/firebase\"",
+    "fb:emulators": "npm run fb:build && firebase emulators:start --project demo-pawtopia",
+    "fb:deploy": "npm run fb:build && firebase deploy --only functions,firestore"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.3",
+    "@firebase/rules-unit-testing": "^6.0.0",
     "@types/d3-geo": "^3.1.1",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^26.6.5",
     "@types/topojson-client": "^3.1.5",
     "d3-geo": "^3.1.1",
+    "esbuild": "^0.28.2",
     "topojson-client": "^3.1.0",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3",
@@ -40,6 +46,7 @@
     "@capacitor/ios": "^8.5.3",
     "@fontsource-variable/fredoka": "^5.3.0",
     "@fontsource-variable/nunito-sans": "^5.3.0",
-    "@revenuecat/purchases-capacitor": "^13.7.3"
+    "@revenuecat/purchases-capacitor": "^13.7.3",
+    "firebase": "^13.1.0"
   }
 }

@@ -18,6 +18,7 @@ import { regionScreen } from './ui/screens/region';
 import { needsWelcome, welcomeScreen } from './ui/screens/welcome';
 import { track } from './services/analytics';
 import { catchUpAchievements } from './app/events';
+import { startLeaderboardSync } from './app/leaderboardSync';
 
 const root = document.getElementById('app')!;
 const router = new Router(root);
@@ -42,6 +43,7 @@ router.onChange((r) => track('screen_view', { screen: r.screen }));
 
 app.save.onboarding.sessions++;
 void app.reconcilePurchases();
+startLeaderboardSync();
 catchUpAchievements();
 app.persist();
 track('app_open', { sessions: app.save.onboarding.sessions });

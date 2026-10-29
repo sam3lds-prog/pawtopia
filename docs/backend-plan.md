@@ -1,4 +1,16 @@
-# Pawtopia — Online leagues backend plan (Phase 6, not built)
+# Pawtopia — Online backend
+
+## Built: the Paw Points leaderboard (Sprint J, D30)
+
+Firebase: anonymous Auth, Firestore, four callable Cloud Functions (`functions/`, logic in `src/leaderboard/`). Players
+opt in with a nickname; each Journey level or Daily solved after joining is sent with its move log, rebuilt and
+replayed on the server, and awarded Paw Points once per award id. Weekly (UTC) and all-time tables. Setup:
+`docs/native-setup.md` §3, `functions/README.md`. Privacy: `docs/privacy-security.md`.
+
+Go-live gate for the leaderboard: rules tests pass on the emulator (`npm run fb:test`), App Check enforced, privacy
+label updated, a real-device join → solve → table → leave run on TestFlight.
+
+## Not built: online Paw Cup leagues (Phase 6)
 
 Status: **design only.** `featureFlags.onlineLeagues` stays `false` until every item in "Go-live gate" passes.
 The pure pieces a server needs already exist and are tested: `competitions/scoring.ts`, `competitions/verify.ts`,

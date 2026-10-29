@@ -101,10 +101,12 @@ describe('resume after the app is closed', () => {
     expect(saved.snap.events).toHaveLength(2);
     const back = resumeSession(saved)!;
     expect(back.session.events.map((e) => e.type)).toEqual(['place', 'place']);
-    // Journey boards don't carry the log (they don't need verification).
+    // Journey boards carry theirs too (the leaderboard server replays them); Zen boards don't need one.
     const lvl = { kind: 'level' as const, level: 3 };
     const ls = new Session(puzzleFor(lvl));
-    expect(captureSession(lvl, ls)!.snap.events).toBeUndefined();
+    expect(captureSession(lvl, ls)!.snap.events).toEqual([]);
+    const zen = { kind: 'zen' as const, size: 6, seed: 3 };
+    expect(captureSession(zen, new Session(puzzleFor(zen)))!.snap.events).toBeUndefined();
   });
 });
 

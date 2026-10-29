@@ -100,7 +100,7 @@ export type Route =
   | { screen: 'home' }
   | { screen: 'play'; chapter?: number }
   | { screen: 'pets' }
-  | { screen: 'league' }
+  | { screen: 'league'; tab?: 'leaderboard' | 'week' | 'daily' }
   | { screen: 'shop'; sanctuary?: SanctuaryId }
   | { screen: 'sanctuary'; welcome?: PetId[] }
   | { screen: 'world' }

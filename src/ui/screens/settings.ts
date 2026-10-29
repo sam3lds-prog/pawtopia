@@ -7,6 +7,7 @@ import { setPantry, skipToLevel } from '../../app/qaTools';
 import { iap } from '../../services/iap';
 import { ads } from '../../services/ads';
 import { track } from '../../services/analytics';
+import { leaderboard } from '../../services/leaderboard';
 import { openSheet, toast } from '../components/sheet';
 import { actionOf, esc } from '../dom';
 import type { Scope } from '../router';
@@ -93,7 +94,14 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
       ${purchaseState}
       <div class="rows-title">Your data</div>
       <div class="rows">
-        <div class="row"><span class="row__label">Saved on this device<small>Pawtopia plays fully offline. No account, no sign-in.</small></span></div>
+        <div class="row"><span class="row__label">Saved on this device<small>Pawtopia plays fully offline. ${app.save.leaderboard.joined ? 'Only the leaderboard uses the internet.' : 'No account, no sign-in.'}</small></span></div>
+        <button class="row" data-act="leaderboard"><span class="row__label">Leaderboard<small>${
+          leaderboard.mode === 'off'
+            ? 'Not open yet. When it is, joining is your choice.'
+            : app.save.leaderboard.joined
+              ? `On, as ${esc(app.save.leaderboard.nickname)}. Our server keeps a random player id, that name, a picture and your leaderboard points. Leave in League to delete it all.`
+              : 'Off. If you join (in League), our server keeps a random player id, a nickname, a picture and your leaderboard points. Nothing else.'
+        }</small></span>${ICON.chevron}</button>
         <div class="row"><span class="row__label">Analytics<small>None are sent in this version. Gameplay events stay in memory on your device and are never linked to you.</small></span></div>
         <div class="row"><span class="row__label">Reward videos<small>${ads.available ? (ads.isStub ? 'Test videos only, clearly labeled.' : 'Only when you choose one, for an extra life, a hint or a video token. Never between boards, never in Paw Cup.') : 'This version shows no videos and no ads.'}</small></span></div>
         ${ads.available && !ads.isStub ? `<button class="row" data-act="ad-privacy"><span class="row__label">Ad privacy choices<small>Change what the video network may use</small></span>${ICON.chevron}</button>` : ''}
@@ -163,6 +171,11 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
     }
     const a = actionOf(e);
     if (!a) return;
+    if (a.act === 'leaderboard') {
+      sh.close();
+      app.router.go({ screen: 'league', tab: 'leaderboard' });
+      return;
+    }
     if (a.act === 'ad-privacy') {
       try {
         const { AdMob } = await import('@capacitor-community/admob');

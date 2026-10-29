@@ -66,17 +66,27 @@ consumable transactions and grants any it missed (a crash between paying and sav
 
 ## 3. Leaderboards — Firebase (see `functions/README.md`)
 
-1. Create a Firebase project (Blaze plan, needed for Cloud Functions), add an **iOS app** with the bundle id above and a
-   **Web app** (the game runs in a web view and uses the JS SDK). Enable **Authentication → Anonymous**.
+1. Create a Firebase project (**Blaze** plan, needed for Cloud Functions; a small leaderboard stays well inside the free
+   quotas) and add a **Web app** (the game runs in a web view and uses the JS SDK). Enable **Authentication →
+   Sign-in method → Anonymous**. Create the **Firestore** database (production mode).
 2. From the Web app's config put in `.env.local`:
    `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID`
-   (and `VITE_FIREBASE_REGION` if you deploy functions outside `us-central1`).
-3. Deploy rules and functions: `npm --prefix functions ci && npm run fb:deploy` (needs `firebase login`).
-4. Before inviting players: run the rules tests with the emulator (`npm run fb:test`), enable App Check (App Attest)
-   and set it to enforce for Functions, and update the privacy label (Firebase stores a nickname and progress).
+   (and `VITE_FIREBASE_REGION` if you deploy the functions outside `us-central1`; then also set `FUNCTIONS_REGION` in
+   `functions/.env`). The web config is not a secret; it identifies the project.
+3. Install the Firebase CLI (`npm i -g firebase-tools`), `firebase login`, copy `.firebaserc.example` to `.firebaserc`
+   with your project id, then: `npm --prefix functions install && npm run fb:deploy`. That builds `functions/lib`,
+   deploys the four callable functions (`lbProfile`, `lbSubmit`, `lbReport`, `lbDelete`), the security rules and the
+   two composite indexes (weekly table and weekly rank).
+4. Run the security-rules tests once against the emulator: `npm run fb:test` (needs Java; the CLI downloads the
+   emulator the first time).
+5. Before inviting players: register the iOS app in Firebase, turn on **App Check** with **App Attest**, then set
+   `ENFORCE_APP_CHECK=true` in `functions/.env` and deploy again. Update the App Store privacy label
+   (docs/privacy-security.md has the exact answers).
 
-Players are never signed in automatically: the leaderboard stays local until a player taps "Join the leaderboard" and
-picks a nickname. They can leave and delete their online data from Settings at any time.
+Players are never signed in automatically: nothing reaches Firebase until a player opens League → Leaderboard and taps
+**Join**. Leaving (League → Leaderboard → Leave) deletes their documents and their anonymous account.
+Without the Firebase settings a release build says the leaderboard is coming; development builds and the tester
+preview run the same server logic on the device (a table with only you on it).
 
 ## 4. Tester builds
 

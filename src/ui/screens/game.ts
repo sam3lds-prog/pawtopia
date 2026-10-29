@@ -19,6 +19,7 @@ import { PET_BY_ID } from '../../meta/catalogs/pets';
 import { COMPANION_BY_ID } from '../../meta/catalogs/companions';
 import { SANCTUARY_BY_ID } from '../../meta/catalogs/sanctuaries';
 import { countsForGrowth, growOnSolve, nextStage, openRegions, stageOf, type GrowthNews } from '../../meta/world';
+import { queueSolve, syncLeaderboard } from '../../app/leaderboardSync';
 import { companionSvg } from '../art/companions';
 import { decorIcon } from '../art/sanctuary';
 import { ads, INTERSTITIALS_ENABLED, shouldShowInterstitial } from '../../services/ads';
@@ -803,6 +804,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     const rewards = rewardsForWin(app.save, mode, rec, new Date(), profile.tier);
     // Every solved puzzle (not Paw Cup, not the guided first board) grows the sanctuary being built.
     const growth = countsForGrowth(mode, tutorial) ? growOnSolve(app.save, openedBefore) : null;
+    // On the leaderboard: queue the board (with its move log) for the server to check, then send in the background.
+    const queued = !tutorial && queueSolve(app.save, mode, spec, s.events, result.mistakes, result.hintsUsed);
     const cupScore = mode.kind === 'cup' ? finishAttempt(app.save, mode, s.events, s.elapsedMs()) : null;
     const news = afterSolve(mode, n, result.mistakes, result.hintsUsed);
     app.clearSaved(mode);
@@ -819,6 +822,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     coach('Harmony restored.');
     // The board locks and glows for a beat (faces smile in a wave), then the results rise in stages. Nothing waits on
     // the animation: the sheet's buttons work the moment it opens, and a tap reveals everything at once.
+    if (queued) void syncLeaderboard();
     scope.timeout(() => showWin(rec, result.seconds, rewards, news, cupScore, growth), app.reducedMotion ? 150 : 500);
   }
 

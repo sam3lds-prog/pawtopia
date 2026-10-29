@@ -3,15 +3,21 @@
 //                              npm run artifact -- --qa  →  artifact/pawtopia-qa.html (adds Tester shortcuts in Settings)
 //
 // It is a release build: no dev hooks, no test store, no test ads. Progress is kept in that browser only.
-import { build } from 'vite';
+import { build, loadEnv } from 'vite';
 
 const qa = process.argv.includes('--qa');
 if (qa) process.env.VITE_QA = '1';
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 
 const outDir = 'artifact/dist';
+// Without Firebase settings the leaderboard runs on the device, so the Firebase SDK is never loaded: leave it out of
+// the single file instead of inlining a megabyte nobody uses.
+const env = loadEnv('production', process.cwd(), 'VITE_');
+const firebaseOn = !!(env.VITE_FIREBASE_API_KEY && env.VITE_FIREBASE_PROJECT_ID && env.VITE_FIREBASE_APP_ID);
+const stub = new URL('./firebase-stub.js', import.meta.url).pathname;
 await build({
   logLevel: 'warn',
+  resolve: firebaseOn ? {} : { alias: [{ find: /^firebase\/(app|auth|firestore|functions)$/, replacement: stub }] },
   build: {
     outDir,
     emptyOutDir: true,

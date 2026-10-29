@@ -344,3 +344,25 @@ Owner request: sanctuaries more animated, and animals excited when you visit.
   3.5–9 s (was 5–12 s), plus short strolls (a few steps, a turn, back to its spot). Every action is still ≤ 1.8 s, nothing
   loops forever, everything pauses when the screen is hidden, and under reduced motion nothing moves by itself (a tap
   still gets a smile and a heart). The puzzle board is unchanged: faces only (D11).
+
+## 2026-10-29 · D30 — A real leaderboard on our own server (Firebase)
+Owner decision (2026-10-29): leaderboard on our own server, Firebase.
+
+- **What is ranked**: Paw Points from the Journey and the Daily (the progress measure players already know), in a
+  weekly table (UTC week) and an all-time table. Paw Cup stays offline practice; its online leagues are still Phase 6.
+- **Opt-in**: League → Leaderboard → Join, with a nickname (a friendly suggestion is the default) and a picture of one
+  of the player's welcomed animals. Anonymous sign-in happens only then. Leaving deletes everything.
+- **Fair by construction**: the client never sends points. It sends which board it solved (mode + spec) and the move
+  log; the server rebuilds the board and replays the log with that mode's rules (the same `Session` and verifier the
+  game uses), then awards with the app's own point table. Award ids (`L12`, `clean:L12`, `nohint:L12`, `D<date>`) pay
+  once per account. Logs faster than 250 ms per placement don't count; 60 solves an hour, 250 a day. Only boards solved
+  after joining count (earlier solves have no logs to check). To make every board checkable, a hint that places a pet
+  is now logged as a placement, and Journey/Daily saves keep their move log across resumes.
+- **Names**: 3–20 characters, blocked words, no links; checked on device and server. Three distinct reports replace a
+  name with "Player ####". Only real players are shown, ever.
+- **Shape**: all decisions in `src/leaderboard/` (pure, unit-tested against an in-memory store that enforces Firestore's
+  reads-before-writes); `functions/src/index.ts` only adapts Firestore and Auth. Firestore rules deny all client
+  writes. The Firebase SDK is loaded only when the leaderboard is used. Without Firebase settings, development builds
+  and the tester preview run the same logic on the device (a table with only you); release builds say it's coming.
+- **Not done here**: the security-rules tests and the functions could not be run against the Firebase emulator in this
+  environment (its download is blocked); they are ready to run with `npm run fb:test` / `npm run fb:emulators`.

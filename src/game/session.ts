@@ -472,6 +472,8 @@ export class Session {
     this.noteHint(h);
     this.hintTarget = null;
     this.set(h.r, h.c, h.species);
+    // Logged like a placement so a replay of the log (the leaderboard verifier) reaches the same board.
+    this.log({ t: this.elapsedMs(), type: 'place', r: h.r, c: h.c, s: h.species });
     this.checkWin();
     return h;
   }

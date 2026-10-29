@@ -28,9 +28,17 @@
 - [ ] Release build never uses the dev store; legacy v1 `removeAds` confirmed by a real restore
 - [ ] If ads: maintained SDK, ATT prompt policy, cadence via `shouldShowInterstitial`, none in Paw Cup or onboarding
 
+## Leaderboard (Firebase, only when configured)
+- [ ] `npm run fb:test` passes against the emulator; `npm run fb:deploy` done for the release project
+- [ ] App Check (App Attest) on and `ENFORCE_APP_CHECK=true` deployed
+- [ ] TestFlight: join → solve a level and the Daily → both tables show the points → edit name → leave (documents and
+      auth user gone in the console); airplane mode while joined queues solves and sends them later
+- [ ] A blocked name is refused; a report from three test accounts renames the target
+
 ## App Store Connect
 - [ ] Name "Pawtopia" (bundle id unchanged), subtitle, keywords, age rating (4+, no Kids Category)
-- [ ] Privacy label: "Data Not Collected" for this build; update when SDKs are added
+- [ ] Privacy label matches docs/privacy-security.md for the services this build turns on
 - [ ] Screenshots from the real build (Home, a board with faces, Sanctuary, Residents, Paw Cup practice)
 - [ ] Support URL and privacy policy URL
-- [ ] Review notes: leagues are offline practice; no purchases or ads in this version
+- [ ] Review notes: Paw Cup is offline practice; the leaderboard is opt-in (anonymous, nickname only, leave = delete);
+      gems buy cosmetic decorations only; reward videos only when the player chooses one

@@ -1,8 +1,11 @@
 /**
- * League (Paw Cup). With `featureFlags.onlineLeagues` off — the only state that exists until the verified backend is
- * built — this screen is honest practice: the real five weekly boards with the real rules (no hints, no revives, two
- * attempts, best counts), scores computed by the same replay verifier, kept on this device and never ranked against
- * anyone. The division preview shows only the player. No made-up names, ranks or live counts anywhere.
+ * League: the online **Leaderboard** of Paw Points (opt-in, server-checked, real players only; leaderboardTab.ts), the
+ * **Paw Cup** and the **Daily** history.
+ *
+ * Paw Cup: with `featureFlags.onlineLeagues` off, it is honest practice: the real five weekly boards with the real rules
+ * (no hints, no revives, two attempts, best counts), scores computed by the same replay verifier, kept on this device
+ * and never ranked against anyone. The division preview shows only the player. No made-up names, ranks or live counts
+ * anywhere.
  */
 
 import { app } from '../../app/app';
@@ -21,9 +24,10 @@ import { actionOf, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { Scope, ScreenDef } from '../router';
 import { coinPill } from './home';
+import { mountLeaderboard } from './leaderboardTab';
 
-type Tab = 'week' | 'daily' | 'friends';
-let lastTab: Tab = 'week';
+type Tab = 'leaderboard' | 'week' | 'daily';
+let lastTab: Tab = 'leaderboard';
 
 export function tierEmblem(tier: LeagueTier, size = 56): string {
   const c = TIER_INFO[tier].color;
@@ -43,7 +47,8 @@ export function tierEmblem(tier: LeagueTier, size = 56): string {
 export const leagueScreen: ScreenDef = {
   tab: 'league',
   title: 'League',
-  mount(root, scope) {
+  mount(root, scope, route) {
+    if (route.screen === 'league' && route.tab) lastTab = route.tab;
     track('league_open', { online: featureFlags.onlineLeagues });
     const el = h(`<div class="league"></div>`);
     root.appendChild(el);
@@ -138,22 +143,11 @@ export const leagueScreen: ScreenDef = {
         </ol>`;
     }
 
-    function friendsTab(): string {
-      return `<section class="card empty-card">
-        <span class="empty-card__icon">${ICON.users}</span>
-        <h3>Friend challenges are on the way</h3>
-        <p class="muted">You'll be able to invite a friend with a code and both solve the same board in your own time. Nothing about you is shared unless you choose to.</p>
-      </section>`;
-    }
+    let lbScope: Scope | null = null;
 
-    function render(): void {
+    function cupHead(): string {
       const ends = utcWeekBounds().end.getTime() - Date.now();
-      el.innerHTML = `
-        <header class="screen-head">
-          <h1 data-autofocus>Paw Cup</h1>
-          <div class="screen-head__end">${coinPill()}</div>
-        </header>
-        <section class="league-hero card">
+      return `<section class="league-hero card">
           ${tierEmblem(tier, 64)}
           <div class="league-hero__body">
             <b>${esc(TIER_INFO[tier].name)} · ${esc(utcWeekKey().replace('-W', ' week '))}</b>
@@ -163,30 +157,50 @@ export const leagueScreen: ScreenDef = {
         ${
           featureFlags.onlineLeagues
             ? ''
-            : `<p class="notice">${ICON.info}<span>Online leagues aren't live yet. Practice the real weekly boards with the real rules. Your scores stay on this device and aren't ranked against anyone.</span></p>`
-        }
+            : `<p class="notice">${ICON.info}<span>Paw Cup divisions aren't online yet. Practice the real weekly boards with the real rules. These scores stay on this device and aren't ranked against anyone.</span></p>`
+        }`;
+    }
+
+    function render(): void {
+      lbScope?.dispose();
+      lbScope = null;
+      el.innerHTML = `
+        <header class="screen-head">
+          <h1 data-autofocus>League</h1>
+          <div class="screen-head__end">${coinPill()}</div>
+        </header>
         <div class="segmented" role="tablist" aria-label="League views">
-          <button role="tab" data-tab="week" aria-selected="${lastTab === 'week'}">This week</button>
+          <button role="tab" data-tab="leaderboard" aria-selected="${lastTab === 'leaderboard'}">Leaderboard</button>
+          <button role="tab" data-tab="week" aria-selected="${lastTab === 'week'}">Paw Cup</button>
           <button role="tab" data-tab="daily" aria-selected="${lastTab === 'daily'}">Daily</button>
-          <button role="tab" data-tab="friends" aria-selected="${lastTab === 'friends'}">Friends</button>
         </div>
-        <div class="league__body">${lastTab === 'week' ? weekTab() : lastTab === 'daily' ? dailyTab() : friendsTab()}</div>`;
+        <div class="league__body">${lastTab === 'leaderboard' ? '<div class="lb" data-lb></div>' : lastTab === 'week' ? cupHead() + weekTab() : dailyTab()}</div>`;
+      const host = el.querySelector('[data-lb]') as HTMLElement | null;
+      if (host) {
+        lbScope = scope.child();
+        mountLeaderboard(lbScope, host);
+      }
     }
     render();
 
-    if (!app.save.onboarding.seenLeagueIntro) {
+    // The Paw Cup's welcome shows the first time its tab is opened.
+    const cupIntro = () => {
+      if (lastTab !== 'week' || app.save.onboarding.seenLeagueIntro) return;
       app.save.onboarding.seenLeagueIntro = true;
       app.persist();
       showIntro(scope);
-    }
+    };
+    cupIntro();
 
     scope.on(el, 'click', (e) => {
       const t = e.target as HTMLElement;
+      if (t.closest('[data-lb]')) return; // the leaderboard handles its own taps
       const tab = t.closest('[data-tab]') as HTMLElement | null;
       if (tab) {
         lastTab = tab.dataset.tab as Tab;
         render();
         (el.querySelector(`[data-tab="${lastTab}"]`) as HTMLElement | null)?.focus();
+        cupIntro();
         return;
       }
       const res = t.closest('[data-resume]') as HTMLElement | null;

@@ -21,6 +21,12 @@ export interface VerifyInput {
   serverElapsedMs?: number;
   /** Rules for ranked play. */
   ranked: boolean;
+  /**
+   * Casual boards only (ignored when ranked, which always uses the Paw Cup allowance): whether mistakes cost hearts
+   * and how many hearts the board starts with. Defaults to the Paw Cup allowance.
+   */
+  hearts?: boolean;
+  maxHearts?: number;
 }
 
 export type VerifyProblem =
@@ -45,6 +51,9 @@ export interface VerifyResult {
   score: ScoreBreakdown;
   /** Not grounds for rejection, but worth a human look (e.g. implausibly fast placements). */
   flags: string[];
+  /** Pets placed (including wrong ones) and the log's own duration, for plausibility checks. */
+  placements: number;
+  logMs: number;
 }
 
 export const MAX_EVENTS = 4000;
@@ -60,7 +69,9 @@ export function verifyAttempt(input: VerifyInput): VerifyResult {
   const flags: string[] = [];
   let clockMs = 0;
   // Competitive boards always use the fixed Paw Cup allowance, whatever casual modes allow.
-  const s = new Session(puzzle, { hearts: true, maxHearts: CUP_HEARTS, now: () => clockMs });
+  const s = input.ranked
+    ? new Session(puzzle, { hearts: true, maxHearts: CUP_HEARTS, now: () => clockMs })
+    : new Session(puzzle, { hearts: input.hearts ?? true, maxHearts: input.maxHearts ?? CUP_HEARTS, now: () => clockMs });
   const inBounds = (r: number, c: number) => Number.isInteger(r) && Number.isInteger(c) && r >= 0 && c >= 0 && r < n && c < n;
 
   if (events.length > MAX_EVENTS) problems.add('too-many-events');
@@ -117,8 +128,9 @@ export function verifyAttempt(input: VerifyInput): VerifyResult {
         }
         break;
       case 'revive':
+        // Casual boards: an extra life gives one heart back (D27); older logs refilled every heart after a loss.
         if (input.ranked) problems.add('revive-in-ranked');
-        else s.revive();
+        else if (!s.addHeart()) s.revive();
         break;
       default:
         problems.add('unknown-event');
@@ -126,6 +138,7 @@ export function verifyAttempt(input: VerifyInput): VerifyResult {
   }
 
   const completed = s.outcome === 'won';
+  const placementCount = placements;
   const logElapsed = lastT;
   if (input.serverElapsedMs !== undefined && logElapsed > input.serverElapsedMs + CLOCK_TOLERANCE_MS) problems.add('client-clock-ahead-of-server');
   const elapsedMs = input.serverElapsedMs ?? logElapsed;
@@ -139,5 +152,5 @@ export function verifyAttempt(input: VerifyInput): VerifyResult {
     { completed: valid && completed, elapsedSeconds, mistakes: s.mistakes, hintsUsed, revives },
     input.parSeconds,
   );
-  return { valid, problems: [...problems], completed, mistakes: s.mistakes, hintsUsed, revives, elapsedSeconds, score, flags };
+  return { valid, problems: [...problems], completed, mistakes: s.mistakes, hintsUsed, revives, elapsedSeconds, score, flags, placements: placementCount, logMs: logElapsed };
 }

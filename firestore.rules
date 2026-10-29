@@ -1,0 +1,28 @@
+rules_version = '2';
+
+// Pawtopia leaderboard. Clients never write: every change goes through the callable Cloud Functions
+// (functions/src/index.ts), which replay each solved board before awarding points. Clients may read the public
+// scores (signed in), and their own player document and awards. Everything else is denied.
+// Tested by test/firebase/rules.test.ts (`npm run fb:test`, needs the Firestore emulator).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /scores/{uid} {
+      allow get, list: if request.auth != null;
+      allow write: if false;
+    }
+
+    match /players/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+
+      match /awards/{awardId} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+    }
+  }
+}

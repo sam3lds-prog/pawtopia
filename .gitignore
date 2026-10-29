@@ -12,3 +12,6 @@ ios/DerivedData/
 .env.*
 !.env.example
 artifact/
+.firebase/
+functions/lib/
+functions/node_modules/
