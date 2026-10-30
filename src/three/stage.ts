@@ -72,6 +72,25 @@ export class SceneStage {
   private vw = 360;
   private vh = 300;
   private cutMat = new THREE.MeshBasicMaterial({ colorWrite: false });
+  /** The scene's evening wash (a tinted rect over the drawing), laid over the toys too, where they are. */
+  private dusk = new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.ShaderMaterial({
+      uniforms: { tint: { value: new THREE.Color('#3b3f6b') }, amount: { value: 0.16 } },
+      vertexShader: 'void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: 'uniform vec3 tint; uniform float amount; void main(){ gl_FragColor = vec4(tint * amount, amount); }',
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.AddEquation,
+      // Only where something is drawn (its alpha), and leave that alpha alone.
+      blendSrc: THREE.DstAlphaFactor,
+      blendDst: THREE.OneMinusSrcAlphaFactor,
+      blendSrcAlpha: THREE.ZeroFactor,
+      blendDstAlpha: THREE.OneFactor,
+    }),
+  );
   private cutGeo = new THREE.PlaneGeometry(1, 1);
   private seedBase = Math.floor(Math.random() * 1e6);
   /** Dev only: a frozen clock for stepping through a clip frame by frame. */
@@ -88,6 +107,10 @@ export class SceneStage {
     this.camera = new THREE.PerspectiveCamera((2 * Math.atan(300 / 2 / D) * 180) / Math.PI, 360 / 300, 10, 4000);
     this.camera.position.set(0, 0, D);
     addLights(this.scene);
+    this.dusk.frustumCulled = false;
+    this.dusk.renderOrder = 1000;
+    this.dusk.visible = false;
+    this.scene.add(this.dusk);
     this.effects = new Effects(this.scene, this.kit);
     this.observer = new MutationObserver((records) => this.onMutations(records));
     this.resize = new ResizeObserver(() => this.fit());
@@ -130,6 +153,13 @@ export class SceneStage {
     this.observer.disconnect();
     this.observer.observe(svg, { attributes: true, childList: true, subtree: true, attributeFilter: ['class', 'data-trick'] });
     this.syncFigures();
+    const wash = svg.querySelector('.sp-dusk');
+    this.dusk.visible = !!wash;
+    if (wash) {
+      const m = this.dusk.material as THREE.ShaderMaterial;
+      m.uniforms.tint.value.set(wash.getAttribute('fill') ?? '#3b3f6b');
+      m.uniforms.amount.value = Number(wash.getAttribute('opacity') ?? 0.16);
+    }
     this.fit();
     this.renderNow();
     figure.classList.add('has-3d');
@@ -432,6 +462,8 @@ export class SceneStage {
     this.effects.dispose();
     this.cutGeo.dispose();
     this.cutMat.dispose();
+    this.dusk.geometry.dispose();
+    (this.dusk.material as THREE.Material).dispose();
     this.kit.dispose();
     this.canvas.remove();
     this.renderer.dispose();

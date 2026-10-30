@@ -22,7 +22,7 @@ export function fireflies(dots: Array<[number, number]>, color = '#fff3b0'): str
 
 /** Evening: a dusk wash and fireflies (or stars). */
 export function dusk(dots: Array<[number, number]>, color?: string): string {
-  return `<rect width="360" height="300" fill="#3b3f6b" opacity="0.16" pointer-events="none"/>${fireflies(dots, color)}`;
+  return `<rect class="sp-dusk" width="360" height="300" fill="#3b3f6b" opacity="0.16" pointer-events="none"/>${fireflies(dots, color)}`;
 }
 
 /** Standalone icon of a decoration drawn at scene coordinates. */

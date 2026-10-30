@@ -435,6 +435,14 @@ try {
   check('leaving the leaderboard deletes your entry', await page.evaluate(() => !window.__pt.app.save.leaderboard.joined && !(localStorage.getItem('pawtopia.lb.device') ?? '').includes('Cozy Otter 77')));
 
   // Scoped reset
+  // Settings → 3D animals off: the drawn animals come back, and no 3D layer is made.
+  await page.evaluate(() => window.__pt.go({ screen: 'home' }));
+  await page.click('[data-act="settings"]');
+  await page.click('[data-switch="toys3d"]');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => window.__pt.go({ screen: 'sanctuary' }));
+  await page.waitForTimeout(1200);
+  check('with 3D animals off, the drawn animals show and no 3D layer is made', await page.evaluate(() => !window.__pt.app.settings.toys3d && !document.querySelector('canvas.scene3d') && getComputedStyle(document.querySelector('.sanctuary__scene .sanctuary__pet')).opacity === '1'));
   await page.evaluate(() => window.__pt.go({ screen: 'home' }));
   await page.click('[data-act="settings"]');
   await page.click('[data-act="reset"]');
