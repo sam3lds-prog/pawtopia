@@ -5,7 +5,7 @@
  * that mode's rules and computes the Paw Points itself, with the same table the app uses (`meta/points.ts`).
  *
  * Each award has a stable id (`L12`, `clean:L12`, `nohint:L12`, `D2026-10-29`), so a board pays at most once per
- * account however often it is sent.
+ * account however often it is sent. Both Dailies of a date share one id: a day's Daily pays once, whichever was played.
  */
 
 import { MAX_EVENTS, verifyAttempt } from '../competitions/verify';
@@ -18,7 +18,8 @@ import { isSessionEvent, type SessionEvent } from '../game/session';
 import type { SpecVersion } from '../game/specs';
 import { POINTS } from '../meta/points';
 
-export type BoardRef = { kind: 'level'; level: number } | { kind: 'daily'; dateKey: string };
+/** A Daily is either the two-animal board or (for players before two animals, D35) the one-animal board of that date. */
+export type BoardRef = { kind: 'level'; level: number } | { kind: 'daily'; dateKey: string; rule?: 'solo' };
 
 export interface SolveSubmission {
   mode: BoardRef;
@@ -34,8 +35,7 @@ export interface Award {
 export type RejectReason = 'bad-board' | 'bad-spec' | 'out-of-window' | 'too-long' | 'invalid-log' | 'not-solved' | 'too-fast';
 
 export type CheckResult =
-  | { ok: true; key: string; awards: Award[]; tier: Difficulty; mistakes: number; hintsUsed: number }
-  | { ok: false; key: string; reason: RejectReason };
+  { ok: true; key: string; awards: Award[]; tier: Difficulty; mistakes: number; hintsUsed: number } | { ok: false; key: string; reason: RejectReason };
 
 /** Highest Journey level accepted (far beyond anything a person can reach). */
 export const MAX_LEVEL = 5000;
@@ -58,9 +58,10 @@ export function parseSubmission(x: unknown): SolveSubmission | null {
   if (!m || typeof m !== 'object') return null;
   let mode: BoardRef;
   if (m.kind === 'level' && Number.isInteger(m.level)) mode = { kind: 'level', level: m.level as number };
-  else if (m.kind === 'daily' && typeof m.dateKey === 'string') mode = { kind: 'daily', dateKey: m.dateKey };
+  else if (m.kind === 'daily' && typeof m.dateKey === 'string' && (m.rule === undefined || m.rule === 'solo'))
+    mode = { kind: 'daily', dateKey: m.dateKey, ...(m.rule === 'solo' ? { rule: 'solo' as const } : {}) };
   else return null;
-  if (o.spec !== 1 && o.spec !== 2 && o.spec !== 3) return null;
+  if (o.spec !== 1 && o.spec !== 2 && o.spec !== 3 && o.spec !== 4) return null;
   if (!Array.isArray(o.events) || o.events.length > MAX_EVENTS || !o.events.every(isSessionEvent)) return null;
   return { mode, spec: o.spec, events: o.events };
 }

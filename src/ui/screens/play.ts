@@ -6,6 +6,7 @@ import { hasMeaningfulProgress } from '../../game/sessionPersistence';
 import { localDateKey } from '../../engine/levels';
 import { displayDifficulty } from '../../game/grading';
 import { puzzleFor, sizeFor } from '../../game/puzzles';
+import { dailyFor, playsSolo } from '../../game/modes';
 import { MAX_NEW_BOARD_SIZE } from '../../game/specs';
 import { chapterAt, chapterOf, visibleChapters, type Chapter } from '../../meta/chapters';
 import { arrivalLevels } from '../../meta/rewards';
@@ -97,7 +98,8 @@ export const playScreen: ScreenDef = {
     const chapters = visibleChapters(next);
     let current = route.screen === 'play' && route.chapter !== undefined ? route.chapter : chapterOf(next).index;
     const dailyKey = localDateKey();
-    const daily = { dateKey: dailyKey, size: sizeFor({ kind: 'daily', dateKey: dailyKey }) };
+    const dailyMode = dailyFor(dailyKey, next);
+    const daily = { dateKey: dailyKey, size: sizeFor(dailyMode) };
     const dailyDone = !!save.daily.done[daily.dateKey];
     // The level you're on, with the board it will really open (a saved board keeps its own spec).
     const curMode = { kind: 'level' as const, level: next };
@@ -196,7 +198,8 @@ export const playScreen: ScreenDef = {
         const seed = save.zen.nextSeed;
         save.zen.nextSeed = seed + 1;
         app.persist();
-        startGame({ kind: 'zen', size, seed: 7_000_000 + seed * 97 + size });
+        // Zen follows the Journey: one-animal boards until the second animal has been introduced (D35).
+        startGame({ kind: 'zen', size, seed: 7_000_000 + seed * 97 + size, ...(playsSolo(next) ? { rule: 'solo' as const } : {}) });
         return;
       }
       const a = actionOf(e);
@@ -206,7 +209,7 @@ export const playScreen: ScreenDef = {
       }
       if (a?.act === 'daily') {
         if (dailyDone) toast(`Today's board is done. A new one arrives tomorrow.`);
-        else playMode({ kind: 'daily', dateKey: daily.dateKey });
+        else playMode(dailyMode);
       }
     });
   },

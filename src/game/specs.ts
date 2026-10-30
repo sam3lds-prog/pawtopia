@@ -12,11 +12,13 @@
 
 import { generatePuzzle } from '../engine/generator';
 import { hashString } from '../engine/rng';
+import { generateSoloPuzzle } from '../engine/solo';
 import type { Difficulty, Puzzle } from '../engine/types';
 import { dateFromKey } from './dates';
 import { profileOf } from './grading';
+import { FIRST_PAIR_LEVEL } from './modes';
 
-export type SpecVersion = 1 | 2 | 3;
+export type SpecVersion = 1 | 2 | 3 | 4;
 
 /** First Journey level on spec 2. Levels 61–70 were already 8×8 and stay exactly as players saw them. */
 export const JOURNEY_V2_FROM = 71;
@@ -32,6 +34,8 @@ export interface TargetSpec {
   tier: Difficulty;
   /** Seed namespace; candidate k uses hashString(`${seedKey}#${k}`). */
   seedKey: string;
+  /** 'solo': a one-animal board (D35). */
+  rule?: 'solo';
 }
 
 type Slot = [number, Difficulty];
@@ -177,6 +181,73 @@ export function dailyTargetV2(dateKey: string): TargetSpec {
   return { size, tier, seedKey: `daily-v2-${dateKey}` };
 }
 
+// ------------------------------------------------------------------ spec 4: one animal first (D35)
+
+/**
+ * Journey levels 1–20 are one-animal boards. From level 21 the two-animal Journey starts again from its first lesson:
+ * level L plays the very board that two-animal level L − 20 always had (the five original lessons, then the spec-3
+ * ramp), so nothing new has to be generated or verified for it.
+ */
+export const SOLO_LEVELS = FIRST_PAIR_LEVEL - 1;
+/** The first two-animal Journey level (the lesson that introduces the second animal). */
+export const TWO_ANIMAL_LEVEL = FIRST_PAIR_LEVEL;
+
+/** Levels 1–20, one by one: three 5×5 lessons, then up to 9×9 by level 17, with smaller breathers. */
+const V4_SOLO: Slot[] = [
+  [5, 'easy'],
+  [5, 'easy'],
+  [5, 'medium'],
+  [6, 'easy'],
+  [6, 'medium'],
+  [6, 'medium'],
+  [7, 'easy'],
+  [7, 'medium'],
+  [6, 'hard'],
+  [7, 'medium'],
+  [7, 'hard'],
+  [8, 'easy'],
+  [8, 'medium'],
+  [7, 'hard'],
+  [8, 'medium'],
+  [8, 'hard'],
+  [9, 'medium'],
+  [8, 'hard'],
+  [9, 'medium'],
+  [9, 'hard'],
+];
+
+export function journeyTargetSolo(level: number): TargetSpec {
+  const [size, tier] = V4_SOLO[Math.max(0, Math.min(SOLO_LEVELS, level) - 1)];
+  return { size, tier, seedKey: `journey-solo-${level}`, rule: 'solo' };
+}
+
+/** Whether a Journey level is a one-animal board under a spec. */
+export function isSoloLevel(level: number, spec: SpecVersion): boolean {
+  return spec === 4 && level <= SOLO_LEVELS;
+}
+
+/** The two-animal level (and the spec it was issued under) whose board a spec-4 level from 21 plays. */
+export function pairSourceOf(level: number): { level: number; spec: SpecVersion } {
+  const p = level - SOLO_LEVELS;
+  return { level: p, spec: p >= JOURNEY_V3_FROM ? 3 : 1 };
+}
+
+/** Daily one-animal boards (for players who haven't reached two animals yet), never above 8×8. Index = getDay(). */
+const DAILY_SOLO: Slot[] = [
+  [8, 'medium'], // Sun
+  [6, 'easy'], // Mon
+  [6, 'medium'], // Tue
+  [7, 'medium'], // Wed
+  [7, 'hard'], // Thu
+  [6, 'hard'], // Fri
+  [8, 'hard'], // Sat
+];
+
+export function dailyTargetSolo(dateKey: string): TargetSpec {
+  const [size, tier] = DAILY_SOLO[dateFromKey(dateKey).getDay()];
+  return { size, tier, seedKey: `daily-solo-${dateKey}`, rule: 'solo' };
+}
+
 const RANK: Record<Difficulty, number> = { easy: 0, medium: 1, hard: 2, expert: 3 };
 
 /**
@@ -188,7 +259,8 @@ export function pickBoard(t: TargetSpec, tries = SEARCH_TRIES): Puzzle {
   let best: Puzzle | null = null;
   let bestDist = Infinity;
   for (let k = 0; k < tries; k++) {
-    const p = generatePuzzle({ size: t.size, seed: hashString(`${t.seedKey}#${k}`) });
+    const seed = hashString(`${t.seedKey}#${k}`);
+    const p = t.rule === 'solo' ? generateSoloPuzzle({ size: t.size, seed }) : generatePuzzle({ size: t.size, seed });
     const dist = Math.abs(RANK[profileOf(p).tier] - RANK[t.tier]);
     if (dist === 0) return p;
     if (dist < bestDist) {

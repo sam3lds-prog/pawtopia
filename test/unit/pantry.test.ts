@@ -265,7 +265,7 @@ describe('fixes from the independent review', () => {
 
   it('a board with a paid hint or a mistake but no placement is still resumable', async () => {
     const { captureSession, hasMeaningfulProgress } = await import('../../src/game/sessionPersistence');
-    const mode = { kind: 'level' as const, level: 14 };
+    const mode = { kind: 'level' as const, level: 34 };
     const { puzzleFor } = await import('../../src/game/puzzles');
     const pz = puzzleFor(mode);
     const fresh = new Session(pz, { maxHearts: CASUAL_HEARTS });

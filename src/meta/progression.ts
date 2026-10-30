@@ -17,7 +17,7 @@ export interface BoardResult {
   /** Whether hearts were in play (Journey, Daily, Cup). Zen mistakes don't make a comeback. */
   hearts: boolean;
   /** Spec of the board that was solved (src/game/specs.ts); missing = 1. */
-  spec?: 1 | 2 | 3;
+  spec?: 1 | 2 | 3 | 4;
   /** Measured difficulty of the solved board (for the sanctuary's small talk). */
   tier?: 'easy' | 'medium' | 'hard' | 'expert';
 }
@@ -69,7 +69,7 @@ export function recordWin(save: SaveV2, mode: ModeRef, r: BoardResult, now = new
         }
       : { firstClearAt: at, bestSeconds: r.seconds, bestMistakes: r.mistakes, clean, hintFree, stars };
     const cl = save.journey.clears[key];
-    if (spec === 2 || spec === 3) cl.spec = spec;
+    if (spec !== 1) cl.spec = spec;
     else delete cl.spec;
     if (mode.level >= save.journey.nextLevel) save.journey.nextLevel = mode.level + 1;
     if (mode.level === 1) save.onboarding.tutorialDone = true;

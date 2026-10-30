@@ -5,7 +5,7 @@ import { currentSpec, puzzleFor } from '../../src/game/puzzles';
 import { Session, type SessionEvent } from '../../src/game/session';
 import { profileOf } from '../../src/game/grading';
 import { POINTS } from '../../src/meta/points';
-import { checkSolve, possibleAwards, type BoardRef } from '../../src/leaderboard/check';
+import { checkSolve, parseSubmission, possibleAwards, type BoardRef } from '../../src/leaderboard/check';
 import { cleanNickname, neutralName, suggestNickname } from '../../src/leaderboard/nickname';
 import { LIMITS, LbError, MemoryStore, cleanupInactive, deleteAccount, reportName, setProfile, submitSolves } from '../../src/leaderboard/server';
 
@@ -15,7 +15,10 @@ const NOW = new Date(Date.UTC(2026, 9, 29, 15, 0, 0));
  * Plays a board the way a person does, at `msPerMove` per action: optionally one wrong pet first, a hint that places a
  * pet, an extra life, then every remaining pet. Returns the session's own event log.
  */
-function play(mode: BoardRef, o: { wrong?: number; hint?: boolean; life?: boolean; msPerMove?: number; stopEarly?: boolean } = {}): { events: SessionEvent[]; session: Session } {
+function play(
+  mode: BoardRef,
+  o: { wrong?: number; hint?: boolean; life?: boolean; msPerMove?: number; stopEarly?: boolean } = {},
+): { events: SessionEvent[]; session: Session } {
   const m = mode as ModeRef;
   const p = puzzleFor(m, currentSpec(m));
   let t = 0;
@@ -100,20 +103,38 @@ describe('checking a solve', () => {
 
   it('counts a board only on the spec it is issued under, and never more hints than cells', () => {
     const L80: BoardRef = { kind: 'level', level: 80 };
-    expect(spec(L80)).toBe(3);
-    expect(checkSolve({ mode: L80, spec: 2, events: play(L80).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
-    // Around the D31 boundary: levels 1–5 stay on spec 1; from 6 only spec 3 counts (a resumed launch-pack board doesn't).
-    expect(spec(L5)).toBe(1);
-    expect(checkSolve({ mode: L5, spec: 3, events: play(L5).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
+    expect(spec(L80)).toBe(4);
+    expect(checkSolve({ mode: L80, spec: 3, events: play(L80).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
+    // Every level is on spec 4 (D35): one-animal boards for 1–20, then two animals; older specs never count.
+    expect(spec(L5)).toBe(4);
+    expect(checkSolve({ mode: L5, spec: 1, events: play(L5).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
     const L6: BoardRef = { kind: 'level', level: 6 };
-    expect(spec(L6)).toBe(3);
-    expect(checkSolve({ mode: L6, spec: 3, events: play(L6).events }, NOW)).toMatchObject({ ok: true });
-    expect(checkSolve({ mode: L6, spec: 1, events: play(L6).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
-    const L60: BoardRef = { kind: 'level', level: 60 };
-    expect(checkSolve({ mode: L60, spec: 1, events: play(L60).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
+    expect(checkSolve({ mode: L6, spec: 4, events: play(L6).events }, NOW)).toMatchObject({ ok: true });
+    expect(checkSolve({ mode: L6, spec: 3, events: play(L6).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
+    const L26: BoardRef = { kind: 'level', level: 26 };
+    expect(checkSolve({ mode: L26, spec: 4, events: play(L26).events }, NOW)).toMatchObject({ ok: true });
     const { events } = play(L5);
-    const flood: SessionEvent[] = [...events.slice(0, 1), ...Array.from({ length: 200 }, () => ({ t: events[0].t, type: 'hint' as const })), ...events.slice(1)];
+    const flood: SessionEvent[] = [
+      ...events.slice(0, 1),
+      ...Array.from({ length: 200 }, () => ({ t: events[0].t, type: 'hint' as const })),
+      ...events.slice(1),
+    ];
     expect(checkSolve({ mode: L5, spec: spec(L5), events: flood }, NOW)).toMatchObject({ ok: false, reason: 'invalid-log' });
+  });
+
+  it('checks the one-animal Daily; both Dailies of a date share one award', () => {
+    const today = NOW.toISOString().slice(0, 10);
+    const solo: BoardRef = { kind: 'daily', dateKey: today, rule: 'solo' };
+    expect(spec(solo)).toBe(4);
+    const r = checkSolve({ mode: solo, spec: 4, events: play(solo).events }, NOW);
+    expect(r).toMatchObject({ ok: true, key: `D${today}` });
+    if (r.ok) expect(r.awards.map((a) => a.id)).toEqual([`D${today}`]);
+    // The two-animal Daily's log doesn't solve the one-animal board (and the other way round).
+    const pair: BoardRef = { kind: 'daily', dateKey: today };
+    expect(checkSolve({ mode: solo, spec: 4, events: play(pair).events }, NOW).ok).toBe(false);
+    expect(checkSolve({ mode: pair, spec: 4, events: play(solo).events }, NOW)).toMatchObject({ ok: false, reason: 'bad-spec' });
+    expect(parseSubmission({ mode: { kind: 'daily', dateKey: today, rule: 'odd' }, spec: 4, events: [] })).toBeNull();
+    expect(parseSubmission({ mode: solo, spec: 4, events: [] })?.mode).toEqual(solo);
   });
 
   it('knows which awards a solve could still add', () => {
@@ -136,14 +157,16 @@ describe('nicknames', () => {
     expect(cleanNickname('Sh1t Head')).toMatchObject({ ok: false, problem: 'words' });
     expect(cleanNickname(42)).toMatchObject({ ok: false });
     // Ordinary names that merely contain a short blocked word are fine…
-    for (const ok of ['Peacock Fan', 'Hancock', 'Sussex Sam', 'Skillful Cat', 'Dickens', 'Grape Ape', 'Nazir', 'Classy Otter', 'Titania']) expect(cleanNickname(ok), ok).toMatchObject({ ok: true });
+    for (const ok of ['Peacock Fan', 'Hancock', 'Sussex Sam', 'Skillful Cat', 'Dickens', 'Grape Ape', 'Nazir', 'Classy Otter', 'Titania'])
+      expect(cleanNickname(ok), ok).toMatchObject({ ok: true });
     // …but the word itself, spaced-out strong words and staff impersonation are not.
-    for (const bad of ['Big Dick', 'Kill Bill', 'F u c k', 'Admin Bob', 'Pawtopia Mod', 'Sexy Cat', 'Kills Cats']) expect(cleanNickname(bad), bad).toMatchObject({ ok: false, problem: 'words' });
+    for (const bad of ['Big Dick', 'Kill Bill', 'F u c k', 'Admin Bob', 'Pawtopia Mod', 'Sexy Cat', 'Kills Cats'])
+      expect(cleanNickname(bad), bad).toMatchObject({ ok: false, problem: 'words' });
   });
 
   it('suggestions always pass, and hidden names are neutral and stable', () => {
     let seed = 1;
-    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     for (let i = 0; i < 300; i++) expect(cleanNickname(suggestNickname(rand)).ok).toBe(true);
     expect(neutralName('abc')).toBe(neutralName('abc'));
     expect(neutralName('abc')).toMatch(/^Player \d{4}$/);
@@ -159,7 +182,9 @@ describe('leaderboard server', () => {
 
   it('needs a profile first, validates it, and starts at zero', async () => {
     const store = new MemoryStore();
-    await expect(submitSolves(store, 'u1', [{ mode: L5, spec: spec(L5), events: play(L5).events }], NOW)).rejects.toMatchObject({ code: 'failed-precondition' });
+    await expect(submitSolves(store, 'u1', [{ mode: L5, spec: spec(L5), events: play(L5).events }], NOW)).rejects.toMatchObject({
+      code: 'failed-precondition',
+    });
     await expect(setProfile(store, 'u1', { nickname: 'no', avatar: 'mochi' }, NOW)).rejects.toBeInstanceOf(LbError);
     await expect(setProfile(store, 'u1', { nickname: 'Fine Name', avatar: 'dragon' }, NOW)).rejects.toMatchObject({ code: 'invalid-argument' });
     const p = await setProfile(store, 'u1', { nickname: 'Fine Name', avatar: 'gumnut' }, NOW);
@@ -179,7 +204,11 @@ describe('leaderboard server', () => {
     expect(again.results.map((r) => r.status)).toEqual(['already', 'already']);
     expect(again.total).toBe(expected);
     // A clean replay of a level first solved with mistakes adds only the clean bonus.
-    const messy = { mode: { kind: 'level', level: 12 }, spec: spec({ kind: 'level', level: 12 }), events: play({ kind: 'level', level: 12 }, { wrong: 1 }).events };
+    const messy = {
+      mode: { kind: 'level', level: 12 },
+      spec: spec({ kind: 'level', level: 12 }),
+      events: play({ kind: 'level', level: 12 }, { wrong: 1 }).events,
+    };
     const m1 = await submitSolves(store, 'u1', [messy], NOW);
     expect(m1.results[0].awarded).toEqual(['L12', 'nohint:L12']);
     const clean = { ...messy, events: play({ kind: 'level', level: 12 }).events };
@@ -195,7 +224,12 @@ describe('leaderboard server', () => {
 
   it('reports bad entries and rejected solves without stopping the rest', async () => {
     const store = await joined();
-    const r = await submitSolves(store, 'u1', ['junk', { mode: L5, spec: spec(L5), events: play(L5, { msPerMove: 10 }).events }, { mode: L5, spec: spec(L5), events: play(L5).events }], NOW);
+    const r = await submitSolves(
+      store,
+      'u1',
+      ['junk', { mode: L5, spec: spec(L5), events: play(L5, { msPerMove: 10 }).events }, { mode: L5, spec: spec(L5), events: play(L5).events }],
+      NOW,
+    );
     expect(r.results.map((x) => x.status)).toEqual(['bad-request', 'too-fast', 'ok']);
     await expect(submitSolves(store, 'u1', new Array(LIMITS.perCall + 1).fill('x'), NOW)).rejects.toMatchObject({ code: 'invalid-argument' });
   });
@@ -210,10 +244,15 @@ describe('leaderboard server', () => {
   it('checks nothing for someone who has not joined or is over the allowance', async () => {
     const store = new MemoryStore();
     // A board that would take a long time to rebuild is never rebuilt for a stranger.
-    await expect(submitSolves(store, 'stranger', [{ mode: { kind: 'level', level: 4999 }, spec: 2, events: [] }], NOW)).rejects.toMatchObject({ code: 'failed-precondition' });
+    await expect(submitSolves(store, 'stranger', [{ mode: { kind: 'level', level: 4999 }, spec: 2, events: [] }], NOW)).rejects.toMatchObject({
+      code: 'failed-precondition',
+    });
     const s2 = await joined();
     const doc = s2.docs.get('players/u1')!;
-    s2.docs.set('players/u1', { ...doc, rate: { hour: NOW.toISOString().slice(0, 13), nHour: LIMITS.perHour - 1, day: NOW.toISOString().slice(0, 10), nDay: LIMITS.perHour - 1 } });
+    s2.docs.set('players/u1', {
+      ...doc,
+      rate: { hour: NOW.toISOString().slice(0, 13), nHour: LIMITS.perHour - 1, day: NOW.toISOString().slice(0, 10), nDay: LIMITS.perHour - 1 },
+    });
     const good = { mode: L5, spec: spec(L5), events: play(L5).events };
     const r = await submitSolves(s2, 'u1', [good, { mode: { kind: 'level', level: 4999 }, spec: 2, events: [] }], NOW);
     expect(r.results.map((x) => x.status)).toEqual(['ok', 'rate-limited']);
@@ -222,7 +261,10 @@ describe('leaderboard server', () => {
   it('limits how many solves count per hour', async () => {
     const store = await joined();
     const doc = store.docs.get('players/u1')!;
-    store.docs.set('players/u1', { ...doc, rate: { hour: NOW.toISOString().slice(0, 13), nHour: LIMITS.perHour, day: NOW.toISOString().slice(0, 10), nDay: LIMITS.perHour } });
+    store.docs.set('players/u1', {
+      ...doc,
+      rate: { hour: NOW.toISOString().slice(0, 13), nHour: LIMITS.perHour, day: NOW.toISOString().slice(0, 10), nDay: LIMITS.perHour },
+    });
     const r = await submitSolves(store, 'u1', [{ mode: L5, spec: spec(L5), events: play(L5).events }], NOW);
     expect(r.results[0].status).toBe('rate-limited');
     const later = new Date(NOW.getTime() + 3_600_000);
@@ -298,7 +340,10 @@ describe('on the device', () => {
     // Survives a save round trip; junk is dropped.
     const s = defaultSave();
     s.leaderboard = lb;
-    const back = normalizeSave({ ...JSON.parse(JSON.stringify(s)), leaderboard: { ...JSON.parse(JSON.stringify(lb)), pending: [...lb.pending, { key: 'x', mode: { kind: 'zen' }, spec: 1, events: [] }] } });
+    const back = normalizeSave({
+      ...JSON.parse(JSON.stringify(s)),
+      leaderboard: { ...JSON.parse(JSON.stringify(lb)), pending: [...lb.pending, { key: 'x', mode: { kind: 'zen' }, spec: 1, events: [] }] },
+    });
     expect(back.leaderboard.pending).toHaveLength(LB_PENDING_MAX);
     expect(back.leaderboard.joined).toBe(true);
   });

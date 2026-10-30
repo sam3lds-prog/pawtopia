@@ -11,7 +11,7 @@ import { sceneMarkup } from './sanctuary';
 import { openSheet } from '../components/sheet';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
 import { claimMissionDetailed, missionStates, type MissionDef } from '../../meta/missions';
-import { CASUAL_HEARTS } from '../../game/modes';
+import { CASUAL_HEARTS, dailyFor } from '../../game/modes';
 import { itemBalance } from '../../meta/items';
 import { nextPetMilestone } from '../../meta/rewards';
 import { addDaysKey, localWeekStart } from '../../game/dates';
@@ -89,13 +89,18 @@ export const homeScreen: ScreenDef = {
     const chapter = chapterOf(level);
     const resumeMode = resumableMode();
     const todayKey = localDateKey();
-    const daily = { dateKey: todayKey, size: sizeFor({ kind: 'daily', dateKey: todayKey }) };
+    const dailyMode = dailyFor(todayKey, level);
+    const daily = { dateKey: todayKey, size: sizeFor(dailyMode), solo: dailyMode.kind === 'daily' && dailyMode.rule === 'solo' };
     const dailyDone = !!save.daily.done[daily.dateKey];
     const streak = liveStreak(save, localDateKey());
     const weekday = WEEKDAY[new Date().getDay()];
     const nextPet = nextPetMilestone(save);
 
-    const continueTitle = resumeMode ? `Resume ${modeTitle(resumeMode).toLowerCase().replace(/^level/, 'level')}` : `Play level ${level}`;
+    const continueTitle = resumeMode
+      ? `Resume ${modeTitle(resumeMode)
+          .toLowerCase()
+          .replace(/^level/, 'level')}`
+      : `Play level ${level}`;
     const thumbMode = resumeMode ?? { kind: 'level' as const, level };
     // A resumable board keeps the spec it was issued under (an old 9×9 save still shows as 9×9).
     const thumbSpec = resumeMode ? (save.lastSession?.specVersion ?? 1) : undefined;
@@ -182,7 +187,8 @@ export const homeScreen: ScreenDef = {
         if (slot) slot.innerHTML = miniBoard(p.regions);
         const desc = el.querySelector('[data-board-desc]');
         const tier = displayDifficulty(p);
-        if (desc) desc.textContent = `${thumbSize}×${thumbSize} · ${tier.charAt(0).toUpperCase()}${tier.slice(1)}${resumeMode ? ', saved where you left it' : ''}`;
+        if (desc)
+          desc.textContent = `${thumbSize}×${thumbSize} · ${tier.charAt(0).toUpperCase()}${tier.slice(1)}${resumeMode ? ', saved where you left it' : ''}`;
       } catch {
         /* thumbnail is decorative */
       }
@@ -256,7 +262,9 @@ export const homeScreen: ScreenDef = {
           const pill = el.querySelector('[data-coins]');
           if (pill) pill.outerHTML = coinPill();
           // Say exactly what arrived (when the pantry is full, the item arrives as coins).
-          const more = [got.lives ? `+${plural(got.lives, 'extra life', 'extra lives')}` : '', got.hints ? `+${plural(got.hints, 'hint')}` : ''].filter(Boolean);
+          const more = [got.lives ? `+${plural(got.lives, 'extra life', 'extra lives')}` : '', got.hints ? `+${plural(got.hints, 'hint')}` : ''].filter(
+            Boolean,
+          );
           toast([`+${coins} Paw Coins`, ...more].join(' · '));
         }
         return;
@@ -282,7 +290,7 @@ export const homeScreen: ScreenDef = {
           break;
         case 'daily':
           if (dailyDone) toast(`Today's board is done. A new one arrives tomorrow.`);
-          else playMode({ kind: 'daily', dateKey: daily.dateKey });
+          else playMode(dailyMode);
           break;
         case 'zen':
           app.router.go({ screen: 'play' });

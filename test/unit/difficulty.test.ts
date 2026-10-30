@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { JOURNEY_PACK_2 } from '../../src/data/journeyPack2';
 import { JOURNEY_PACK_3 } from '../../src/data/journeyPack3';
+import { JOURNEY_PACK_4 } from '../../src/data/journeyPack4';
 import { JOURNEY_PACK3_LAST, JOURNEY_PACK_FIRST, JOURNEY_PACK_LAST } from '../../src/data/journeyPackRange';
 import { LEVEL_PACK } from '../../src/data/levelPack';
 import { decodePack, verifyBoard } from '../../src/data/packFormat';
@@ -10,8 +11,22 @@ import { CAT, DOG, EMPTY, type Species } from '../../src/engine/types';
 import { cupBoardSpec } from '../../src/competitions/cup';
 import { addDaysKey, dateFromKey } from '../../src/game/dates';
 import { GRADING_VERSION, profileBoard, profileOf, tierFor, displayDifficulty, difficultyReason } from '../../src/game/grading';
-import { currentSpec, puzzleDigest, puzzleFor, sizeFor, journeyMeta } from '../../src/game/puzzles';
-import { DAILY_V2_FROM, JOURNEY_V2_FROM, JOURNEY_V3_FROM, MAX_JOURNEY_SIZE, MAX_NEW_BOARD_SIZE, dailyTargetV2, journeyTargetV2, journeyTargetV3, pickBoard } from '../../src/game/specs';
+import { currentSpec, puzzleDigest, puzzleFor, sizeFor, journeyMeta, packedLevelTier, ruleFor } from '../../src/game/puzzles';
+import { dailyFor, modeKey } from '../../src/game/modes';
+import {
+  DAILY_V2_FROM,
+  JOURNEY_V2_FROM,
+  JOURNEY_V3_FROM,
+  MAX_JOURNEY_SIZE,
+  MAX_NEW_BOARD_SIZE,
+  SOLO_LEVELS,
+  dailyTargetSolo,
+  dailyTargetV2,
+  journeyTargetSolo,
+  journeyTargetV2,
+  journeyTargetV3,
+  pickBoard,
+} from '../../src/game/specs';
 import { Session } from '../../src/game/session';
 import { captureSession, resumeSession } from '../../src/game/sessionPersistence';
 import { recordWin } from '../../src/meta/progression';
@@ -21,6 +36,7 @@ const LEVEL_PACK_BY_LEVEL = (level: number) => decodePack(LEVEL_PACK).find((e) =
 
 const pack2 = decodePack(JOURNEY_PACK_2);
 const pack3 = decodePack(JOURNEY_PACK_3);
+const pack4 = decodePack(JOURNEY_PACK_4);
 
 describe('measured difficulty', () => {
   it('is deterministic for a board', () => {
@@ -112,12 +128,14 @@ describe('Journey pack 3 (spec 3, levels 6–150): the steeper ramp', () => {
       expect(e.meta.tier, `level ${e.level}`).toBe(profileOf(e.puzzle).tier);
       expect(e.meta.tier, `level ${e.level}`).toBe(t.tier);
     }
-    for (const L of [6, 15, 40, 77, 150]) expect(puzzleDigest(pickBoard(journeyTargetV3(L))), `level ${L}`).toBe(puzzleDigest(pack3.find((e) => e.level === L)!.puzzle));
+    for (const L of [6, 15, 40, 77, 150])
+      expect(puzzleDigest(pickBoard(journeyTargetV3(L))), `level ${L}`).toBe(puzzleDigest(pack3.find((e) => e.level === L)!.puzzle));
   }, 120_000);
 
   it('ramps the way it should: 7×7 right after the first lessons, 8×8 joining, 9×9 from 40 and the main size after 70', () => {
     const size = (L: number) => pack3.find((e) => e.level === L)!.puzzle.size;
-    const share = (from: number, to: number, n: number) => pack3.filter((e) => e.level >= from && e.level <= to && e.puzzle.size === n).length / (to - from + 1);
+    const share = (from: number, to: number, n: number) =>
+      pack3.filter((e) => e.level >= from && e.level <= to && e.puzzle.size === n).length / (to - from + 1);
     expect(size(6)).toBe(7);
     expect(share(6, 20, 7)).toBeGreaterThanOrEqual(0.6);
     expect(share(6, 39, 9)).toBe(0);
@@ -131,22 +149,42 @@ describe('Journey pack 3 (spec 3, levels 6–150): the steeper ramp', () => {
 });
 
 describe('versioned specs', () => {
-  it('Journey 6+ uses spec 3, dailies from the cut-over spec 2; the first lessons, Zen and Paw Cup stay on spec 1', () => {
-    expect(currentSpec({ kind: 'level', level: 5 })).toBe(1);
-    expect(currentSpec({ kind: 'level', level: 6 })).toBe(3);
-    expect(currentSpec({ kind: 'level', level: 70 })).toBe(3);
-    expect(currentSpec({ kind: 'level', level: 71 })).toBe(3);
+  it('every Journey level is on spec 4 (D35); dailies from the cut-over spec 2 (one-animal dailies 4); Zen and Paw Cup stay on spec 1', () => {
+    for (const level of [1, 5, 6, 20, 21, 70, 71, 200]) expect(currentSpec({ kind: 'level', level })).toBe(4);
     expect(currentSpec({ kind: 'daily', dateKey: addDaysKey(DAILY_V2_FROM, -1) })).toBe(1);
     expect(currentSpec({ kind: 'daily', dateKey: DAILY_V2_FROM })).toBe(2);
+    expect(currentSpec({ kind: 'daily', dateKey: DAILY_V2_FROM, rule: 'solo' })).toBe(4);
     expect(currentSpec({ kind: 'zen', size: 6, seed: 3 })).toBe(1);
     expect(currentSpec({ kind: 'cup', weekKey: '2026-W44', index: 4 })).toBe(1);
   });
 
-  it('new Journey boards come from pack 3, and boards saved under spec 1 or 2 still find their own board', () => {
-    const now = puzzleFor({ kind: 'level', level: 75 });
+  it('spec 4: levels 1–20 are the one-animal pack; from 21 each level is the board two-animal level L − 20 always had', () => {
+    for (let level = 1; level <= 20; level++) {
+      const p = puzzleFor({ kind: 'level', level });
+      expect(p.rule, `level ${level}`).toBe('solo');
+      expect(puzzleDigest(p)).toBe(puzzleDigest(pack4.find((e) => e.level === level)!.puzzle));
+      expect(ruleFor({ kind: 'level', level })).toBe('solo');
+      expect(sizeFor({ kind: 'level', level })).toBe(p.size);
+      expect(journeyMeta(level)?.spec).toBe(4);
+    }
+    // 21–25: the five original lessons (launch pack, spec 1); 26+: the spec-3 ramp.
+    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 21 }))).toBe(puzzleDigest(decodePack(LEVEL_PACK)[0].puzzle));
+    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 25 }))).toBe(puzzleDigest(decodePack(LEVEL_PACK)[4].puzzle));
+    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 26 }))).toBe(puzzleDigest(pack3.find((e) => e.level === 6)!.puzzle));
+    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 95 }))).toBe(puzzleDigest(pack3.find((e) => e.level === 75)!.puzzle));
+    expect(ruleFor({ kind: 'level', level: 21 })).toBe('pair');
+    expect(puzzleFor({ kind: 'level', level: 21 }).rule).toBeUndefined();
+    expect(journeyMeta(95)?.spec).toBe(3);
+    expect(sizeFor({ kind: 'level', level: 95 })).toBe(puzzleFor({ kind: 'level', level: 95 }).size);
+    expect(packedLevelTier(26, 4)).toBe(pack3.find((e) => e.level === 6)!.meta.tier);
+    expect(packedLevelTier(3, 4)).toBe(pack4[2].meta.tier);
+  });
+
+  it('boards saved under spec 3, 2 or 1 still find their own board', () => {
+    const now = puzzleFor({ kind: 'level', level: 75 }, 3);
     expect(puzzleDigest(now)).toBe(puzzleDigest(pack3.find((e) => e.level === 75)!.puzzle));
-    expect(journeyMeta(75)?.spec).toBe(3);
-    expect(sizeFor({ kind: 'level', level: 75 })).toBe(now.size);
+    expect(journeyMeta(75, 3)?.spec).toBe(3);
+    expect(sizeFor({ kind: 'level', level: 75 }, 3)).toBe(now.size);
     // Spec 2 (the ≤ 8×8 rotation) and spec 1 (the original 9×9) are still buildable for saves made under them.
     expect(puzzleDigest(puzzleFor({ kind: 'level', level: 75 }, 2))).toBe(puzzleDigest(pack2.find((e) => e.level === 75)!.puzzle));
     expect(journeyMeta(75, 2)?.spec).toBe(2);
@@ -154,12 +192,29 @@ describe('versioned specs', () => {
     expect(sizeFor({ kind: 'level', level: 75 }, 1)).toBe(9);
     // Levels 6–60 under spec 1 are still the launch pack's boards; 1–5 never changed.
     expect(puzzleDigest(puzzleFor({ kind: 'level', level: 12 }, 1))).toBe(puzzleDigest(decodePack(LEVEL_PACK)[11].puzzle));
-    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 3 }))).toBe(puzzleDigest(decodePack(LEVEL_PACK)[2].puzzle));
+    expect(puzzleDigest(puzzleFor({ kind: 'level', level: 3 }, 1))).toBe(puzzleDigest(decodePack(LEVEL_PACK)[2].puzzle));
   });
+
+  it('the one-animal Daily is its own board, picked by measured difficulty, never above 8×8', () => {
+    let k = DAILY_V2_FROM;
+    for (let i = 0; i < 7; i++, k = addDaysKey(k, 1)) {
+      const p = puzzleFor({ kind: 'daily', dateKey: k, rule: 'solo' });
+      expect(p.rule).toBe('solo');
+      expect(p.size).toBe(dailyTargetSolo(k).size);
+      expect(p.size).toBeLessThanOrEqual(8);
+      expect(displayDifficulty(p)).toBe(dailyTargetSolo(k).tier);
+      expect(sizeFor({ kind: 'daily', dateKey: k, rule: 'solo' })).toBe(p.size);
+    }
+    expect(dailyFor('2026-10-29', 1)).toEqual({ kind: 'daily', dateKey: '2026-10-29', rule: 'solo' });
+    expect(dailyFor('2026-10-29', 21)).toEqual({ kind: 'daily', dateKey: '2026-10-29', rule: 'solo' });
+    expect(dailyFor('2026-10-29', 22)).toEqual({ kind: 'daily', dateKey: '2026-10-29' });
+    expect(modeKey({ kind: 'daily', dateKey: '2026-10-29', rule: 'solo' })).toBe('D2026-10-29s');
+    expect(puzzleFor({ kind: 'zen', size: 6, seed: 9, rule: 'solo' }).rule).toBe('solo');
+  }, 30_000);
 
   it('levels beyond pack 3 are picked on device by the same rule (≤ 9×9, measured label = target)', () => {
     for (const L of [151, 156, 158]) {
-      const p = puzzleFor({ kind: 'level', level: L });
+      const p = puzzleFor({ kind: 'level', level: L }, 3);
       const t = journeyTargetV3(L);
       expect(p.size).toBe(t.size);
       expect(displayDifficulty(p)).toBe(t.tier);
@@ -229,8 +284,18 @@ describe('saved boards across the spec change', () => {
     const mode = { kind: 'level' as const, level: 75 };
     const s = new Session(puzzleFor(mode), { maxHearts: 5 });
     const saved = captureSession(mode, s)!;
-    expect(saved.specVersion).toBe(3);
+    expect(saved.specVersion).toBe(4);
     expect(resumeSession(saved)!.session.size).toBe(puzzleFor(mode).size);
+    const s3 = new Session(puzzleFor(mode, 3), { maxHearts: 5 });
+    const back3 = resumeSession(JSON.parse(JSON.stringify(captureSession(mode, s3, new Date(), 3)!)))!;
+    expect(back3.spec).toBe(3);
+    expect(puzzleDigest(back3.session.puzzle)).toBe(puzzleDigest(puzzleFor(mode, 3)));
+    // A one-animal board saved at level 4 resumes as that board.
+    const solo = { kind: 'level' as const, level: 4 };
+    const ss = new Session(puzzleFor(solo), { maxHearts: 5 });
+    const backSolo = resumeSession(JSON.parse(JSON.stringify(captureSession(solo, ss)!)))!;
+    expect(backSolo.spec).toBe(4);
+    expect(backSolo.session.rule).toBe('solo');
     const old = new Session(puzzleFor(mode, 2), { maxHearts: 5 });
     const saved2 = captureSession(mode, old, new Date(), 2)!;
     const back = resumeSession(JSON.parse(JSON.stringify(saved2)))!;
@@ -260,5 +325,30 @@ describe('species never leak through grading', () => {
     const p = generatePuzzle({ size: 6, seed: 5 });
     const swapped = { ...p, solution: p.solution.map((row) => row.map((v) => (v === CAT ? DOG : v === DOG ? CAT : v))) };
     expect(profileOf(swapped)).toEqual(profileOf(p));
+  });
+});
+
+describe('Journey pack 4 (spec 4, one-animal levels 1–20, D35)', () => {
+  it('covers levels 1–20, each board valid, unique with nothing given, logic-solvable, and measured as its slot asks', () => {
+    expect(pack4.map((e) => e.level)).toEqual(Array.from({ length: SOLO_LEVELS }, (_, i) => i + 1));
+    expect(JOURNEY_PACK_4.gradingVersion).toBe(GRADING_VERSION);
+    for (const e of pack4) {
+      const t = journeyTargetSolo(e.level);
+      expect(e.puzzle.rule).toBe('solo');
+      expect(e.puzzle.givens).toEqual([]);
+      expect(verifyBoard(e.puzzle), `level ${e.level}`).toEqual([]);
+      expect(e.puzzle.size).toBe(t.size);
+      expect(e.meta.tier).toBe(t.tier);
+      expect(profileOf(e.puzzle).tier).toBe(e.meta.tier);
+    }
+  });
+
+  it('starts gently: three 5×5 lessons, the first two Easy, and level 1 opens with a one-tile color', () => {
+    expect(pack4.slice(0, 3).map((e) => e.puzzle.size)).toEqual([5, 5, 5]);
+    expect(pack4.slice(0, 2).map((e) => e.meta.tier)).toEqual(['easy', 'easy']);
+    const counts = new Map<number, number>();
+    for (const row of pack4[0].puzzle.regions) for (const g of row) counts.set(g, (counts.get(g) ?? 0) + 1);
+    expect([...counts.values()]).toContain(1);
+    expect(pack4[19].puzzle.size).toBe(9);
   });
 });

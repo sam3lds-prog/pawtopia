@@ -9,6 +9,7 @@
  */
 
 import { app } from '../../app/app';
+import { dailyFor } from '../../game/modes';
 import { playMode, resumeGame, savedFor, startGame } from '../../app/gameFlow';
 import { featureFlags } from '../../config/featureFlags';
 import { CUP_ATTEMPTS_PER_BOARD, cupWeek, PAR_SECONDS, type CupBoardSpec } from '../../competitions/cup';
@@ -219,7 +220,7 @@ export const leagueScreen: ScreenDef = {
       }
       const a = actionOf(e);
       if (a?.act === 'how') showScoring(scope);
-      else if (a?.act === 'daily') playMode({ kind: 'daily', dateKey: dailySpec().dateKey });
+      else if (a?.act === 'daily') playMode(dailyFor(dailySpec().dateKey, app.save.journey.nextLevel));
     });
   },
 };

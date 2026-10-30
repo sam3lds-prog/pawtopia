@@ -6,9 +6,23 @@
 
 export type ModeRef =
   | { kind: 'level'; level: number }
-  | { kind: 'daily'; dateKey: string }
-  | { kind: 'zen'; size: number; seed: number }
+  /** `rule: 'solo'`: the one-animal Daily, for players who haven't reached two animals yet (D35). */
+  | { kind: 'daily'; dateKey: string; rule?: 'solo' }
+  | { kind: 'zen'; size: number; seed: number; rule?: 'solo' }
   | { kind: 'cup'; weekKey: string; index: number };
+
+/** Journey levels from which boards hold two animals (D35). Kept here so screens can ask without the generator. */
+export const FIRST_PAIR_LEVEL = 21;
+
+/** Whether a player still plays one-animal boards outside the Journey (Daily, Zen): until the two-animal lesson is done. */
+export function playsSolo(nextLevel: number): boolean {
+  return nextLevel <= FIRST_PAIR_LEVEL;
+}
+
+/** Today's Daily for a player at `nextLevel`. */
+export function dailyFor(dateKey: string, nextLevel: number): ModeRef {
+  return playsSolo(nextLevel) ? { kind: 'daily', dateKey, rule: 'solo' } : { kind: 'daily', dateKey };
+}
 
 export type ModeKind = ModeRef['kind'];
 
@@ -45,15 +59,15 @@ export function rulesFor(mode: ModeRef): ModeRules {
   }
 }
 
-/** Stable string id for a mode's board, e.g. `L12`, `D2026-10-25`, `Z7-123`, `C2026-W43-2`. */
+/** Stable string id for a mode's board, e.g. `L12`, `D2026-10-25`, `D2026-10-25s` (one-animal), `Z7-123`, `C2026-W43-2`. */
 export function modeKey(mode: ModeRef): string {
   switch (mode.kind) {
     case 'level':
       return `L${mode.level}`;
     case 'daily':
-      return `D${mode.dateKey}`;
+      return `D${mode.dateKey}${mode.rule === 'solo' ? 's' : ''}`;
     case 'zen':
-      return `Z${mode.size}-${mode.seed}`;
+      return `Z${mode.size}-${mode.seed}${mode.rule === 'solo' ? 's' : ''}`;
     case 'cup':
       return `C${mode.weekKey}-${mode.index}`;
   }
@@ -76,9 +90,15 @@ export function isValidModeRef(x: unknown): x is ModeRef {
     case 'level':
       return Number.isInteger(m.level) && (m.level as number) >= 1;
     case 'daily':
-      return typeof m.dateKey === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(m.dateKey);
+      return typeof m.dateKey === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(m.dateKey) && (m.rule === undefined || m.rule === 'solo');
     case 'zen':
-      return Number.isInteger(m.size) && (m.size as number) >= 5 && (m.size as number) <= 9 && Number.isInteger(m.seed);
+      return (
+        Number.isInteger(m.size) &&
+        (m.size as number) >= 5 &&
+        (m.size as number) <= 9 &&
+        Number.isInteger(m.seed) &&
+        (m.rule === undefined || m.rule === 'solo')
+      );
     case 'cup':
       return typeof m.weekKey === 'string' && Number.isInteger(m.index);
     default:

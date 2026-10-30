@@ -14,8 +14,23 @@ import { modeKey } from './modes';
 import { LEVEL_PACK } from '../data/levelPack';
 import { JOURNEY_PACK_2 } from '../data/journeyPack2';
 import { JOURNEY_PACK_3 } from '../data/journeyPack3';
+import { JOURNEY_PACK_4 } from '../data/journeyPack4';
 import { decodePack, type PackLevel, type PackLevel2 } from '../data/packFormat';
-import { DAILY_V2_FROM, JOURNEY_V3_FROM, dailyTargetV2, journeyTargetV2, journeyTargetV3, pickBoard, type SpecVersion } from './specs';
+import { generateSoloPuzzle } from '../engine/solo';
+import type { Rule } from '../engine/types';
+import {
+  DAILY_V2_FROM,
+  SOLO_LEVELS,
+  dailyTargetSolo,
+  dailyTargetV2,
+  isSoloLevel,
+  journeyTargetSolo,
+  journeyTargetV2,
+  journeyTargetV3,
+  pairSourceOf,
+  pickBoard,
+  type SpecVersion,
+} from './specs';
 
 export type { SpecVersion } from './specs';
 
@@ -30,24 +45,39 @@ export type PuzzleSource = (mode: ModeRef, spec: SpecVersion) => Puzzle | null;
 const PACK = new Map(decodePack(LEVEL_PACK).map((e) => [e.level, e]));
 const PACK_2 = new Map(decodePack(JOURNEY_PACK_2).map((e) => [e.level, e]));
 const PACK_3 = new Map(decodePack(JOURNEY_PACK_3).map((e) => [e.level, e]));
+const PACK_4 = new Map(decodePack(JOURNEY_PACK_4).map((e) => [e.level, e]));
 
 /**
- * The spec a mode's board is issued under today. Journey levels from JOURNEY_V3_FROM use spec 3 (the steeper ramp up
- * to 9×9, D31); dailies from DAILY_V2_FROM use spec 2 (≤ 8×8); levels 1–5, older dailies, Zen and Paw Cup stay on
- * spec 1. Spec 2 Journey boards (71+) remain buildable for boards saved under it.
+ * The spec a mode's board is issued under today. Every Journey level is on spec 4 (D35): one-animal boards for
+ * levels 1–20, then the two-animal Journey from its first lesson. The one-animal Daily is spec 4 too; two-animal
+ * dailies from DAILY_V2_FROM use spec 2 (≤ 8×8); older dailies, Zen and Paw Cup stay on spec 1. Boards saved under
+ * an older spec keep resuming on it.
  */
 export function currentSpec(mode: ModeRef): SpecVersion {
-  if (mode.kind === 'level') return mode.level >= JOURNEY_V3_FROM ? 3 : 1;
-  if (mode.kind === 'daily') return mode.dateKey >= DAILY_V2_FROM ? 2 : 1;
+  if (mode.kind === 'level') return 4;
+  if (mode.kind === 'daily') return mode.rule === 'solo' ? 4 : mode.dateKey >= DAILY_V2_FROM ? 2 : 1;
   return 1;
 }
 
+/** The rule a mode's board is played with, without building it. */
+export function ruleFor(mode: ModeRef, spec: SpecVersion = currentSpec(mode)): Rule {
+  if (mode.kind === 'level') return isSoloLevel(mode.level, spec) ? 'solo' : 'pair';
+  if (mode.kind === 'daily' || mode.kind === 'zen') return mode.rule === 'solo' ? 'solo' : 'pair';
+  return 'pair';
+}
+
 /**
- * The frozen, verified Journey packs: levels 1–60 (launch pack, identical to v1) and 61–150 (pack 2). A pack board is
- * used only for the spec it was issued under, so a board saved under spec 1 at level 75 still finds its 9×9.
+ * The frozen, verified Journey packs: levels 1–60 (launch pack, identical to v1), 61–150 (pack 2), 6–150 on spec 3
+ * and the one-animal levels 1–20 of spec 4 (pack 4). A pack board is used only for the spec it was issued under, so a
+ * board saved under spec 1 at level 75 still finds its 9×9. A spec-4 level from 21 is the board of level L − 20.
  */
 export const levelPackSource: PuzzleSource = (mode, spec) => {
   if (mode.kind !== 'level') return null;
+  if (spec === 4) {
+    if (mode.level <= SOLO_LEVELS) return PACK_4.get(mode.level)?.puzzle ?? null;
+    const src = pairSourceOf(mode.level);
+    return levelPackSource({ kind: 'level', level: src.level }, src.spec);
+  }
   if (spec === 3) return PACK_3.get(mode.level)?.puzzle ?? null;
   const first = PACK.get(mode.level);
   if (first && spec === 1) return first.puzzle;
@@ -60,6 +90,11 @@ export const levelPackSource: PuzzleSource = (mode, spec) => {
  * board isn't in a pack (beyond 150, or an old spec-1 board at 71+).
  */
 export function packedLevelTier(level: number, spec: SpecVersion): Difficulty | undefined {
+  if (spec === 4) {
+    if (level <= SOLO_LEVELS) return PACK_4.get(level)?.meta.tier;
+    const src = pairSourceOf(level);
+    return packedLevelTier(src.level, src.spec);
+  }
   if (spec === 3) return PACK_3.get(level)?.meta.tier;
   const first = PACK.get(level);
   if (first && spec === 1) return profileOf(first.puzzle).tier;
@@ -69,6 +104,11 @@ export function packedLevelTier(level: number, spec: SpecVersion): Difficulty | 
 
 /** Pack metadata (spec, measured tier) for a level's board under a spec, or null when it isn't in pack 2 or 3. */
 export function journeyMeta(level: number, spec: SpecVersion = currentSpec({ kind: 'level', level })): PackLevel2 | null {
+  if (spec === 4) {
+    if (level <= SOLO_LEVELS) return PACK_4.get(level)?.meta ?? null;
+    const src = pairSourceOf(level);
+    return journeyMeta(src.level, src.spec);
+  }
   if (spec === 3) return PACK_3.get(level)?.meta ?? null;
   const m = PACK_2.get(level)?.meta;
   return m && m.spec === spec ? m : null;
@@ -103,18 +143,24 @@ export function puzzleFor(mode: ModeRef, spec: SpecVersion = currentSpec(mode)):
 function generateFor(mode: ModeRef, version: SpecVersion): Puzzle {
   switch (mode.kind) {
     case 'level': {
+      if (version === 4) {
+        if (mode.level <= SOLO_LEVELS) return pickBoard(journeyTargetSolo(mode.level));
+        const src = pairSourceOf(mode.level);
+        return puzzleFor({ kind: 'level', level: src.level }, src.spec);
+      }
       if (version === 3) return pickBoard(journeyTargetV3(mode.level));
       if (version === 2) return pickBoard(journeyTargetV2(mode.level));
       const spec = levelSpec(mode.level);
       return generatePuzzle({ size: spec.size, seed: spec.seed, difficulty: spec.difficulty });
     }
     case 'daily': {
+      if (mode.rule === 'solo') return pickBoard(dailyTargetSolo(mode.dateKey));
       if (version === 2) return pickBoard(dailyTargetV2(mode.dateKey));
       const spec = dailySpec(dateFromKey(mode.dateKey));
       return generatePuzzle({ size: spec.size, seed: spec.seed, difficulty: spec.difficulty });
     }
     case 'zen':
-      return generatePuzzle({ size: mode.size, seed: mode.seed });
+      return mode.rule === 'solo' ? generateSoloPuzzle({ size: mode.size, seed: mode.seed }) : generatePuzzle({ size: mode.size, seed: mode.seed });
     case 'cup': {
       const spec = cupBoardSpec(mode.weekKey, mode.index);
       return generatePuzzle({ size: spec.size, seed: spec.seed, difficulty: spec.difficulty });
@@ -125,9 +171,16 @@ function generateFor(mode: ModeRef, version: SpecVersion): Puzzle {
 /** Size of the board a mode will produce, without generating it. */
 export function sizeFor(mode: ModeRef, spec: SpecVersion = currentSpec(mode)): number {
   switch (mode.kind) {
-    case 'level':
+    case 'level': {
+      if (spec === 4) {
+        if (mode.level <= SOLO_LEVELS) return journeyTargetSolo(mode.level).size;
+        const src = pairSourceOf(mode.level);
+        return sizeFor({ kind: 'level', level: src.level }, src.spec);
+      }
       return spec === 3 ? journeyTargetV3(mode.level).size : spec === 2 ? journeyTargetV2(mode.level).size : levelSpec(mode.level).size;
+    }
     case 'daily':
+      if (mode.rule === 'solo') return dailyTargetSolo(mode.dateKey).size;
       return spec === 2 ? dailyTargetV2(mode.dateKey).size : dailySpec(dateFromKey(mode.dateKey)).size;
     case 'zen':
       return mode.size;
