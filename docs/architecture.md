@@ -19,16 +19,19 @@ unchanged.
  specs, grading,  points, world, feeding, leagueRules, cup,  nickname, queue —   kv guard, ads, iap,
  persistence)     missions, achievements, localCup)          shared with the     leaderboard, analytics,
                   sanctuary, catalogs)                       Cloud Functions)    audio, haptics)
- engine/ (solver, deduce, generator, levels, rng)  ← unchanged from v1
- data/ (levelPack: frozen levels 1–60; journeyPack2: frozen levels 61–150)
+ engine/ (solver, deduce, generator, levels, rng ← unchanged from v1; solo: the one-animal rule, D35)
+ data/ (levelPack: frozen levels 1–60; journeyPack2: 61–150; journeyPack3: 6–150 on spec 3; journeyPack4: one-animal 1–20)
  functions/ (Firebase callable functions: a thin Firestore/Auth adapter around leaderboard/server.ts)
 ```
 
 ## Key flows
 
 **Starting a board.** `gameFlow.startGame(mode)` → `puzzles.currentSpec(mode)` → `puzzles.puzzleFor(mode, spec)`
-(frozen packs for levels 1–150; spec 2 picks boards by measured difficulty via `specs.pickBoard`; spec 1 uses the
-original generator ladder) → `new Session({ maxHearts })` → router shows `screens/game`. Paw Cup boards first open an attempt
+(frozen packs for levels 1–150; spec 4 plays one-animal levels 1–20 from pack 4 and, from 21, the board of two-animal
+level L − 20; spec 2 picks boards by measured difficulty via `specs.pickBoard`; spec 1 uses the original generator
+ladder) → `cast.castFor` (which animals the board shows, D35) → `new Session({ maxHearts })` → router shows
+`screens/game`. A `Puzzle` with `rule: 'solo'` is a one-animal board; the session, hints, grading and the server
+verifier dispatch on it. Paw Cup boards first open an attempt
 (`localCup.startAttempt`), which fails when both attempts are used.
 
 **Playing.** Board input → `Session.apply/tap/place` → `MoveResult` → feedback (sound, haptic, tile overlay, face
@@ -45,9 +48,10 @@ interstitial *may* be considered by `shouldShowInterstitial` (never in release t
 `world.reconcileWorld` (regional friends whose stage was reached) → `catchUpAchievements` → gem purchase reconcile and
 leaderboard sync in the background → route to Welcome (fresh install) or Home.
 
-**Growing a sanctuary.** On a win (not Paw Cup, not the guided board) `world.growOnSolve` adds one to the regional
-sanctuary being built; stages, arrivals and the completion gift are derived from that count, so re-running is safe.
-The win sheet shows the growth; "Visit" opens `screens/region` with the new stage growing in. D28.
+**Growing a sanctuary.** On a win (not Paw Cup) `world.growOnSolve` adds one to the sanctuary being built (the Farm,
+the Pet Garden or a region); stages, arrivals (`meta/animals.ts` records who is home) and the completion gift are
+derived from that count, so re-running is safe. The win sheet says who came home and who is next; "Meet" opens the
+sanctuary with the newcomer. D28, D35.
 
 **Leaderboard.** If the player joined, the win also queues `{mode, spec, move log}` (`leaderboard/queue.ts`) and
 `leaderboardSync` sends batches to `lbSubmit`, which rebuilds the board, replays the log (`leaderboard/check.ts` →
@@ -132,10 +136,11 @@ backend or a store stays off until integrated, tested and approved.
 | Suite | What it guards |
 | --- | --- |
 | `test/engine.test.ts` | v1 engine: unique, valid, logic-only puzzles |
+| `test/unit/solo.test.ts` | one-animal rule: solver counts, generator unique and logic-only, sound deduction steps, grading, sessions, hints |
 | `test/unit/session.test.ts` | outcome claimed once, tools, undo/redo, zen, clock, hints, snapshots |
 | `test/unit/storage.test.ts` | v1 → v2 migration, backups, corruption, scoped reset, storage that throws |
 | `test/unit/hearts.test.ts` | five casual hearts, Cup's three, wrong Cat/Dog semantics, legacy save upgrade |
-| `test/unit/difficulty.test.ts` | grading, pack 2 frozen and reproducible, spec routing, old 9×9 saves resume |
+| `test/unit/difficulty.test.ts` | grading, packs 2–4 frozen and reproducible, spec routing (spec 4: one animal to 20, L − 20 after), old 9×9 saves resume |
 | `test/unit/pantry.test.ts` | item ledger caps/overflow, earning rules, hint-ticket costs, treats, Paw Rank |
 | `test/unit/sanctuaryLife.test.ts` | ambient budget, reduced motion, CSS scope, companions, pats, small talk |
 | `test/unit/feel.test.ts` | mistake strike is fade-only, remembered tool |
@@ -146,7 +151,7 @@ backend or a store stays off until integrated, tested and approved.
 | `test/unit/economy.test.ts` | ledger idempotency, rewards, v1 reconcile, decor purchase, scene |
 | `test/unit/competition.test.ts` | score fixtures, tie-breaks, league settlement, replay verifier tamper cases |
 | `test/unit/meta.test.ts` | missions, badges, v1 stats, local cup attempt limits |
-| `test/unit/world.test.ts` | projection, regions opening, growth/stages/arrivals/gift once, switching, reconcile, regional decor, scenes |
+| `test/unit/world.test.ts` | projection, sanctuaries opening, growth/stages/arrivals/gift once, switching, reconcile, the board's cast, decor, scenes |
 | `test/unit/leaderboard.test.ts` | solve replay (mistakes, hints, extra lives), rejections, awards once, weekly rollover, rate limits, names, reports, deletion, queue |
 | `test/firebase/rules.test.ts` | Firestore rules against the emulator (`npm run fb:test`; not part of `npm test`) |
-| `test/e2e/smoke.mjs` | first run, next level, resume, purchase once, sanctuary life, world map growth, leaderboard join → solve → leave, scoped reset |
+| `test/e2e/smoke.mjs` | first run (one-animal guided board, tap ✕ / double-tap), Cotton comes home, Farm gifts, wrong placement, Erase, pause, the level-21 lesson, Paw Cup gating, resume, purchase once, Farm treats, sanctuary life and rides, world map growth, leaderboard join → solve → leave, scoped reset |

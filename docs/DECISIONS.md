@@ -461,3 +461,56 @@ acted out with face and body.
   something plays, ~30 fps for breathing, a few per second under reduced motion (where nothing moves by itself), none
   when hidden or scrolled away. The canvas and context are released when the screen closes.
 - The puzzle board is untouched (faces only, D11).
+
+## 2026-10-29 · D35 — One animal first; the Farm and the Pet Garden; animals come home as you build (revises D11, D15, D28)
+Owner decisions (2026-10-29): Journey levels 1–20 are one-animal boards and two animals start after level 20, which
+also slows how fast animals are collected. Not cats only: the animals belong to the sanctuary being built, starting
+with farm animals (a sheep first, so it doesn't feel like a cat or dog puzzle), then domestic pets including cats and
+dogs; beginner sanctuaries first, the exotic regions at later levels. You collect a sanctuary's animals, treats and
+decor, then move on and build the next one. Controls: tap places ✕, double-tap places the animal and a wrong one costs
+a heart; only Erase and Hint below the board, the rules tucked away. Recommended options taken: a new Farm plus the
+Pet Garden as the beginner sanctuaries; one level ladder; the board shows the animal you're bringing home; two animal
+buttons on two-animal boards. Slow-down pace, board sizes and the Daily left to us.
+
+- **The one-animal rule** (`engine/solo.ts`): one animal in every row, column and color region, and no two touch,
+  not even at a corner. The animal is stored as species 1, so sessions, saves, replays and the server verifier carry
+  it unchanged; `Puzzle.rule = 'solo'` marks the board. The generator places a random permutation, grows regions from
+  the animals at uneven rates, repairs any second solution by moving one cell between neighboring regions, and keeps
+  the board only if the human deduction steps solve it (single → pointing → neighbor lock → k regions in k lines).
+  1–13 ms per board. Hints and grading use the same steps (`docs/DIFFICULTY.md`).
+- **One ladder, spec 4** (`game/specs.ts`, `data/journeyPack4.ts`): levels 1–20 are one-animal boards, 5×5 lessons
+  up to 9×9 by level 17 (level 1 has a one-tile region, so the first move needs no hunting); level 21 is the
+  two-animal lesson and every level L ≥ 21 plays the exact board two-animal level L − 20 always had (the five original
+  lessons, then the spec-3 ramp), so nothing new is generated for it. Saved boards keep their spec. Daily and Zen are
+  one-animal boards until the two-animal lesson is done (`playsSolo`); the one-animal Daily is its own board (≤ 8×8),
+  and both Dailies of a date share one award id, so a day pays Paw Points once. Paw Cup boards have two animals, so
+  the Cup opens after level 21.
+- **The world** (`meta/world.ts`, `meta/catalogs/sanctuaries.ts`): the Farm and the Pet Garden are open from the
+  start; the Outback opens after level 10, the Savanna 25, the Arctic 40, the Amazon 60. Every puzzle you solve
+  (Journey, Daily, Zen, including the guided first board; not Paw Cup) grows the sanctuary you're building by one.
+  Its animals come home one at a time at set counts: the Farm's Cotton the sheep (1), Truffle the piglet (4),
+  Buttercup the calf (8), Pepper the goat kid (13), Marigold the chick (19) and Hazel the pony (26); the Pet Garden's
+  Juniper the bunny, then the six cats and dogs, Ember and Maple (1 → 53); the regions' three animals at 3, 8 and 15.
+  The Farm and the regions also grow through drawn stages. When everyone is home (and the last stage is reached) the
+  sanctuary is finished, pays a coin gift once, and building moves to the next open one; the player can switch at
+  any time. Arrivals and stages are derived from the count, so nothing is ever granted twice. Earlier saves start the
+  Pet Garden at their residents' place in its line.
+- **The board's animals** (`meta/cast.ts`): a board shows the animal you're bringing home next in the sanctuary you're
+  building; a two-animal board pairs it with one already home, of a different kind when possible. The cast is saved
+  with the board. All the friends' heads now have animated face layers (`ui/art/companions.ts` → `friendRigBody`),
+  still faces only on the board (D11 kept).
+- **Controls** (`ui/screens/game.ts`): tap a tile for ✕ (tap again to clear); double-tap (within 380 ms) to place;
+  a wrong placement costs a heart and leaves a ✕. Erase is a toggle; one-animal boards show only Erase and Hint,
+  two-animal boards add the two animal buttons (the double tap places the one picked). Undo, redo and How to play are
+  in the pause sheet. The old tap cycle stays as Settings → Controls → Classic. How to play draws the board's own
+  animals and shows the rule the player is on.
+- **Each sanctuary has its own treats and decor**: the Food shop is filtered by sanctuary; the Farm sells hay, apples
+  and corn, and has five decorations (a scarecrow, a flower wheelbarrow and a water trough, then a tire swing and a
+  little red tractor that animals ride, in 2D and 3D). The first free starter gift is offered where the player first
+  visits: a wheelbarrow or a trough on the Farm.
+- **3D** (D34): seven new soft toys (sheep, piglet, calf, goat kid, chick, pony, bunny) with side ears, wool, horns,
+  a beard, a crest, patches and a blaze; tire-swing and tractor rides.
+- **Screens**: Home shows the sanctuary being built and who comes next; the win sheet says who came home and who is on
+  the way; the album groups animals by sanctuary and shows the next arrival in color; the World map has six pins.
+- Kept: hearts, hints and the Paw Cup's rules; the two-animal engine and every shipped two-animal board; nothing
+  pay-to-win.

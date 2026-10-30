@@ -61,9 +61,16 @@ Defects confirmed in source and fixed in Sprint 0:
 - [x] **Sprint N** (D34) — the 20 sanctuary animals as 3D soft toys (three.js, lazy-loaded) with idle life and strolls
 - [x] **Sprint O** (D34) — tricks performed in 3D with props; eight emotes (2 free, 4 video-token, 2 premium)
 - [x] **Sprint P** (D34) — 3D rides on all twelve special and premium decorations; 3D previews in trick cards
+- [x] **Sprint Q** (D35) — the one-animal rule in the engine: solver, generator, deduction steps, grading
+- [x] **Sprint R** (D35) — spec 4: one animal for levels 1–20 (pack 4), the two-animal lesson at 21, then the
+  two-animal boards from their first lesson; one-animal Daily and Zen until then
+- [x] **Sprint S** (D35) — the Farm and the Pet Garden; every solve brings the next animal home in the sanctuary being
+  built; the board shows that animal; seven new farm and garden animals in 2D and 3D; treats and decor per sanctuary
+- [x] **Sprint T** (D35) — tap ✕ / double-tap to place, Erase and Hint only (animal buttons on two-animal boards),
+  undo and rules in pause; Paw Cup after level 21; album by sanctuary
 - [ ] Game Center and online Paw Cup leagues — not started
 
-Test count: 318 unit tests + 71 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
+Test count: 345 unit tests + 92 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.

@@ -2,10 +2,15 @@
 
 *A clever little puzzle with a whole lot of heart.*
 
-Pawtopia is a cozy, portrait-first logic puzzle for iPhone. Every row, column and color region needs exactly
-**one cat and one dog**, and pets never sit side by side. Every board has one answer you can reach by logic alone.
-Solving boards welcomes residents into the Harmony Sanctuary, a garden you decorate with coins you earn by playing.
-The pets on the board are alive in the smallest way: they blink, glance, smile and frown, but only their faces move.
+Pawtopia is a cozy, portrait-first logic puzzle for iPhone. For the first 20 levels every row, column and color region
+needs exactly **one animal**, and animals never touch, not even at a corner. From level 21 each line holds **two
+animals**, one of each kind, never side by side. Every board has one answer you can reach by logic alone. Tap a tile
+to mark it ✕; double-tap to place the animal.
+
+Every puzzle you solve builds a sanctuary: the Farm first (a sheep, a piglet, a calf, a goat kid, a chick, a pony),
+then the Pet Garden's bunny, cats and dogs, then the Outback, Savanna, Arctic and Amazon as the Journey opens them.
+Animals come home one at a time, and the board shows the one you're bringing home. The animals on the board are alive
+in the smallest way: they blink, glance, smile and frown, but only their faces move.
 
 ![Pawtopia screens](docs/screenshots/pawtopia-screens.png)
 
@@ -16,22 +21,22 @@ puzzle engine, its tests and every v1 board are preserved, and v1 saves migrate 
 
 | | |
 | --- | --- |
-| **Journey** | 60 verified launch levels in chapters of 20 (5×5 → 8×8), then endless generated boards up to 9×9. Stars for clean, hint-free solves. A new resident at levels 1, 5, 10, 15 and 20; a decoration gift per chapter. |
-| **First run** | A two-sentence welcome, then a forgiving guided board where the deduction engine highlights two forced moves one at a time. Later levels introduce one idea each in one sentence. |
-| **Daily Cozy Puzzle** | One shared board per day, with a gentle streak and one free Cozy Day per month. |
+| **Journey** | Levels 1–20 are verified one-animal boards (5×5 → 9×9); level 21 teaches two animals, and from there the verified two-animal boards follow, then endless generated boards. Stars for clean, hint-free solves; a decoration gift per chapter. |
+| **First run** | A two-sentence welcome, then a forgiving guided board with Cotton the sheep where the deduction engine highlights forced moves one at a time. Level 21 is a guided two-animal lesson. |
+| **Daily Cozy Puzzle** | One shared board per day (one animal until you've reached two), with a gentle streak and one free Cozy Day per month. |
 | **Zen Garden** | Any size, no clock, no hearts. |
-| **Paw Cup** | Five fixed boards per UTC week, two attempts each, no hints, best counts. Practice-only (clearly labeled) until the verified backend exists. |
-| **Sanctuary** | An illustrated garden with 15 decorations in fixed spots and your residents sitting on their favorites. |
-| **Residents** | Six original pets (Mochi, Pip, Clover, Biscuit, Nori, Peanut) with personalities that shape their expressions. |
+| **Paw Cup** | Five fixed two-animal boards per UTC week, two attempts each, no hints, best counts. Opens after level 21. |
+| **Sanctuaries** | The Farm and the Pet Garden from the start, four regions later. Each grows with every puzzle you solve, with its own animals, treats and decorations; animals ride the tire swing, the tractor, the balloon. 3D soft toys. |
+| **Animals** | 27 original animals with personalities that shape their expressions, collected sanctuary by sanctuary in the Animal album. |
 | **Meta** | Free Paw Coins on an idempotent ledger, 3 daily missions + 1 weekly, 12 badges, a Journal of stats. |
-| **Comfort** | Tool or tap-cycle controls, left-handed layout, reduced motion, high contrast, region patterns, large board mode, VoiceOver labels, offline play, no sign-in. |
+| **Comfort** | Tap / double-tap or classic tap-cycle controls, left-handed layout, reduced motion, high contrast, region patterns, large board mode, VoiceOver labels, offline play, no sign-in. |
 
 ## Run it
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173 (open the LAN URL on your phone)
-npm test           # 146 unit tests: engine, session, storage, faces, economy, scoring, verifier
+npm test           # 345 unit tests: engines, session, storage, faces, economy, world, scoring, verifier
 npm run gen:check  # generates 1,000 puzzles and verifies uniqueness / validity
 npm run pack:check # re-verifies the 60-level launch pack
 npm run build      # typecheck + production build → dist/
@@ -57,8 +62,8 @@ The bundle id stays `com.sam3lds.catsvsdogs` so Pawtopia ships as an update to t
 ## Project layout
 
 ```
-src/engine/        puzzle engine (unchanged from v1): solver, deduction, generator, levels, rng
-src/data/          frozen, verified 60-level launch pack + pack format/verification
+src/engine/        puzzle engines: two-animal (unchanged from v1: solver, deduction, generator, levels, rng), one-animal (solo.ts)
+src/data/          frozen, verified Journey packs + pack format/verification
 src/game/          session (marks, hearts, undo/redo, hints, snapshots, event log), modes, dates, persistence
 src/meta/          progression, rewards, ledger, sanctuary, missions, achievements, onboarding, catalogs
 src/competitions/  scoring formula, replay verifier, league rules, weekly cup boards, local practice cup

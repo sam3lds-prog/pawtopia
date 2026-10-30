@@ -58,6 +58,24 @@ is why a level that asked for Medium could silently get something else under the
 - Paw Cup keeps its published lineup and par times (owner decision, 2026-10-26); its in-game chip still shows the
   measured label.
 
+## One-animal boards (spec 4, D35)
+
+Journey levels 1–20, and the Daily and Zen until a player has had the two-animal lesson, use the one-animal rule. They
+are measured the same way with that rule's own steps (`src/engine/solo.ts`): **single** (the only spot left in a line
+or region), **pointing** (a region's spots all in one line clear the rest of it, and the reverse), **neighbor lock**
+(a tile whose animal would leave some line or region with no spot), and **subset** (k regions that fit only in k rows
+or columns own those lines).
+
+Score = (3 × breakthroughs + 1.5 × (longestChain − 1) + 1.5 × min(neighborLock, 10) + 4 × subset +
+min(pointing, 12) / 2 + 2 × max(0, 2 − openingSingles)) × (0.8 + 0.07 × (n − 5)). Labels: **Easy** singles only;
+**Medium** needs more, score < 16 (or pointing only, < 16); **Hard** ≥ 16; **Expert** ≥ 40 *and* needs a subset.
+
+Ladder (`V4_SOLO`, frozen in `src/data/journeyPack4.ts`, every slot matched): 5×5 easy, easy, medium; 6×6 easy,
+medium, medium; 7×7 easy, medium; 6×6 hard; 7×7 medium, hard; 8×8 easy, medium; 7×7 hard; 8×8 medium, hard; 9×9
+medium; 8×8 hard; 9×9 medium, hard. Level 1 has a one-tile region so the guided first move is obvious. Level 21 is
+the two-animal lesson and level L ≥ 21 plays two-animal level L − 20's board. The one-animal Daily follows the week
+(Mon 6×6 easy … Sat 8×8 hard, never above 8×8).
+
 ## Changing the formula
 
 Changing a weight or threshold changes labels and which boards future slots pick. Bump `GRADING_VERSION`, re-run
