@@ -30,5 +30,10 @@ retried), so an app that reaches players first loses their leaderboard points un
 queued offline on a retired spec are rejected by design (`bad-spec`): the server counts a board only on the spec it
 is issued under today.
 
+D35 is such a change: spec 4 (one-animal Journey levels 1–20, levels from 21 replaying the board of level L − 20, and
+the one-animal Daily sent as `{ kind: 'daily', dateKey, rule: 'solo' }`). Deploy the functions built from this
+version (`npm run fb:deploy`) before the app update. Both Dailies of a date
+award the same `D<date>` id, so a day still counts once.
+
 `functions/.env` (optional, git-ignored): `FUNCTIONS_REGION` if not `us-central1`. `ENFORCE_APP_CHECK=true` only
 after the app sends App Check tokens (a native App Attest provider; not wired up yet), otherwise every call fails.
