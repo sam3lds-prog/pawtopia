@@ -70,7 +70,7 @@ Defects confirmed in source and fixed in Sprint 0:
   undo and rules in pause; Paw Cup after level 21; album by sanctuary
 - [ ] Game Center and online Paw Cup leagues — not started
 
-Test count: 353 unit tests + 96 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
+Test count: 357 unit tests + 96 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.

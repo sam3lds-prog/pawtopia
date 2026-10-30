@@ -36,7 +36,7 @@ puzzle engine, its tests and every v1 board are preserved, and v1 saves migrate 
 ```bash
 npm install
 npm run dev        # http://localhost:5173 (open the LAN URL on your phone)
-npm test           # 353 unit tests: engines, session, storage, faces, economy, world, scoring, verifier
+npm test           # 357 unit tests: engines, session, storage, faces, economy, world, scoring, verifier
 npm run gen:check  # generates 1,000 puzzles and verifies uniqueness / validity
 npm run pack:check # re-verifies the 60-level launch pack
 npm run build      # typecheck + production build → dist/

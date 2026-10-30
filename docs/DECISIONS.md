@@ -517,13 +517,17 @@ buttons on two-animal boards. Slow-down pace, board sizes and the Daily left to 
   by 20. Clears, stars, best times, the next level, the board in progress and queued leaderboard solves move with it;
   the two-animal lesson counts as done, so their Daily, Zen and Paw Cup stay two-animal. Levels 1–20 show as open
   (not solved) on the path, and Home says once what happened. A player who never cleared a level starts the new
-  ladder.
+  ladder. A save that already uses the new numbering (any one-animal onboarding flag or spec-4 board) is never moved;
+  an old two-animal level 1 left in progress by a player with no clears is dropped rather than resumed as the new
+  level 1. The v1 welcome sheet stays for v1 saves; a moved save's catch-up (finished chapters under their new
+  numbers) is listed in its own notice. Solved counts and the first-chapter badge count real clears.
 - **Rewards follow the board, not the number** (`specs.levelRewardKey`): one-animal levels pay under `S1`–`S20`; level
   L ≥ 21 pays under `L<L − 20>`, the id that board always had. Coins, Paw Points, extra lives, hints and the server's
   awards all use it, so a moved player never earns twice for a board (nor gets nothing for the new levels). Chapter
   gifts stay with chapter numbers.
 - **Both Dailies of a date pay the same** (`specs.dailyPointsTier`): the easier of the two weekday slots, on the device
-  and on the server, so no one gains by playing the other board.
+  and on the server, so no one gains by playing the other board. The server refuses one-animal Dailies dated before
+  the measured Dailies (2026-10-27), when they didn't exist.
 - **No-timing controls**: Settings → Controls → Tap cycle (no quick double tap; for VoiceOver and Switch Control) is
   named in Settings and in How to play.
 - Kept: hearts, hints and the Paw Cup's rules; the two-animal engine and every shipped two-animal board; nothing

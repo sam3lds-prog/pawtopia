@@ -21,6 +21,8 @@ export interface AchievementDef {
 
 const count = (o: Record<string, unknown>) => Object.keys(o).length;
 const solvedSize = (s: SaveV2, min: number) => Object.entries(s.stats.bestBySize).some(([k]) => Number(k) >= min);
+/** Levels 1–20 actually cleared (a save that moved up for D35 hasn't played its new first chapter yet). */
+const firstChapterClears = (s: SaveV2) => Array.from({ length: 20 }, (_, i) => s.journey.clears[`L${i + 1}`]).filter(Boolean).length;
 
 export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'first_friend', name: 'First Friend', description: 'Solve your first board.', icon: 'paw', coins: 20, progress: (s) => [Math.min(1, s.stats.solved), 1] },
@@ -31,7 +33,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   { id: 'whole_family', name: 'The Whole Family', description: `Welcome all ${PETS.length} residents.`, icon: 'heart', coins: 50, progress: (s) => [Math.min(PETS.length, count(s.inventory.pets)), PETS.length] },
   { id: 'daily_devotee', name: 'Daily Devotee', description: 'Reach a 7-day Daily streak.', icon: 'flame', coins: 50, progress: (s) => [Math.min(7, Math.max(s.daily.bestStreak, liveStreak(s))), 7] },
   { id: 'comeback_kid', name: 'Comeback Kid', description: 'Finish a board after two mistakes, or after refilling your hearts.', icon: 'restart', coins: 20, progress: (s) => [Math.min(1, s.stats.comebacks), 1] },
-  { id: 'master_regions', name: 'Master of Regions', description: 'Finish the first chapter, Meadow Gate.', icon: 'star', coins: 40, progress: (s) => [Math.min(20, s.journey.nextLevel - 1), 20] },
+  { id: 'master_regions', name: 'Master of Regions', description: 'Finish the first chapter, Meadow Gate.', icon: 'star', coins: 40, progress: (s) => [firstChapterClears(s), 20] },
   { id: 'zen_gardener', name: 'Zen Gardener', description: 'Solve five Zen boards.', icon: 'leaf', coins: 20, progress: (s) => [Math.min(5, s.zen.solved), 5] },
   { id: 'grand_thinker', name: 'Grand Thinker', description: 'Solve a 9×9 board (Paw Cup\'s Grand Hall).', icon: 'sparkle', coins: 40, progress: (s) => [solvedSize(s, 9) ? 1 : 0, 1] },
   { id: 'full_garden', name: 'In Full Bloom', description: `Own all ${DECOR.length} decorations.`, icon: 'trophy', coins: 100, progress: (s) => [Math.min(DECOR.length, count(s.inventory.decor)), DECOR.length] },

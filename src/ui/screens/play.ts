@@ -134,7 +134,7 @@ export const playScreen: ScreenDef = {
             </div>
           </div>
         </div>
-        <div class="section-head"><h2>Journey</h2><span class="muted num">${next - 1} solved</span></div>
+        <div class="section-head"><h2>Journey</h2><span class="muted num">${Object.keys(save.journey.clears).length} solved</span></div>
         <div class="chapter-tabs" role="tablist" aria-label="Chapters">
           ${chapters.map((c) => `<button role="tab" class="chapter-tab" data-chapter="${c.index}" aria-selected="${c.index === current}">${c.index + 1}</button>`).join('')}
         </div>

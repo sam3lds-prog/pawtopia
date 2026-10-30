@@ -16,6 +16,8 @@ import { recordWin } from '../../src/meta/progression';
 import { pluralNoun } from '../../src/meta/animals';
 import { difficultyReason, profileOf } from '../../src/game/grading';
 import { addDaysKey } from '../../src/game/dates';
+import { checkAchievements } from '../../src/meta/achievements';
+import { checkSolve } from '../../src/leaderboard/check';
 
 const NOW = new Date('2026-10-29T15:00:00Z');
 const oldSpec = (L: number): SpecVersion => (L >= 6 ? 3 : 1);
@@ -99,6 +101,36 @@ describe('D35: saves from before the one-animal levels move up by 20', () => {
     const { save } = loadSave(new MemoryKV({ [V2_KEY]: JSON.stringify(raw) }), NOW);
     expect(save.journey.nextLevel).toBe(95);
     expect(save.lastSession).toBeNull();
+  });
+
+  it('a save already on the new numbering (a D35 build before the ladder field) is not moved', () => {
+    const raw = defaultSave(NOW) as unknown as { journey: Record<string, unknown> } & Record<string, unknown>;
+    delete raw.journey.ladder;
+    raw.journey.nextLevel = 6;
+    raw.journey.clears = { L1: { firstClearAt: 'x', bestSeconds: 30, bestMistakes: 0, clean: true, hintFree: true, stars: 3, spec: 4 } };
+    const { save } = loadSave(new MemoryKV({ [V2_KEY]: JSON.stringify(raw) }), NOW);
+    expect(save.journey.nextLevel).toBe(6);
+    expect(save.journey.clears.L1).toBeDefined();
+    expect(save.onboarding.ladderNotice).toBe(false);
+  });
+
+  it('an untouched old level 1 in progress is dropped, not resumed as the one-animal level 1', () => {
+    const raw = preD35(1) as Record<string, unknown>;
+    const mode = { kind: 'level' as const, level: 1 };
+    raw.lastSession = captureSession(mode, new Session(puzzleFor(mode, 1)), NOW, 1);
+    const { save } = loadSave(new MemoryKV({ [V2_KEY]: JSON.stringify(raw) }), NOW);
+    expect(save.lastSession).toBeNull();
+  });
+
+  it('the first-chapter badge waits for the new first chapter', () => {
+    const { save } = loadSave(new MemoryKV({ [V2_KEY]: JSON.stringify(preD35(25)) }), NOW);
+    expect(save.journey.nextLevel).toBe(45);
+    expect(checkAchievements(save, NOW).map((a) => a.id)).not.toContain('master_regions');
+  });
+
+  it('the server refuses a one-animal Daily dated before one-animal Dailies existed', () => {
+    const r = checkSolve({ mode: { kind: 'daily', dateKey: '2026-10-24', rule: 'solo' }, spec: 4, events: [] }, new Date('2026-10-29T12:00:00Z'));
+    expect(r).toMatchObject({ ok: false, reason: 'bad-board' });
   });
 
   it('nothing pays twice: rewards follow the board, so moved clears earn nothing new', () => {

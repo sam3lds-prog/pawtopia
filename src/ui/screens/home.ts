@@ -263,6 +263,12 @@ export const homeScreen: ScreenDef = {
     const movedLine = movedTo
       ? `Pawtopia now opens with twenty one-animal puzzles, so your Journey moved up to make room: you're on level ${movedTo}, with every clear, star and best time. Levels 1 to 20 are new and open whenever you'd like them.`
       : '';
+    const caught = app.ladderGift;
+    app.ladderGift = null;
+    const caughtLine =
+      movedTo && caught && (caught.coins || caught.decor.length)
+        ? `Your finished chapters were counted under their new numbers: ${[caught.coins ? `+${caught.coins} Paw Coins` : '', ...caught.decor.map((d) => DECOR_BY_ID[d].name)].filter(Boolean).join(', ')}.`
+        : '';
     if (movedTo) {
       app.save.onboarding.ladderNotice = false;
       app.persist();
@@ -294,6 +300,7 @@ export const homeScreen: ScreenDef = {
         title: 'Twenty new levels',
         center: true,
         body: `<p class="sheet__lead">${esc(movedLine)}</p>
+          ${caughtLine ? `<p>${esc(caughtLine)}</p>` : ''}
           <div class="sheet__actions"><button class="btn btn--block" data-act="ok">Got it</button></div>`,
       });
       ls.scope.on(ls.el, 'click', (e) => {

@@ -10,7 +10,7 @@ import { setSoundEnabled } from '../services/audio';
 import type { Router } from '../ui/router';
 import { modeKey, type ModeRef } from '../game/modes';
 import type { Session } from '../game/session';
-import type { SpecVersion } from '../game/specs';
+import { SOLO_LEVELS, type SpecVersion } from '../game/specs';
 import type { Cast } from '../meta/cast';
 import { captureSession } from '../game/sessionPersistence';
 import { reconcileRewards, type RewardSummary } from '../meta/rewards';
@@ -36,20 +36,28 @@ class App {
 
   /** What a v1 player received when their earlier progress was converted (shown once on Home). */
   upgradeGift: RewardSummary | null = null;
+  /** What a save that moved up for D35 caught up on (finished chapters under their new numbers), shown with its notice. */
+  ladderGift: RewardSummary | null = null;
 
   constructor() {
     setTestEntriesCount(TEST_BUILD);
-    this.save = loadSave().save;
+    const loaded = loadSave();
+    this.save = loaded.save;
     // Grant anything already earned but not yet recorded (v1 levels, Paw Points for clears made before points
     // existed). Idempotent, so it is a no-op after the first run.
-    const gift = reconcileRewards(this.save, new Date(), (level, clear) => packedLevelTier(level, clear.spec ?? 1));
+    // A clear that moved up 20 levels (D35) on a board from an older spec is graded as the board it really was.
+    const tierOf = (level: number, spec: SpecVersion) => (level > SOLO_LEVELS && spec !== 4 ? packedLevelTier(level - SOLO_LEVELS, spec) : packedLevelTier(level, spec));
+    const gift = reconcileRewards(this.save, new Date(), (level, clear) => tierOf(level, clear.spec ?? 1));
     // Everyone, new or returning, gets the starter pantry once (rewards are not back-dated in treats or tickets).
     const pantry = grantStarterItems(this.save);
     // Saves from before D35 start the Pet Garden at their residents' place in its line, and any arrival that was reached
     // but not recorded (an interrupted save) happens now.
     const growthBefore = JSON.stringify(this.save.world.growth);
     const friends = reconcileWorld(this.save);
-    if (gift.coins > 0 || gift.decor.length) this.upgradeGift = gift;
+    if (gift.coins > 0 || gift.decor.length) {
+      if (loaded.source === 'migrated-v1') this.upgradeGift = gift;
+      else if (this.save.onboarding.ladderNotice) this.ladderGift = gift;
+    }
     if (gift.coins > 0 || gift.decor.length || gift.points > 0 || pantry || friends.length || growthBefore !== JSON.stringify(this.save.world.growth))
       saveSave(this.save);
     try {

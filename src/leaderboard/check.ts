@@ -16,7 +16,7 @@ import { profileOf } from '../game/grading';
 import { rulesFor, type ModeRef } from '../game/modes';
 import { currentSpec, puzzleFor } from '../game/puzzles';
 import { isSessionEvent, type SessionEvent } from '../game/session';
-import { dailyPointsTier, levelRewardKey, type SpecVersion } from '../game/specs';
+import { DAILY_V2_FROM, dailyPointsTier, levelRewardKey, type SpecVersion } from '../game/specs';
 import { POINTS } from '../meta/points';
 
 /** A Daily is either the two-animal board or (for players before two animals, D35) the one-animal board of that date. */
@@ -82,6 +82,8 @@ export function checkSolve(sub: SolveSubmission, now: Date): CheckResult {
     // Local dates run up to a day ahead of UTC; late syncs are allowed for a week.
     const today = utcDateKey(now);
     if (m.dateKey > addDaysKey(today, 1) || m.dateKey < addDaysKey(today, -DAILY_WINDOW_DAYS)) return fail('out-of-window');
+    // The one-animal Daily (D35) exists only from the measured Dailies on, where both boards of a date pay the same.
+    if (m.rule === 'solo' && m.dateKey < DAILY_V2_FROM) return fail('bad-board');
   }
   const mode = m as ModeRef;
   // A board counts only on the spec it is issued under today (a forger can't pick the better-paying one).

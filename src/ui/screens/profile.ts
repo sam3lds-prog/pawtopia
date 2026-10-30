@@ -45,7 +45,7 @@ export const profileScreen: ScreenDef = {
             <div class="stat"><div class="stat__v num">${s.stats.solved}</div><div class="stat__k">boards solved</div></div>
             <div class="stat"><div class="stat__v num">${s.stats.clean}</div><div class="stat__k">clean solves</div></div>
             <div class="stat"><div class="stat__v num">${s.stats.hintFree}</div><div class="stat__k">without hints</div></div>
-            <div class="stat"><div class="stat__v num">${s.journey.nextLevel - 1}</div><div class="stat__k">Journey levels</div></div>
+            <div class="stat"><div class="stat__v num">${Object.keys(s.journey.clears).length}</div><div class="stat__k">Journey levels</div></div>
             <div class="stat"><div class="stat__v num">${liveStreak(s)}</div><div class="stat__k">day streak</div></div>
             <div class="stat"><div class="stat__v num">${s.daily.bestStreak}</div><div class="stat__k">best streak</div></div>
           </div>

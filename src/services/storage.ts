@@ -461,6 +461,19 @@ function normSavedSession(x: unknown): SavedSession | null {
   };
 }
 
+/**
+ * Whether a stored save already uses D35's level numbering even though it has no `ladder` field: builds between the
+ * one-animal levels and the ladder field wrote the one-animal onboarding flags or spec-4 boards.
+ */
+function isD35Save(x: Record<string, unknown>): boolean {
+  const ob = isObj(x.onboarding) ? x.onboarding : {};
+  if ('soloRulesSeen' in ob || 'pairLessonDone' in ob) return true;
+  const j = isObj(x.journey) ? x.journey : {};
+  if (isObj(j.clears) && Object.values(j.clears).some((c) => isObj(c) && c.spec === 4)) return true;
+  const last = isObj(x.lastSession) ? x.lastSession : null;
+  return !!last && last.specVersion === 4 && isObj(last.mode) && last.mode.kind === 'level';
+}
+
 /** Coerces any parsed JSON into a complete, well-typed v2 save. */
 export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
   const d = defaultSave(now);
@@ -496,7 +509,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
           ...(v.spec === 2 || v.spec === 3 || v.spec === 4 ? { spec: v.spec as 2 | 3 | 4 } : {}),
         };
       }),
-      ladder: j.ladder === 4 ? 4 : 3,
+      ladder: j.ladder === 4 || isD35Save(x) ? 4 : 3,
     },
     daily: {
       done: rec(dl.done, (v) => (isObj(v) ? { at: str(v.at, ''), seconds: int(v.seconds, 0, 0), mistakes: int(v.mistakes, 0, 0) } : undefined)),
@@ -664,13 +677,19 @@ export function upgradeLadder(save: SaveV2): boolean {
   const j = save.journey;
   if (j.ladder === 4) return false;
   j.ladder = 4;
-  const cleared = Object.keys(j.clears).filter((k) => /^L\d+$/.test(k));
-  if (j.nextLevel <= 1 && cleared.length === 0) return false;
+  const cleared = Object.keys(j.clears).filter((k) => /^L[1-9]\d*$/.test(k));
+  if (j.nextLevel <= 1 && cleared.length === 0) {
+    // Nothing to move, but a two-animal level 1 left in progress would otherwise resume as the one-animal level 1.
+    if (save.lastSession?.mode.kind === 'level' && save.lastSession.specVersion !== 4) save.lastSession = null;
+    return false;
+  }
   const up = (L: number) => L + SOLO_LEVELS;
   // The same board keeps its records comparable (spec 4); a board from an older spec keeps its own spec.
   const sameBoard = (L: number, spec: number | undefined) => (spec ?? 1) === pairSourceOf(up(L)).spec;
 
   const clears: Record<string, LevelClear> = {};
+  // Keys that aren't a level number (never written by the app) are kept as they are.
+  for (const [k, v] of Object.entries(j.clears)) if (!cleared.includes(k)) clears[k] = v;
   for (const k of cleared) {
     const L = Number(k.slice(1));
     const c = j.clears[k];
@@ -680,7 +699,10 @@ export function upgradeLadder(save: SaveV2): boolean {
   }
   j.clears = clears;
   const times: Record<string, number> = {};
-  for (const [k, secs] of Object.entries(j.bestTimes)) if (/^L\d+$/.test(k)) times[`L${up(Number(k.slice(1)))}`] = secs;
+  for (const [k, secs] of Object.entries(j.bestTimes)) {
+    if (/^L[1-9]\d*$/.test(k)) times[`L${up(Number(k.slice(1)))}`] = secs;
+    else times[k] = secs;
+  }
   j.bestTimes = times;
   j.nextLevel = up(j.nextLevel);
 
