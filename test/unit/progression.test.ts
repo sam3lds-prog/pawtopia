@@ -126,10 +126,16 @@ describe('onboarding', () => {
     recordWin(s, { kind: 'level', level: 1 }, clean);
     expect(isTutorial({ kind: 'level', level: 1 }, s)).toBe(false);
   });
-  it('introduces one idea at a time, one sentence each', () => {
-    expect(levelTip(4)).toMatch(/region/);
-    expect(levelTip(7)).toMatch(/side by side/);
-    expect(levelTip(3)).toBeNull();
-    for (const L of [2, 4, 6, 7, 10, 12, 15, 19, 40]) expect(levelTip(L)!.split('. ').length).toBeLessThanOrEqual(2);
+  it("introduces one idea at a time, one sentence each, in the board's own words", () => {
+    expect(levelTip(2, 'sheep')).toMatch(/Each sheep rules out/);
+    expect(levelTip(3, 'sheep')).toMatch(/color that fits in a single row/);
+    expect(levelTip(22, 'sheep', 'piglet')).toBe('Every row and every column holds exactly one sheep and one piglet.');
+    expect(levelTip(27)).toMatch(/beside an animal/);
+    expect(levelTip(5)).toBeNull();
+    for (const L of [2, 3, 4, 6, 7, 9, 12, 14, 17, 20, 22, 24, 26, 27, 30, 35, 39, 60]) {
+      const t = levelTip(L, 'sheep', 'piglet')!;
+      expect(t, `level ${L}`).not.toMatch(/[{}]/);
+      expect(t.split('. ').length, `level ${L}`).toBeLessThanOrEqual(2);
+    }
   });
 });

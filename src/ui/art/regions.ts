@@ -17,7 +17,27 @@ import { OUT, SHADOW, dusk, heartAbove, type DecorArt } from './sceneKit';
 
 export type RegionDecorId = Extract<
   DecorId,
-  'campfire' | 'windmill' | 'hammock' | 'opalrock' | 'baobab' | 'weaver' | 'flamingos' | 'pavilion' | 'igloo' | 'snowman' | 'icelanterns' | 'aurora' | 'ropebridge' | 'orchids' | 'fireflyjars' | 'waterfall'
+  | 'scarecrow'
+  | 'wheelbarrow'
+  | 'trough'
+  | 'tireswing'
+  | 'tractor'
+  | 'campfire'
+  | 'windmill'
+  | 'hammock'
+  | 'opalrock'
+  | 'baobab'
+  | 'weaver'
+  | 'flamingos'
+  | 'pavilion'
+  | 'igloo'
+  | 'snowman'
+  | 'icelanterns'
+  | 'aurora'
+  | 'ropebridge'
+  | 'orchids'
+  | 'fireflyjars'
+  | 'waterfall'
 >;
 
 const paw = (x: number, y: number, c: string) =>
@@ -35,6 +55,73 @@ function sign(x: number, y: number, accent: string): string {
 // ------------------------------------------------------------------ regional decorations
 
 export const REGION_DECOR_ART: Record<RegionDecorId, DecorArt> = {
+  // Farm
+  scarecrow: {
+    base: 196,
+    box: [12, 132, 50, 68],
+    draw: () => `
+      <ellipse cx="37" cy="196" rx="12" ry="2.6" fill="${SHADOW}"/>
+      <path d="M37 196 V146" stroke="#8a6a4f" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M18 160 H56" stroke="#8a6a4f" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M27 158 L47 158 L50 182 L24 182 Z" fill="#7fa8d6" stroke="${OUT}" stroke-width="0.9"/>
+      <path d="M31 164 h12 M31 170 h12" stroke="#5f86b8" stroke-width="0.9"/>
+      <path d="M20 159 l-4 4 M20 159 l-5 0 M54 159 l4 4 M54 159 l5 0" stroke="#e8c76a" stroke-width="1.4" stroke-linecap="round"/>
+      <path d="M26 182 l-2 5 M33 182 l-1 6 M41 182 l1 6 M48 182 l2 5" stroke="#e8c76a" stroke-width="1.4" stroke-linecap="round"/>
+      <circle cx="37" cy="150" r="7.4" fill="#f3e2bf" stroke="${OUT}" stroke-width="0.9"/>
+      <circle cx="34.4" cy="149.4" r="1" fill="#2f2a27"/><circle cx="39.6" cy="149.4" r="1" fill="#2f2a27"/><path d="M34.6 152.6 q2.4 1.8 4.8 0" stroke="#2f2a27" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+      <path d="M26.5 145 C29 137 45 137 47.5 145 Z" fill="#c8945a" stroke="${OUT}" stroke-width="0.9"/><path d="M24 145.4 H50" stroke="#a87642" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="43" cy="141" r="1.8" fill="#e5546c"/>`,
+  },
+  wheelbarrow: {
+    base: 270,
+    box: [264, 236, 52, 38],
+    draw: () => `
+      <ellipse cx="288" cy="270" rx="22" ry="3" fill="${SHADOW}"/>
+      <path d="M270 256 L304 256 L298 268 L276 268 Z" fill="#d9734f" stroke="${OUT}" stroke-width="0.9"/>
+      <path d="M304 258 L314 252" stroke="#8a6a4f" stroke-width="2" stroke-linecap="round"/><path d="M278 268 L276 272 M296 268 L298 272" stroke="#8a6a4f" stroke-width="1.6"/>
+      <circle cx="268" cy="266" r="5" fill="#5b4a3a" stroke="${OUT}" stroke-width="0.8"/><circle cx="268" cy="266" r="1.6" fill="#c9b49a"/>
+      <g><circle cx="276" cy="252" r="4" fill="#f4a6c4"/><circle cx="284" cy="248" r="4.4" fill="#f6d27a"/><circle cx="292" cy="251" r="4" fill="#fff"/><circle cx="299" cy="250" r="3.6" fill="#e5546c"/><circle cx="288" cy="244" r="3.2" fill="#b49ae0"/></g>
+      <g fill="#7fb35d"><ellipse cx="280" cy="255" rx="3" ry="1.4"/><ellipse cx="296" cy="255" rx="3" ry="1.4"/></g>`,
+  },
+  trough: {
+    base: 226,
+    box: [296, 204, 52, 26],
+    draw: () => `
+      <ellipse cx="322" cy="226" rx="24" ry="3" fill="${SHADOW}"/>
+      <path d="M300 212 H344 L340 224 H304 Z" fill="#9aa3a8" stroke="${OUT}" stroke-width="0.9"/>
+      <path d="M302 214 H342" stroke="#7d868c" stroke-width="1"/>
+      <ellipse cx="322" cy="213" rx="20" ry="2.4" fill="#a7d3e4"/>
+      <g class="sp-water" stroke="#fff" stroke-width="1" fill="none" opacity="0.8" stroke-linecap="round"><path d="M310 213 q4 1 8 0"/><path d="M326 213 q4 1 8 0"/></g>
+      <path d="M306 224 v3 M338 224 v3" stroke="#7d868c" stroke-width="2" stroke-linecap="round"/>`,
+  },
+  tireswing: {
+    base: 214,
+    box: [2, 52, 80, 166],
+    draw: () => `
+      <ellipse cx="34" cy="214" rx="30" ry="4.4" fill="${SHADOW}"/>
+      <path d="M22 214 C26 180 24 140 30 102 L42 102 C46 140 44 180 48 214 Z" fill="#9a7352" stroke="${OUT}" stroke-width="1"/>
+      <path d="M32 200 C33 170 32 140 36 112" stroke="#86613f" stroke-width="1.2" fill="none"/>
+      <path d="M40 104 C52 96 64 92 76 92" stroke="#9a7352" stroke-width="5" stroke-linecap="round" fill="none"/>
+      <g fill="#7fb35d"><circle cx="18" cy="86" r="18"/><circle cx="40" cy="70" r="22"/><circle cx="64" cy="82" r="18"/><circle cx="76" cy="96" r="10"/><circle cx="10" cy="104" r="10"/></g>
+      <g fill="#97c473"><circle cx="34" cy="62" r="10"/><circle cx="58" cy="74" r="8"/><circle cx="20" cy="80" r="7"/></g>
+      <g fill="#e5546c"><circle cx="24" cy="94" r="2"/><circle cx="56" cy="88" r="2"/><circle cx="44" cy="78" r="1.8"/></g>
+      <g class="sp-swing"><path d="M68 94 V178" stroke="#8a6a4f" stroke-width="1.2"/><ellipse class="sp-seat" cx="68" cy="186" rx="10" ry="9" fill="none" stroke="#3f3a36" stroke-width="5"/><ellipse cx="68" cy="186" rx="10" ry="9" fill="none" stroke="#5d5752" stroke-width="1.2"/><path class="sp-tire-front" d="M58 187 A10 9 0 0 0 78 187" fill="none" stroke="#3f3a36" stroke-width="5"/></g>`,
+  },
+  tractor: {
+    base: 286,
+    box: [196, 236, 72, 54],
+    draw: () => `
+      <ellipse cx="230" cy="286" rx="34" ry="4" fill="${SHADOW}"/>
+      <g class="sp-tractor">
+        <path d="M206 270 L206 254 C206 250 209 248 213 248 L236 248 L240 262 L258 262 C262 262 264 265 264 268 L264 276 L206 276 Z" fill="#d9483b" stroke="${OUT}" stroke-width="1"/>
+        <path d="M214 248 V238 H234 L238 248" fill="#f3efe6" stroke="${OUT}" stroke-width="0.9"/><path d="M216 240 H232 V248 H216 Z" fill="#bfe3f2" opacity="0.9"/>
+        <path d="M252 262 V250" stroke="#5b5550" stroke-width="2.4" stroke-linecap="round"/><path d="M250 250 h5" stroke="#5b5550" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="216" cy="276" r="11" fill="#3f3a36" stroke="${OUT}" stroke-width="0.9"/><circle cx="216" cy="276" r="5" fill="#f6d27a"/><circle cx="216" cy="276" r="1.6" fill="#3f3a36"/>
+        <circle cx="254" cy="279" r="7" fill="#3f3a36" stroke="${OUT}" stroke-width="0.9"/><circle cx="254" cy="279" r="3" fill="#f6d27a"/>
+        <rect x="258" y="264" width="7" height="5" rx="1.4" fill="#fff6c8" stroke="${OUT}" stroke-width="0.6"/>
+        <ellipse class="sp-seat" cx="224" cy="250" rx="7" ry="2.4" fill="#5b4a3a"/>
+      </g>`,
+  },
   // Outback
   campfire: {
     base: 248,
@@ -271,9 +358,15 @@ interface Spot {
   base?: number;
 }
 
-type RegionalCompanion = Exclude<CompanionId, 'ember' | 'maple'>;
+type RegionalCompanion = Exclude<CompanionId, 'ember' | 'maple' | 'juniper'>;
 
 const SPOTS: Record<RegionalCompanion, Spot> = {
+  cotton: { x: 70, y: 214, H: 34, mood: 'happy' },
+  truffle: { x: 182, y: 262, H: 30, mood: 'happy' },
+  buttercup: { x: 262, y: 230, H: 38, mood: 'idle' },
+  pepper: { x: 214, y: 166, H: 24, mood: 'happy', base: 189 },
+  marigold: { x: 134, y: 232, H: 20, mood: 'happy' },
+  hazel: { x: 320, y: 270, H: 44, mood: 'idle' },
   gumnut: { x: 86, y: 118, H: 28, mood: 'sleepy', base: 176 },
   skipper: { x: 232, y: 240, H: 42, mood: 'happy' },
   dozer: { x: 60, y: 250, H: 34, mood: 'idle' },
@@ -328,7 +421,10 @@ const birdFlock = (pts: Array<[number, number]>, c = '#5b4a3a') =>
 
 const butterflies = (pts: Array<[number, number]>) =>
   `<g class="sp-birds">${pts
-    .map(([x, y]) => `<g><ellipse cx="${x - 2.6}" cy="${y}" rx="3" ry="4" fill="#4fa3e0" transform="rotate(-20 ${x - 2.6} ${y})"/><ellipse cx="${x + 2.6}" cy="${y}" rx="3" ry="4" fill="#4fa3e0" transform="rotate(20 ${x + 2.6} ${y})"/><path d="M${x} ${y - 3} v6" stroke="#2f2a27" stroke-width="1"/></g>`)
+    .map(
+      ([x, y]) =>
+        `<g><ellipse cx="${x - 2.6}" cy="${y}" rx="3" ry="4" fill="#4fa3e0" transform="rotate(-20 ${x - 2.6} ${y})"/><ellipse cx="${x + 2.6}" cy="${y}" rx="3" ry="4" fill="#4fa3e0" transform="rotate(20 ${x + 2.6} ${y})"/><path d="M${x} ${y - 3} v6" stroke="#2f2a27" stroke-width="1"/></g>`,
+    )
     .join('')}</g>`;
 
 const ARCTIC_STARS: Array<[number, number, number]> = [
@@ -341,7 +437,146 @@ const ARCTIC_STARS: Array<[number, number, number]> = [
   [120, 52, 1.4],
 ];
 
+const daisy = (x: number, y: number) =>
+  `<g><path d="M${x} ${y} v-6" stroke="#7fa85a" stroke-width="1"/><g fill="#fff">${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="${x}" cy="${y - 8.6}" rx="1.1" ry="2" transform="rotate(${a} ${x} ${y - 7})"/>`).join('')}</g><circle cx="${x}" cy="${y - 7}" r="1.2" fill="#f6c84e"/></g>`;
+
+const sunflower = (x: number, y: number, h = 30) =>
+  `<g><path d="M${x} ${y} V${y - h}" stroke="#6f9a4a" stroke-width="1.8"/><path d="M${x} ${y - h * 0.4} c-6 -3 -9 -1 -10 2 c4 1 7 0 10 -2z M${x} ${y - h * 0.6} c6 -3 9 -1 10 2 c-4 1 -7 0 -10 -2z" fill="#7fb35d"/>
+   <g fill="#f6c430">${Array.from({ length: 10 }, (_, i) => `<ellipse cx="${x}" cy="${y - h - 6}" rx="1.8" ry="3.6" transform="rotate(${i * 36} ${x} ${y - h})"/>`).join('')}</g><circle cx="${x}" cy="${y - h}" r="3.6" fill="#7a4a2a"/></g>`;
+
+const appleTree = (x: number, y: number, s = 1) =>
+  `<g><ellipse cx="${x}" cy="${y + 0.5}" rx="${10 * s}" ry="${2 * s}" fill="${SHADOW}"/><path d="M${x} ${y} V${y - 14 * s}" stroke="#8a6a4f" stroke-width="${2.4 * s}" stroke-linecap="round"/>
+   <g fill="#86bd62"><circle cx="${x - 6 * s}" cy="${y - 18 * s}" r="${7 * s}"/><circle cx="${x + 6 * s}" cy="${y - 18 * s}" r="${7 * s}"/><circle cx="${x}" cy="${y - 25 * s}" r="${8 * s}"/></g>
+   <g fill="#e5546c"><circle cx="${x - 5 * s}" cy="${y - 16 * s}" r="${1.4 * s}"/><circle cx="${x + 4 * s}" cy="${y - 22 * s}" r="${1.4 * s}"/><circle cx="${x + 7 * s}" cy="${y - 15 * s}" r="${1.3 * s}"/></g></g>`;
+
+const FARM_FENCE = (() => {
+  const posts = [8, 36, 64, 92, 148, 176];
+  const y = (x: number) => 186 - x * 0.02;
+  return `<g>${posts.map((x) => `<rect x="${x - 2}" y="${y(x) - 26}" width="4" height="28" rx="1.4" fill="#b98a5e" stroke="${OUT}" stroke-width="0.7"/>`).join('')}
+    <path d="M6 ${y(6) - 20} L96 ${y(96) - 20} M6 ${y(6) - 9} L96 ${y(96) - 9} M146 ${y(146) - 20} L180 ${y(180) - 20} M146 ${y(146) - 9} L180 ${y(180) - 9}" stroke="#c99a6c" stroke-width="3.2" stroke-linecap="round"/>
+    <g stroke="#d9b07f" stroke-width="2.2" stroke-linecap="round"><path d="M98 ${y(98) - 22} H144 M98 ${y(98) - 6} H144 M98 ${y(98) - 22} L144 ${y(144) - 6}"/></g>
+    <path d="M98 ${y(98) - 24} V${y(98)} M144 ${y(144) - 24} V${y(144)}" stroke="#b98a5e" stroke-width="2.6" stroke-linecap="round"/></g>`;
+})();
+
 const REGION_ART: Record<RegionId, RegionArt> = {
+  farm: {
+    sky: (id) => `
+      <defs>
+        <linearGradient id="${id}-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bfe3f2"/><stop offset="0.72" stop-color="#e3f3f4"/><stop offset="1" stop-color="#f0f7ea"/></linearGradient>
+        <linearGradient id="${id}-grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#acd682"/><stop offset="1" stop-color="#8dc46b"/></linearGradient>
+      </defs>
+      <rect width="360" height="300" fill="url(#${id}-sky)"/>
+      <circle cx="62" cy="42" r="28" fill="#fff6c8" opacity="0.5"/><circle cx="62" cy="42" r="17" fill="#ffe9a0"/>
+      <g fill="#fff" opacity="0.88"><ellipse cx="196" cy="34" rx="28" ry="7"/><ellipse cx="214" cy="28" rx="15" ry="7"/><ellipse cx="312" cy="58" rx="22" ry="5"/></g>`,
+    land: (id) => `
+      <path d="M0 120 C40 98 92 96 140 112 C182 98 232 92 280 108 C312 100 340 102 360 108 V150 H0Z" fill="#c3df9e"/>
+      <path d="M150 114 C170 106 200 104 222 110 L216 124 L156 126Z" fill="#e2e2a0" opacity="0.85"/>
+      <path d="M244 112 C262 106 286 106 300 110 L296 122 L248 124Z" fill="#b5d48c" opacity="0.9"/>
+      <g fill="#9cc77a">${[18, 34, 50, 66, 82, 230, 246, 262, 318, 334, 350].map((x, i) => `<circle cx="${x}" cy="${118 + (i % 3)}" r="${5 + (i % 2)}"/>`).join('')}</g>
+      <path d="M0 132 C90 124 200 130 280 126 C320 124 345 128 360 126 V300 H0Z" fill="url(#${id}-grass)"/>
+      <g stroke="#c0e39a" stroke-width="10" opacity="0.32" fill="none"><path d="M0 196 C120 188 240 194 360 186"/><path d="M0 252 C120 244 250 250 360 242"/></g>
+      <path d="M128 300 C150 274 188 254 220 236 C246 222 270 204 282 186 L292 186 C284 208 262 228 236 244 C204 262 170 280 158 300Z" fill="#e6cfa2" opacity="0.85"/>
+      ${[
+        [24, 250],
+        [96, 284],
+        [214, 296],
+        [340, 222],
+        [300, 296],
+        [170, 206],
+      ]
+        .map(([x, y]) => tuft(x, y, '#76ab55'))
+        .join('')}
+      ${[
+        [44, 268],
+        [62, 290],
+        [232, 284],
+        [348, 290],
+        [196, 214],
+      ]
+        .map(([x, y]) => daisy(x, y))
+        .join('')}`,
+    stages: {
+      1: [
+        { base: 187, svg: FARM_FENCE },
+        {
+          base: 204,
+          svg: `<ellipse cx="160" cy="204" rx="15" ry="3" fill="${SHADOW}"/><ellipse cx="160" cy="194" rx="13" ry="11" fill="#e8c76a" stroke="${OUT}" stroke-width="0.9"/><ellipse cx="160" cy="194" rx="7" ry="6" fill="none" stroke="#d1a94a" stroke-width="1.1"/><ellipse cx="160" cy="194" rx="2.6" ry="2.2" fill="#d1a94a"/>`,
+        },
+        {
+          base: 258,
+          svg: `<ellipse cx="184" cy="262" rx="26" ry="6.4" fill="#9a7352" opacity="0.85"/><ellipse cx="178" cy="261" rx="15" ry="3.4" fill="#86613f"/><g fill="#b48d68"><circle cx="164" cy="263" r="1.6"/><circle cx="200" cy="260" r="1.4"/></g>`,
+        },
+      ],
+      2: [
+        {
+          base: 182,
+          svg: `
+          <ellipse cx="286" cy="182" rx="56" ry="5" fill="${SHADOW}"/>
+          <path d="M240 182 V128 L286 100 L332 128 V182 Z" fill="#c9483b" stroke="${OUT}" stroke-width="1"/>
+          <path d="M234 132 L286 96 L338 132" stroke="#f3efe6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <g stroke="#b13d31" stroke-width="1" opacity="0.7">${[140, 152, 164].map((y) => `<path d="M242 ${y} H330"/>`).join('')}</g>
+          <rect x="266" y="140" width="40" height="42" fill="#a9372c" stroke="#f3efe6" stroke-width="3"/>
+          <path d="M268 142 L304 180 M304 142 L268 180" stroke="#f3efe6" stroke-width="2.4"/>
+          <path d="M276 112 H296 V128 H276 Z" fill="#7a2f26" stroke="#f3efe6" stroke-width="2.2"/>
+          <rect x="246" y="146" width="12" height="12" fill="#f8e6b8" stroke="#f3efe6" stroke-width="2"/><rect x="314" y="146" width="12" height="12" fill="#f8e6b8" stroke="#f3efe6" stroke-width="2"/>`,
+        },
+        {
+          base: 189,
+          svg: `<ellipse cx="214" cy="189" rx="22" ry="3" fill="${SHADOW}"/>
+          <g fill="#e8c76a" stroke="${OUT}" stroke-width="0.8"><rect x="194" y="174" width="20" height="14" rx="2"/><rect x="214" y="174" width="20" height="14" rx="2"/><rect x="204" y="161" width="20" height="13" rx="2"/></g>
+          <g stroke="#d1a94a" stroke-width="0.8"><path d="M198 178 h12 M218 178 h12 M208 165 h12 M198 184 h12 M218 184 h12 M208 170 h12"/></g>`,
+        },
+      ],
+      3: [
+        {
+          base: 276,
+          svg: `<ellipse cx="62" cy="276" rx="56" ry="14" fill="#8dbf74" opacity="0.6"/><ellipse cx="62" cy="274" rx="50" ry="11" fill="#9fd3e0"/>
+          <g class="sp-water" stroke="#fff" stroke-width="1.3" fill="none" opacity="0.8" stroke-linecap="round"><path d="M30 272 q7 2 13 0"/><path d="M72 278 q7 2 13 0"/><path d="M90 268 q4 1.2 8 0"/></g>
+          ${[14, 20, 104, 110].map((x, i) => `<path d="M${x} ${272 - (i % 2) * 2} V${254 - (i % 2) * 4}" stroke="#6f9a4a" stroke-width="1.4"/><rect x="${x - 1.6}" y="${252 - (i % 2) * 4}" width="3.2" height="8" rx="1.6" fill="#8a5a3a"/>`).join('')}
+          <g><ellipse cx="54" cy="272" rx="6" ry="3.4" fill="#fff"/><circle cx="58" cy="268" r="2.8" fill="#fff"/><path d="M60.4 268 l3 .8 -3 .8z" fill="#f2a23a"/><circle cx="58.6" cy="267.4" r=".6" fill="#2f2a27"/></g>
+          <g><ellipse cx="76" cy="275" rx="4.6" ry="2.6" fill="#f6e9b0"/><circle cx="79" cy="272.4" r="2.2" fill="#f6e9b0"/><path d="M81 272.4 l2.4 .6 -2.4 .6z" fill="#f2a23a"/></g>`,
+        },
+        {
+          base: 226,
+          svg: `<ellipse cx="108" cy="226" rx="20" ry="3" fill="${SHADOW}"/>
+          <path d="M92 226 V202 H124 V226 Z" fill="#f2d7a6" stroke="${OUT}" stroke-width="0.9"/>
+          <path d="M88 204 L108 188 L128 204 Z" fill="#c9483b" stroke="${OUT}" stroke-width="0.9"/>
+          <path d="M104 226 V212 C104 208 112 208 112 212 V226 Z" fill="#7a4a2a"/>
+          <path d="M112 226 L124 238" stroke="#b98a5e" stroke-width="2.2" stroke-linecap="round"/><path d="M114 230 h3 M117 233 h3" stroke="#b98a5e" stroke-width="1"/>
+          <circle cx="100" cy="210" r="2.4" fill="#f8e6b8" stroke="${OUT}" stroke-width="0.6"/>`,
+        },
+      ],
+      4: [
+        {
+          base: 188,
+          svg: `${[24, 50, 80, 162, 186].map((x, i) => sunflower(x, 196 - x * 0.02, 26 + (i % 2) * 6)).join('')}`,
+        },
+        {
+          base: 124,
+          svg: `${appleTree(170, 118, 0.8)}${appleTree(198, 116, 0.9)}${appleTree(226, 118, 0.75)}`,
+        },
+        {
+          base: 183,
+          svg: `<path d="M244 132 Q286 150 328 132" stroke="#8a6a4f" stroke-width="0.8" fill="none"/>${[0, 1, 2, 3, 4, 5, 6]
+            .map((i) => {
+              const x = 250 + i * 12;
+              const y = 135 + Math.sin((i / 6) * Math.PI) * 8;
+              return `<path d="M${x - 4} ${y} L${x + 4} ${y} L${x} ${y + 7} Z" fill="${['#f6c430', '#9fd3e0', '#f4a6c4', '#7fb35d'][i % 4]}"/>`;
+            })
+            .join('')}`,
+        },
+      ],
+    },
+    sign: [126, 296],
+    evening: [
+      [40, 170],
+      [120, 150],
+      [200, 210],
+      [250, 250],
+      [340, 200],
+      [80, 240],
+    ],
+  },
   outback: {
     sky: (id) => `
       <defs>
@@ -409,7 +644,10 @@ const REGION_ART: Record<RegionId, RegionArt> = {
           <ellipse cx="150" cy="268" rx="72" ry="14" fill="#9fd0d4"/>
           <g class="sp-water" stroke="#fff" stroke-width="1.4" opacity="0.75" fill="none" stroke-linecap="round"><path d="M110 266 q8 2 14 0"/><path d="M164 272 q8 2 14 0"/><path d="M190 262 q5 1.4 9 0"/></g>
           ${[86, 92, 210, 216]
-            .map((x, i) => `<path d="M${x} ${266 - (i % 2) * 2} V${248 - (i % 2) * 4}" stroke="#7d9a5a" stroke-width="1.4"/><rect x="${x - 1.6}" y="${246 - (i % 2) * 4}" width="3.2" height="8" rx="1.6" fill="#8a5a3a"/>`)
+            .map(
+              (x, i) =>
+                `<path d="M${x} ${266 - (i % 2) * 2} V${248 - (i % 2) * 4}" stroke="#7d9a5a" stroke-width="1.4"/><rect x="${x - 1.6}" y="${246 - (i % 2) * 4}" width="3.2" height="8" rx="1.6" fill="#8a5a3a"/>`,
+            )
             .join('')}`,
         },
         {

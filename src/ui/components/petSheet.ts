@@ -2,6 +2,7 @@
 
 import { app } from '../../app/app';
 import { PET_BY_ID, type PetId } from '../../meta/catalogs/pets';
+import { arrivalLine } from '../../meta/world';
 import { petSvg } from '../art/pets';
 import type { FaceMood } from '../animation/faceMachine';
 import { esc } from '../dom';
@@ -11,7 +12,14 @@ import { openSheet } from './sheet';
 import { bindFriendPanel, friendPanelMarkup, type FeedEvents } from './feedPanel';
 
 /** Soft region pastel behind each resident's portrait. */
-export const PET_TINT: Record<PetId, string> = { mochi: 'var(--r5)', pip: 'var(--r2)', clover: 'var(--r1)', biscuit: 'var(--r3)', nori: 'var(--r0)', peanut: 'var(--r4)' };
+export const PET_TINT: Record<PetId, string> = {
+  mochi: 'var(--r5)',
+  pip: 'var(--r2)',
+  clover: 'var(--r1)',
+  biscuit: 'var(--r3)',
+  nori: 'var(--r0)',
+  peanut: 'var(--r4)',
+};
 
 export function portrait(id: PetId, mood: FaceMood = 'idle', locked = false): string {
   return `<span class="portrait${locked ? ' is-locked' : ''}" style="--tint:${PET_TINT[id]}">${petSvg(id, { mood })}</span>`;
@@ -37,7 +45,7 @@ export function showPetSheet(scope: Scope, id: PetId, opts: { onChange?: () => v
     body: `
       <div class="pet-sheet__hero">${portrait(id, owned ? 'happy' : 'idle', !owned)}</div>
       <p class="pet-sheet__trait">${esc(p.trait)}</p>
-      ${owned ? `<p class="sheet__lead">${esc(p.bio)}</p>` : `<p class="sheet__lead">${esc(p.name)} moves in when you first clear level ${p.unlockLevel}.</p>`}
+      ${owned ? `<p class="sheet__lead">${esc(p.bio)}</p>` : `<p class="sheet__lead">${esc(arrivalLine(app.save, id))}</p>`}
       ${
         owned
           ? `<div class="pet-sheet__faces" aria-label="Expressions">
@@ -46,7 +54,7 @@ export function showPetSheet(scope: Scope, id: PetId, opts: { onChange?: () => v
             <dl class="pet-sheet__facts">
               <div><dt>Signature</dt><dd>${esc(p.signature)}</dd></div>
               <div><dt>Moved in</dt><dd>${esc(date ?? 'Today')}</dd></div>
-              <div><dt>Kind</dt><dd>${p.species === 'cat' ? 'Cat' : 'Dog'} · ${p.rarity === 'founding' ? 'Founding resident' : p.rarity === 'rare' ? 'Rare neighbor' : 'Neighbor'}</dd></div>
+              <div><dt>Kind</dt><dd>${p.species === 'cat' ? 'Cat' : 'Dog'} · Pet Garden</dd></div>
             </dl>
             ${friendPanelMarkup(id, p.name)}`
           : ''

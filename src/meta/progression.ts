@@ -4,7 +4,7 @@
  * Rewards (coins, unlocks, achievements) layer on top in `meta/rewards.ts`.
  */
 
-import type { ModeRef } from '../game/modes';
+import { FIRST_PAIR_LEVEL, type ModeRef } from '../game/modes';
 import { daysBetween, monthKey, prevDateKey, localDateKey, localWeekStart } from '../game/dates';
 import type { SaveV2 } from '../services/storage';
 
@@ -73,6 +73,7 @@ export function recordWin(save: SaveV2, mode: ModeRef, r: BoardResult, now = new
     else delete cl.spec;
     if (mode.level >= save.journey.nextLevel) save.journey.nextLevel = mode.level + 1;
     if (mode.level === 1) save.onboarding.tutorialDone = true;
+    if (mode.level === FIRST_PAIR_LEVEL) save.onboarding.pairLessonDone = true;
   } else if (mode.kind === 'daily') {
     const key = `D${mode.dateKey}`;
     const prevBest = save.daily.bestTimes[key];

@@ -515,6 +515,67 @@
   transform: translateY(1px);
 }
 
+/* ---------- Board controls (D35) ----------
+   One row. One-animal boards: Erase and Hint. Two-animal boards: the two animal buttons (which animal a double tap
+   places), then Erase and Hint. Erase is a mode, shown pressed while it's on. */
+.controls {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+:root[data-hand='left'] .controls {
+  flex-direction: row-reverse;
+}
+.controls .tools {
+  flex: 2.2;
+}
+.controls .act {
+  flex: 1;
+  min-height: 68px;
+}
+.controls--solo .act {
+  min-height: 60px;
+  flex-direction: row;
+  gap: 8px;
+  font-size: 15px;
+}
+.act--erase[aria-pressed='true'] {
+  background: var(--brand-tint);
+  color: var(--brand-dark);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--brand);
+}
+.game.is-erasing .board {
+  outline: 2px dashed var(--brand);
+  outline-offset: 3px;
+}
+@media (max-height: 700px) {
+  .controls .act {
+    min-height: 54px;
+  }
+  .controls--solo .act {
+    min-height: 48px;
+  }
+}
+.pause-row {
+  display: flex;
+  gap: 8px;
+}
+.pause-row .btn {
+  flex: 1;
+}
+.rule-fig__x {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--muted-ink);
+}
+.rule-fig__x .ico {
+  width: 60%;
+  height: 60%;
+}
+
 /* Small phones: tighten chrome so the board keeps its space. */
 @media (max-height: 700px) {
   .game {

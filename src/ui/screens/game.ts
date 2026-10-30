@@ -1,4 +1,9 @@
-/** The play screen: top bar, the board (hero), one coach line, tools and actions. */
+/**
+ * The play screen: top bar, the board (hero), one coach line, and the controls (D35): tap a tile to mark it ✕,
+ * double-tap to place the board's animal (a wrong one costs a heart). One-animal boards have just Erase and Hint;
+ * two-animal boards add two animal buttons that choose which animal a double-tap places. The board shows the animal
+ * you're bringing home to the sanctuary you're building (meta/cast.ts).
+ */
 
 import { app } from '../../app/app';
 import { restartGame, startGame } from '../../app/gameFlow';
@@ -10,29 +15,27 @@ import { modeShortTitle, modeTitle, type SpecVersion } from '../../game/puzzles'
 import { difficultyReason, profileOf } from '../../game/grading';
 import { MARK, type HintInfo, type MoveResult, type Session, type Tool, type UnitRef } from '../../game/session';
 import { recordLoss, recordWin, type WinRecord } from '../../meta/progression';
-import { nextArrival, rewardsForWin, type RewardSummary } from '../../meta/rewards';
+import { rewardsForWin, type RewardSummary } from '../../meta/rewards';
 import { finishAttempt } from '../../competitions/localCup';
 import type { ScoreBreakdown } from '../../competitions/scoring';
 import { afterSolve, type MetaNews } from '../../app/events';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
-import { PET_BY_ID } from '../../meta/catalogs/pets';
-import { COMPANION_BY_ID } from '../../meta/catalogs/companions';
-import { SANCTUARY_BY_ID } from '../../meta/catalogs/sanctuaries';
-import { countsForGrowth, growOnSolve, nextStage, openRegions, stageOf, type GrowthNews } from '../../meta/world';
+import { SANCTUARY_BY_ID, isRegionId, type SanctuaryId } from '../../meta/catalogs/sanctuaries';
+import { activeSanctuary, arrivalProgress, countsForGrowth, growOnSolve, nextStage, openRegions, stageOf, type GrowthNews } from '../../meta/world';
+import { animalInfo, withArticle, type AnimalId } from '../../meta/animals';
+import { castFor, castWord, type Cast } from '../../meta/cast';
 import { queueSolve, syncLeaderboard } from '../../app/leaderboardSync';
-import { companionSvg } from '../art/companions';
 import { decorIcon } from '../art/sanctuary';
 import { ads, INTERSTITIALS_ENABLED, shouldShowInterstitial } from '../../services/ads';
 import { canOfferVideo, watchVideoFor, type WatchResult } from '../../app/rewarded';
 import { track } from '../../services/analytics';
 import { sfx } from '../../services/audio';
 import { haptic } from '../../services/haptics';
-import { rosterFor, tilePetId, toolPetSvg } from '../art/petTiles';
-import { applyFace, petElement, petSvg, speciesKey } from '../art/pets';
+import { speciesKey } from '../art/pets';
+import { animalElement, animalPortrait, animalSvg, applyAnimalFace } from '../art/animals';
 import { FaceDirector, lookToward, type Clock } from '../animation/faceDirector';
 import type { ReactionMood } from '../animation/faceMachine';
-import type { PetId } from '../../meta/catalogs/pets';
-import { isTutorial, levelTip, TUTORIAL_STEPS } from '../../meta/onboarding';
+import { isPairLesson, isTutorial, levelTip, TUTORIAL_STEPS } from '../../meta/onboarding';
 import { EMPTY } from '../../engine/types';
 import { Board } from '../components/board';
 import { openSheet, toast, type SheetHandle } from '../components/sheet';
@@ -42,8 +45,9 @@ import type { Scope, ScreenDef } from '../router';
 import { showRules } from './rules';
 import { showSettings } from './settings';
 
-const SPECIES_WORD: Record<number, string> = { [CAT]: 'cat', [DOG]: 'dog' };
 const MISS_MS = 700;
+/** Two taps on the same tile within this long are a double tap (place the animal). */
+export const DOUBLE_TAP_MS = 380;
 
 /** In-memory ad cadence (resets each launch, which only makes ads rarer). */
 const cadence = { boardsSinceLast: 0, lastShownAt: null as number | null, shownToday: 0, day: '' };
@@ -57,32 +61,44 @@ export const gameScreen: ScreenDef = {
       app.router.go({ screen: 'home' });
       return;
     }
-    mountGame(root, scope, active.mode, active.session, active.spec);
+    mountGame(root, scope, active.mode, active.session, active.spec, active.cast ?? castFor(app.save, active.session.rule, active.session.puzzle.seed));
   },
 };
 
-function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, spec: SpecVersion = 1): void {
+function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, spec: SpecVersion = 1, cast: Cast): void {
   const tutorial = isTutorial(mode, app.save);
+  // The first two-animal board (level 21) is guided too, but keeps its hearts.
+  const pairLesson = !tutorial && isPairLesson(mode, app.save);
+  const guided = tutorial || pairLesson;
   // Hearts follow the session (the guided first board has none to lose).
   const rules = { ...rulesFor(mode), hearts: s.heartsEnabled };
   const n = s.size;
-  const total = 2 * n;
+  const total = s.total;
+  const solo = s.rule === 'solo';
+  /** The animal a board species shows, and the word coaching uses for it ("sheep", or a name when both are one kind). */
+  const animalOf = (sp: Species): AnimalId => (sp === DOG && cast.b ? cast.b : cast.a);
+  const wordOf = (sp: Species) => castWord(cast, sp === DOG ? 'b' : 'a');
+  const aWord = (sp: Species) => withArticle(wordOf(sp));
   // The label comes from measuring this exact board, never from what the level or day asked for.
   const profile = profileOf(s.puzzle);
   const tierName = capitalize(profile.tier);
   const settings = app.settings;
   const classic = settings.controls === 'classic';
-  // The board opens with the pet tool the player used last (never Empty/Erase, so a first tap always places).
-  let tool: Tool = settings.lastSpecies;
+  // Which animal a double tap places: always the one animal on a one-animal board; on two-animal boards the one the
+  // player picked last.
+  let tool: Tool = solo ? 'cat' : settings.lastSpecies;
+  /** Erase is a mode: while it's on, taps take things back. */
+  let erasing = false;
+  let lastTap: { r: number; c: number; t: number } | null = null;
   let hint: { info: HintInfo; tier: 1 | 2 } | null = null;
   let finished = false;
   let sheet: SheetHandle | null = null;
-  let lastPlaced: PetId | null = null;
+  let lastPlaced: AnimalId | null = null;
   /** Tutorial: the placement the coach is pointing at. */
   let guide: { step: number; r: number; c: number; species: Species; unit: UnitRef | null; text: string } | null = null;
-  let winPet: PetId | null = null;
+  let winPet: AnimalId | null = null;
   // Zen and the guided first board never charge for hints. Extra lives work on casual boards with hearts (not Paw Cup).
-  const freeHints = mode.kind === 'zen' || tutorial;
+  const freeHints = mode.kind === 'zen' || guided;
   const pantryOn = rules.revive && rules.hearts && !tutorial;
   const tickets = () => itemBalance(app.save, 'hint');
   const lives = () => itemBalance(app.save, 'life');
@@ -110,21 +126,19 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
           </div>
         </div>
       </div>
-      <div class="tools" role="radiogroup" aria-label="${classic ? 'Pet to place' : 'Tool'}">
-        <button class="tool" role="radio" data-tool="cat"><span class="tool__art">${toolPetSvg(CAT)}</span><span class="tool__label">Cat</span></button>
-        <button class="tool" role="radio" data-tool="dog"><span class="tool__art">${toolPetSvg(DOG)}</span><span class="tool__label">Dog</span></button>
-        ${classic ? '' : `<button class="tool" role="radio" data-tool="mark"><span class="tool__art tool__art--icon">${ICON.mark}</span><span class="tool__label">Empty</span></button>`}
-        ${classic ? '' : `<button class="tool" role="radio" data-tool="erase"><span class="tool__art tool__art--icon">${ICON.erase}</span><span class="tool__label">Erase</span></button>`}
-      </div>
-      <div class="actions">
-        <button class="act" data-act="undo">${ICON.undo}<span>Undo</span></button>
-        <button class="act" data-act="redo">${ICON.redo}<span>Redo</span></button>
+      <div class="controls controls--${solo ? 'solo' : 'pair'}">
+        ${solo ? '' : `<div class="tools" role="radiogroup" aria-label="Animal a double tap places">${animalButton(CAT)}${animalButton(DOG)}</div>`}
+        <button class="act act--erase" data-act="erase" aria-pressed="false">${ICON.erase}<span>Erase</span></button>
         <button class="act" data-act="hint" ${rules.hints ? '' : 'disabled aria-describedby="no-hints"'}>${rules.hints ? ICON.bulb : ICON.hint}<span data-hint-label>Hint</span>${rules.hints && !freeHints ? '<span class="act__badge" data-hint-badge></span>' : ''}</button>
-        <button class="act" data-act="rules">${ICON.help}<span>Rules</span></button>
       </div>
       ${rules.hints ? '' : '<p id="no-hints" class="sr-only">Hints are off in Paw Cup so every player has the same rules.</p>'}
     </div>`);
   root.appendChild(el);
+
+  function animalButton(sp: Species): string {
+    const word = wordOf(sp);
+    return `<button class="tool" role="radio" data-tool="${sp === CAT ? 'cat' : 'dog'}" aria-label="${esc(capitalize(word))}: double tap places ${esc(withArticle(word))}"><span class="tool__art">${animalSvg(animalOf(sp))}</span><span class="tool__label">${esc(capitalize(word))}</span></button>`;
+  }
 
   const stage = qs(el, '[data-stage]');
   const coachEl = qs(el, '[data-coach]');
@@ -133,8 +147,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   const heartsEl = el.querySelector('[data-hearts]') as HTMLElement | null;
 
   // ---------------------------------------------------------------- faces (facial-only animation)
-  const roster = rosterFor(app.save);
-  const tilePets = new Map<string, PetId>();
+  const tilePets = new Map<string, AnimalId>();
   const clock: Clock = { now: () => performance.now(), set: (fn, ms) => window.setTimeout(fn, ms), clear: (id) => clearTimeout(id) };
   const faces = new FaceDirector({ clock, seed: s.puzzle.seed, reducedMotion: app.reducedMotion, slowBlink: (k) => tilePets.get(k) === 'mochi' });
   scope.onDispose(() => faces.dispose());
@@ -147,10 +160,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     {
       pannable: settings.largeBoard,
       pet: (r, c, sp) => {
-        const id = tilePetId(s.puzzle, r, c, sp, roster);
-        const { el, svg } = petElement(id);
+        const id = animalOf(sp);
+        const { el, svg } = animalElement(id);
         tilePets.set(keyOf(r, c), id);
-        faces.add(keyOf(r, c), speciesKey(sp), { apply: (v) => applyFace(svg, id, v) });
+        faces.add(keyOf(r, c), speciesKey(sp), { apply: (v) => applyAnimalFace(svg, id, v) });
         return el;
       },
       onPetRemoved: (r, c) => {
@@ -159,8 +172,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       },
       petName: (r, c) => {
         const id = tilePets.get(keyOf(r, c));
-        return id ? PET_BY_ID[id].name : null;
+        return id ? animalInfo(id).name : null;
       },
+      speciesName: (sp) => wordOf(sp),
     },
   );
   stage.appendChild(board.el);
@@ -178,15 +192,20 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   function paint(): void {
     board.render({ cells: s.cells, givenMask: s.givenMask, dead: settings.autoMark ? s.deadCells() : null });
-    progressEl.textContent = `${s.placedCount()} of ${total} pets placed`;
+    progressEl.textContent = `${s.placedCount()} of ${total} ${total === 1 ? 'animal' : 'animals'} placed`;
     if (heartsEl) {
       heartsEl.dataset.max = String(s.maxHearts);
       heartsEl.innerHTML = Array.from({ length: s.maxHearts }, (_, i) => (i < s.hearts ? ICON.life : ICON.lifeOff)).join('');
-      heartsEl.setAttribute('aria-label', pantryOn ? `${plural(s.hearts, 'heart')} left. Extra lives: ${lives()}. Tap to use one.` : `${plural(s.hearts, 'heart')} left`);
+      heartsEl.setAttribute(
+        'aria-label',
+        pantryOn ? `${plural(s.hearts, 'heart')} left. Extra lives: ${lives()}. Tap to use one.` : `${plural(s.hearts, 'heart')} left`,
+      );
     }
-    for (const b of el.querySelectorAll<HTMLButtonElement>('[data-tool]')) b.setAttribute('aria-checked', String(b.dataset.tool === tool));
-    (qs(el, '[data-act="undo"]') as HTMLButtonElement).disabled = !s.canUndo() || finished;
-    (qs(el, '[data-act="redo"]') as HTMLButtonElement).disabled = !s.canRedo() || finished;
+    for (const b of el.querySelectorAll<HTMLButtonElement>('[data-tool]')) b.setAttribute('aria-checked', String(b.dataset.tool === tool && !erasing));
+    const eb = qs(el, '[data-act="erase"]') as HTMLButtonElement;
+    eb.setAttribute('aria-pressed', String(erasing));
+    eb.disabled = finished;
+    el.classList.toggle('is-erasing', erasing);
     const hintLabel = el.querySelector('[data-hint-label]');
     if (hintLabel) hintLabel.textContent = !hint ? 'Hint' : hint.tier === 1 ? 'Closer' : 'Show me';
     const badge = el.querySelector('[data-hint-badge]') as HTMLElement | null;
@@ -204,7 +223,12 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       badge.innerHTML = nextIsFree ? 'Free' : `<span class="num">${tickets()}</span>`;
       badge.classList.toggle('is-free', nextIsFree);
       const hb = badge.closest('button')!;
-      hb.setAttribute('aria-label', nextIsFree ? `${hintLabel?.textContent ?? 'Hint'}, free` : `${hintLabel?.textContent ?? 'Hint'}, uses one of your hints. ${plural(tickets(), 'hint')} left`);
+      hb.setAttribute(
+        'aria-label',
+        nextIsFree
+          ? `${hintLabel?.textContent ?? 'Hint'}, free`
+          : `${hintLabel?.textContent ?? 'Hint'}, uses one of your hints. ${plural(tickets(), 'hint')} left`,
+      );
     }
     tick();
     syncGuide();
@@ -222,15 +246,24 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       track('onboarding_step', { step: 'tutorial_free_play' });
       return;
     }
-    const word = SPECIES_WORD[info.species];
-    const text =
-      step === 1
-        ? `Every row, column and color needs one cat and one dog. Tap the glowing tile to place a ${word}.`
-        : `${friendlyReason(info.reason)} Tap the glowing tile.`;
+    const word = wordOf(info.species);
+    const name = animalInfo(animalOf(info.species)).name;
+    let text: string;
+    if (solo)
+      text =
+        step === 1
+          ? `One ${word} in every row, column and color, never touching, not even at corners. This color has a single tile, so ${name} goes there: double-tap it.`
+          : `${friendlyReason(info.reason)} Double-tap the glowing tile.`;
+    else
+      text =
+        step === 1
+          ? `Now two animals: one ${wordOf(CAT)} and one ${wordOf(DOG)} in every row, column and color, never side by side. ${friendlyReason(info.reason)} Double-tap the glowing tile.`
+          : `${friendlyReason(info.reason)} The ${word} button is picked for you: double-tap the glowing tile.`;
     guide = { step, r: info.r, c: info.c, species: info.species, unit: info.unit, text };
     tool = info.species === CAT ? 'cat' : 'dog';
+    erasing = false;
     coachGuide(text);
-    track('onboarding_step', { step: `tutorial_${step}` });
+    track('onboarding_step', { step: `${tutorial ? 'tutorial' : 'pair_lesson'}_${step}` });
   }
 
   function syncGuide(): void {
@@ -294,30 +327,57 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   function defaultCoach(): string {
     if (mode.kind === 'cup') return `Paw Cup rules: no hints, ${numberWord(CUP_HEARTS).toLowerCase()} hearts, your time counts.`;
-    const tip = mode.kind === 'level' ? levelTip(mode.level) : null;
+    const tip = mode.kind === 'level' ? levelTip(mode.level, wordOf(CAT), wordOf(DOG)) : null;
     if (tip) return tip;
     if (mode.kind === 'zen') return 'No clock, no hearts. Take all the time you like.';
-    if (classic) return 'Tap once to mark a tile empty, again to place your pet.';
-    return 'One cat and one dog in every row, column and color.';
+    if (classic) return solo ? `Tap once to mark a tile ✕, again to place ${aWord(CAT)}.` : `Tap once to mark a tile ✕, again to place the animal you picked.`;
+    if (solo) return `One ${wordOf(CAT)} in every row, column and color, never touching. Tap to mark ✕, double-tap to place.`;
+    return `One ${wordOf(CAT)} and one ${wordOf(DOG)} in every row, column and color. Double-tap places the one you picked.`;
   }
 
   // ---------------------------------------------------------------- input
 
+  const species = (): Species => (tool === 'dog' ? DOG : CAT);
+
   function onPress(r: number, c: number): 'mark' | 'unmark' | null {
     if (finished || s.paused) return null;
     faces.activity();
-    if (classic) {
-      handle(s.tap(r, c, tool === 'dog' ? DOG : CAT), r, c);
+    if (erasing) {
+      lastTap = null;
+      handle(s.apply(r, c, 'erase'), r, c);
       return null;
     }
-    const before = s.cells[r][c];
-    const res = s.apply(r, c, tool);
-    handle(res, r, c);
-    if (tool === 'mark' && !s.givenMask[r][c]) {
-      if (res.marked) return 'mark';
-      if (res.unmarked && before === MARK) return 'unmark';
+    if (classic) {
+      handle(s.tap(r, c, species()), r, c);
+      return null;
     }
+    const now = performance.now();
+    const v = s.cells[r][c];
+    // A second tap on the same tile, quickly: place the animal (the first tap's ✕ goes away with it).
+    if (lastTap && lastTap.r === r && lastTap.c === c && now - lastTap.t < DOUBLE_TAP_MS && v !== CAT && v !== DOG) {
+      lastTap = null;
+      placeAt(r, c);
+      return null;
+    }
+    if (v === CAT || v === DOG) {
+      lastTap = null;
+      handle({ ignored: true }, r, c);
+      return null;
+    }
+    const res = s.toggleMark(r, c);
+    lastTap = s.givenMask[r][c] ? null : { r, c, t: now };
+    handle(res, r, c);
+    if (guide && guide.r === r && guide.c === c && res.marked) coach(`Now tap it again, quickly, to place ${aWord(guide.species)}.`);
+    if (res.marked) return 'mark';
+    if (res.unmarked) return 'unmark';
     return null;
+  }
+
+  /** Places the picked animal; a wrong guess costs a heart and leaves a ✕ where it can't go. */
+  function placeAt(r: number, c: number): void {
+    const res = s.place(r, c, species());
+    if (res.wrong) s.markIfEmpty(r, c);
+    handle(res, r, c);
   }
 
   function onDrag(r: number, c: number, m: 'mark' | 'unmark'): void {
@@ -331,10 +391,12 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   function onKey(r: number, c: number, key: string): boolean {
     const k = key.toLowerCase();
-    if (k === 'c' || k === '1') return keyApply(r, c, 'cat');
-    if (k === 'd' || k === '2') return keyApply(r, c, 'dog');
-    if (k === 'x' || k === '3' || k === '.') return keyApply(r, c, 'mark');
-    if (k === 'backspace' || k === 'delete' || k === '0') return keyApply(r, c, 'erase');
+    // Enter places the picked animal; Space (or X) marks ✕; 1 and 2 place the first or second animal directly.
+    if (k === 'enter') return keyApply(r, c, species() === DOG ? 'dog' : 'cat');
+    if (k === '1' || k === 'a') return keyApply(r, c, 'cat');
+    if (!solo && (k === '2' || k === 'b')) return keyApply(r, c, 'dog');
+    if (k === ' ' || k === 'x' || k === '.') return keyApply(r, c, 'mark');
+    if (k === 'backspace' || k === 'delete' || k === '0' || k === 'e') return keyApply(r, c, 'erase');
     if (k === 'z') {
       doUndo();
       return true;
@@ -353,6 +415,16 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   function keyApply(r: number, c: number, t: Tool): boolean {
     if (finished || s.paused) return true;
     faces.activity();
+    if (t === 'cat' || t === 'dog') {
+      const v = s.cells[r][c];
+      if (v === CAT || v === DOG) handle({ ignored: true }, r, c);
+      else {
+        const res = s.place(r, c, t === 'dog' ? DOG : CAT);
+        if (res.wrong) s.markIfEmpty(r, c);
+        handle(res, r, c);
+      }
+      return true;
+    }
     handle(s.apply(r, c, t), r, c);
     return true;
   }
@@ -360,9 +432,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   function handle(res: MoveResult, r: number, c: number): void {
     if (res.ignored) {
       const v = s.cells[r][c];
-      if ((v === CAT || v === DOG) && !s.givenMask[r][c] && (tool === 'cat' || tool === 'dog'))
-        coach(`That tile has a ${SPECIES_WORD[v]}. Pick Erase to clear it.`);
-      else if (s.givenMask[r][c]) coach('This pet is already home. Its spot is locked.');
+      if (s.givenMask[r][c]) coach(`This ${wordOf(v === DOG ? DOG : CAT)} is already home. Its spot is locked.`);
+      else if (v === CAT || v === DOG) coach(`That ${wordOf(v)} is settled. Pick Erase to take it back.`);
       return;
     }
     let react: (() => void) | undefined;
@@ -407,15 +478,15 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     sfx('oops');
     haptic('error');
     board.flash([[r, c]], 'is-miss', MISS_MS);
-    // The attempted pet appears faintly, puzzled, and fades. It is the only face that reacts to a mistake.
-    board.ghost(r, c, petElement(tilePetId(s.puzzle, r, c, sp, roster), 'confused').el, MISS_MS);
-    const word = SPECIES_WORD[sp];
+    // The attempted animal appears faintly, puzzled, and fades. It is the only face that reacts to a mistake.
+    board.ghost(r, c, animalElement(animalOf(sp), 'confused').el, MISS_MS);
+    const word = wordOf(sp);
     if (guide) {
-      coach(`Not quite. That tile can't hold a ${word}.`);
+      coach(`Not quite. That tile can't hold ${withArticle(word)}.`);
       const g = guide;
       scope.timeout(() => guide === g && coachGuide(g.text), 1800);
-    } else if (!rules.hearts) coach(`Not a ${word} spot. No rush, try another line of thought.`);
-    else if (s.hearts > 0) coach(`Not a ${word} spot. ${plural(s.hearts, 'heart')} left.`);
+    } else if (!rules.hearts) coach(`Not ${withArticle(word)} spot. No rush, try another line of thought.`);
+    else if (s.hearts > 0) coach(`Not ${withArticle(word)} spot. ${plural(s.hearts, 'heart')} left.`);
   }
 
   function onUnits(units: UnitRef[]): void {
@@ -642,9 +713,25 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     return `${u.kind} ${u.index + 1}`;
   }
 
-  /** Engine reasons say "region 3"; players see colors. */
+  /**
+   * Engine reasons say "region 3" and "cat" / "dog" (or "animal" on one-animal boards); players see colors and the
+   * board's own animals.
+   */
   function friendlyReason(reason: string): string {
-    return reason.replace(/region (\d+)/g, (_m, d) => `the ${board.regionName(Number(d) - 1)} region`).replace(/^Only one spot left/, 'Only one spot is left');
+    const name = (w: string) => (w === 'dog' ? wordOf(DOG) : wordOf(CAT));
+    return reason
+      .replace(
+        /regions (\d+(?:, \d+)*) and (\d+)/g,
+        (_m, list: string, last: string) =>
+          `the ${[...list.split(', '), last]
+            .map((d) => board.regionName(Number(d) - 1))
+            .join(', ')
+            .replace(/, ([^,]*)$/, ' and $1')} regions`,
+      )
+      .replace(/region (\d+)/g, (_m, d) => `the ${board.regionName(Number(d) - 1)} region`)
+      .replace(/\b(a|an) (cat|dog|animal)\b/g, (_m, _a, w: string) => withArticle(name(w)))
+      .replace(/\b(cat|dog|animal)\b/g, (_m, w: string) => name(w))
+      .replace(/^Only one spot left/, 'Only one spot is left');
   }
 
   scope.on(el, 'click', (e) => {
@@ -666,21 +753,19 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       case 'pause':
         openPause();
         break;
-      case 'undo':
-        doUndo();
-        break;
-      case 'redo':
-        doRedo();
+      case 'erase':
+        if (finished) break;
+        erasing = !erasing;
+        lastTap = null;
+        haptic('select');
+        coach(erasing ? 'Erase is on: tap a ✕ or an animal to take it back. Tap Erase again when you are done.' : defaultCoach());
+        paint();
         break;
       case 'hint':
         doHint();
         break;
       case 'hearts':
         openHearts();
-        break;
-      case 'rules':
-        pauseBoard();
-        showRules(scope, () => resumeIfOnScreen());
         break;
     }
   });
@@ -692,9 +777,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     if ((ke.target as HTMLElement)?.closest?.('.cell')) return;
     if (ke.repeat) return; // a held key acts once (a held H must not run through hint tiers and tickets)
     const k = ke.key.toLowerCase();
-    const map: Record<string, Tool> = { c: 'cat', d: 'dog', x: 'mark', e: 'erase' };
-    if (map[k] && !(classic && (k === 'x' || k === 'e'))) {
-      selectTool(map[k]);
+    if (!solo && (k === '1' || k === 'a' || k === '2' || k === 'b')) {
+      selectTool(k === '1' || k === 'a' ? 'cat' : 'dog');
+      paint();
+    } else if (k === 'e') {
+      erasing = !erasing;
       paint();
     } else if (k === 'z') doUndo();
     else if (k === 'y') doRedo();
@@ -702,9 +789,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     else if (k === 'p' || k === 'escape') openPause();
   });
 
-  /** Picks a tool. A picked pet becomes the default for the next board (saved with the next move). */
+  /** Picks which animal a double tap places (and leaves Erase). Remembered for the next two-animal board. */
   function selectTool(t: Tool): void {
     tool = t;
+    erasing = false;
+    lastTap = null;
     if (t === 'cat' || t === 'dog') settings.lastSpecies = t;
   }
 
@@ -732,6 +821,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         <div class="sheet__actions">
           <button class="btn btn--block" data-act="resume">${ICON.resume}Resume</button>
           ${mode.kind === 'cup' ? '' : `<button class="btn btn--secondary btn--block" data-act="restart">${ICON.restart}Restart board</button>`}
+          <div class="pause-row">
+            <button class="btn btn--quiet" data-act="undo" ${s.canUndo() ? '' : 'disabled'}>${ICON.undo}Undo</button>
+            <button class="btn btn--quiet" data-act="redo" ${s.canRedo() ? '' : 'disabled'}>${ICON.redo}Redo</button>
+          </div>
+          <button class="btn btn--quiet" data-act="rules">${ICON.help}How to play</button>
           <button class="btn btn--quiet" data-act="settings">Settings</button>
           <button class="btn btn--quiet" data-act="leave">${mode.kind === 'cup' ? 'Leave (this attempt stays open)' : 'Leave and keep progress'}</button>
         </div>`,
@@ -746,7 +840,15 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       const a = actionOf(e);
       if (!a) return;
       if (a.act === 'resume') ps.close();
-      else if (a.act === 'restart') {
+      else if (a.act === 'undo' || a.act === 'redo') {
+        ps.close();
+        if (a.act === 'undo') doUndo();
+        else doRedo();
+      } else if (a.act === 'rules') {
+        ps.close();
+        pauseBoard();
+        showRules(scope, () => resumeIfOnScreen(), { rule: s.rule, cast });
+      } else if (a.act === 'restart') {
         ps.close();
         confirmRestart();
       } else if (a.act === 'settings') {
@@ -793,16 +895,25 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     finished = true;
     s.pause();
     paint();
-    // Every pet smiles or winks in a short staggered wave (≤1.5s total), faces only.
+    // Every animal smiles or winks in a short staggered wave (≤1.5s total), faces only.
     const order: string[] = [];
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) order.push(keyOf(r, c));
     faces.celebrate(order);
     winPet = lastPlaced ?? tilePets.values().next().value ?? null;
-    const result = { size: n, seconds: s.elapsedSeconds(), mistakes: s.mistakes, hintsUsed: s.hintsUsed, revives: s.revives, hearts: rules.hearts, spec, tier: profile.tier };
+    const result = {
+      size: n,
+      seconds: s.elapsedSeconds(),
+      mistakes: s.mistakes,
+      hintsUsed: s.hintsUsed,
+      revives: s.revives,
+      hearts: rules.hearts,
+      spec,
+      tier: profile.tier,
+    };
     const openedBefore = openRegions(app.save);
     const rec = recordWin(app.save, mode, result);
     const rewards = rewardsForWin(app.save, mode, rec, new Date(), profile.tier);
-    // Every solved puzzle (not Paw Cup, not the guided first board) grows the sanctuary being built.
+    // Every solved puzzle (not Paw Cup) grows the sanctuary being built; the guided first board brings the first animal home.
     const growth = countsForGrowth(mode, tutorial) ? growOnSolve(app.save, openedBefore) : null;
     // On the leaderboard: queue the board (with its move log) for the server to check, then send in the background.
     const queued = !tutorial && queueSolve(app.save, mode, spec, s.events, result.mistakes, result.hintsUsed);
@@ -814,9 +925,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     cadence.boardsSinceLast++;
     track('puzzle_complete', { mode: mode.kind, size: n, seconds: result.seconds, mistakes: result.mistakes, hints: result.hintsUsed });
     if (mode.kind === 'daily' && rec.newDaily) track('daily_complete', { streak: rec.streak ?? 0 });
-    for (const p of rewards.pets) track('pet_unlocked', { pet: p });
     if (growth?.stageUp) track('region_stage', { region: growth.sanctuary, stage: stageOf(app.save, growth.sanctuary) });
-    for (const c of growth?.arrived ?? []) track('companion_unlocked', { companion: c });
+    for (const c of growth?.arrived ?? []) track('animal_arrived', { animal: c, sanctuary: growth!.sanctuary });
     sfx('win');
     haptic('success');
     coach('Harmony restored.');
@@ -827,59 +937,89 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   }
 
   function rewardsMarkup(r: RewardSummary): string {
-    if (!r.coins && !r.pets.length && !r.decor.length && !r.lives && !r.hints && !r.companions.length) return '';
-    const friends = r.companions
-      .map((id) => `<div class="reward-item"><span class="reward-item__art">${companionSvg(id, 'happy')}</span><span><b>${esc(COMPANION_BY_ID[id].name)} the ${esc(COMPANION_BY_ID[id].kind.toLowerCase())} moved in!</b><small>${esc(COMPANION_BY_ID[id].trait)}</small></span></div>`)
-      .join('');
+    if (!r.coins && !r.decor.length && !r.lives && !r.hints) return '';
     const pantry = [
-      r.lives ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.lifePlus}</span><span><b>+${plural(r.lives, 'extra life', 'extra lives')}</b><small>One heart back on any Journey or Daily board</small></span></div>` : '',
-      r.hints ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.bulb}</span><span><b>+${plural(r.hints, 'hint')}</b><small>Pays for one hint, whichever step you need</small></span></div>` : '',
+      r.lives
+        ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.lifePlus}</span><span><b>+${plural(r.lives, 'extra life', 'extra lives')}</b><small>One heart back on any Journey or Daily board</small></span></div>`
+        : '',
+      r.hints
+        ? `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry">${ICON.bulb}</span><span><b>+${plural(r.hints, 'hint')}</b><small>Pays for one hint, whichever step you need</small></span></div>`
+        : '',
     ].join('');
     const coins = r.coins
       ? `<div class="reward-coins"><span class="reward-coins__amt">${ICON.coin}<b class="num">+${r.coins}</b></span><span class="muted">${esc(r.lines.map((l) => l.label).join(' · '))}</span></div>`
       : '';
-    const pets = r.pets
-      .map((id) => `<div class="reward-item"><span class="reward-item__art">${petSvg(id, { mood: 'happy' })}</span><span><b>${esc(PET_BY_ID[id].name)} moved in!</b><small>${esc(PET_BY_ID[id].trait)}</small></span></div>`)
-      .join('');
     const decor = r.decor
-      .map((id) => `<div class="reward-item"><span class="reward-item__art">${decorIcon(id)}</span><span><b>${esc(DECOR_BY_ID[id].name)}</b><small>${r.chapter ? `Gift for finishing ${esc(r.chapter.name)}` : 'New decoration'}</small></span></div>`)
+      .map(
+        (id) =>
+          `<div class="reward-item"><span class="reward-item__art">${decorIcon(id)}</span><span><b>${esc(DECOR_BY_ID[id].name)}</b><small>${r.chapter ? `Gift for finishing ${esc(r.chapter.name)}` : 'New decoration'}</small></span></div>`,
+      )
       .join('');
-    return `<div class="win-rewards">${coins}${pets}${friends}${decor}${pantry}</div>`;
+    return `<div class="win-rewards">${coins}${decor}${pantry}</div>`;
   }
 
-  /** What this solve did for the world map: the sanctuary growing, a new stage, a new friend, a region opening. */
+  /**
+   * What this solve did for the world: the sanctuary growing, a new stage, an animal coming home, a region opening, and
+   * how far the next animal is.
+   */
   function growthMarkup(g: GrowthNews | null): string {
     if (!g) return '';
     const parts: string[] = [];
     for (const r of g.opened) {
       const def = SANCTUARY_BY_ID[r];
-      parts.push(`<div class="reward-item"><span class="reward-item__art reward-item__art--pantry" style="color:${def.accent}">${ICON.globe}</span><span><b>The ${esc(def.name)} is open!</b><small>${esc(def.blurb)}</small></span></div>`);
+      parts.push(
+        `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry" style="color:${def.accent}">${ICON.globe}</span><span><b>The ${esc(def.name)} is open!</b><small>${esc(def.blurb)}</small></span></div>`,
+      );
     }
     if (g.growth > 0) {
       const def = SANCTUARY_BY_ID[g.sanctuary];
-      const short = def.name.replace(/ Sanctuary$/, '');
-      const next = nextStage(app.save, g.sanctuary);
-      if (g.completed) parts.push(`<div class="win-growth is-up" style="--accent:${def.accent}">${ICON.sparkle}<span><b>The ${esc(def.name)} is complete!</b>${g.coins ? ` <span class="num">+${g.coins}</span> Paw Coins` : ''}</span></div>`);
-      else if (g.stageUp) parts.push(`<div class="win-growth is-up" style="--accent:${def.accent}">${ICON.sprout}<span><b>${esc(short)}: ${esc(g.stageUp.name)}!</b> ${esc(g.stageUp.change)}.</span></div>`);
-      if (next && !g.stageUp) {
-        const pct = Math.round(((next.have - next.from) / (next.need - next.from)) * 100);
-        const left = next.need - next.have;
-        parts.push(`<div class="win-growth" style="--accent:${def.accent}">${ICON.sprout}<span class="win-growth__body"><span><b>${esc(short)} +1</b> · ${left === 1 ? 'one more puzzle' : `${left} more puzzles`} to ${esc(next.stage.name.toLowerCase())}</span><span class="progress world-progress" role="progressbar" aria-label="${esc(short)} progress" aria-valuemin="${next.from}" aria-valuemax="${next.need}" aria-valuenow="${next.have}"><span style="width:${pct}%"></span></span></span></div>`);
-      }
       for (const id of g.arrived) {
-        const c = COMPANION_BY_ID[id];
-        parts.push(`<div class="reward-item"><span class="reward-item__art">${companionSvg(id, 'happy')}</span><span><b>${esc(c.name)} the ${esc(c.kind.toLowerCase())} moved in!</b><small>${esc(c.trait)}</small></span></div>`);
+        const a = animalInfo(id);
+        parts.push(
+          `<div class="reward-item reward-item--arrival"><span class="reward-item__art">${animalPortrait(id, 'happy')}</span><span><b>${esc(a.name)} the ${esc(a.noun)} came home to the ${esc(def.short)}!</b><small>${esc(a.trait)}</small></span></div>`,
+        );
       }
+      if (g.completed)
+        parts.push(
+          `<div class="win-growth is-up" style="--accent:${def.accent}">${ICON.sparkle}<span><b>The ${esc(def.name)} is complete!</b>${g.coins ? ` <span class="num">+${g.coins}</span> Paw Coins` : ''}</span></div>`,
+        );
+      else if (g.stageUp)
+        parts.push(
+          `<div class="win-growth is-up" style="--accent:${def.accent}">${ICON.sprout}<span><b>${esc(def.short)}: ${esc(g.stageUp.name)}!</b> ${esc(g.stageUp.change)}.</span></div>`,
+        );
+      parts.push(nextFriendMarkup(g.sanctuary));
     }
     return parts.length ? `<div class="win-world">${parts.join('')}</div>` : '';
+  }
+
+  /** The animal on its way to the sanctuary being built, and how many puzzles until it arrives. */
+  function nextFriendMarkup(where: SanctuaryId | null): string {
+    if (!where || mode.kind === 'cup') return '';
+    const p = arrivalProgress(app.save, where);
+    const def = SANCTUARY_BY_ID[where];
+    if (!p) {
+      const st = nextStage(app.save, where);
+      if (!st) return '';
+      const left = st.need - st.have;
+      return `<div class="win-growth" style="--accent:${def.accent}">${ICON.sprout}<span><b>${esc(def.short)} +1</b> · ${left === 1 ? 'one more puzzle' : `${left} more puzzles`} to ${esc(st.stage.name.toLowerCase())}</span></div>`;
+    }
+    const a = animalInfo(p.next.id);
+    const span = Math.max(1, p.need - p.from);
+    const pct = Math.round(((p.have - p.from) / span) * 100);
+    return `<div class="win-next-friend" style="--accent:${def.accent}"><span class="win-next-friend__art is-shy">${animalPortrait(p.next.id, 'idle')}</span><span class="win-growth__body"><span><b>${esc(a.name)} the ${esc(a.noun)}</b> is on the way: ${p.left === 1 ? 'one more puzzle' : `${p.left} more puzzles`}</span><span class="progress world-progress" role="progressbar" aria-label="${esc(a.name)} coming home" aria-valuemin="${p.from}" aria-valuemax="${p.need}" aria-valuenow="${p.have}"><span style="width:${pct}%"></span></span></span></div>`;
   }
 
   function newsMarkup(nw: MetaNews): string {
     if (!nw.achievements.length && !nw.missions.length) return '';
     const badges = nw.achievements
-      .map((a) => `<div class="reward-item"><span class="reward-item__art reward-item__art--badge">${ICON[a.icon]}</span><span><b>Badge: ${esc(a.name)}</b><small>${esc(a.description)} +${a.coins} coins</small></span></div>`)
+      .map(
+        (a) =>
+          `<div class="reward-item"><span class="reward-item__art reward-item__art--badge">${ICON[a.icon]}</span><span><b>Badge: ${esc(a.name)}</b><small>${esc(a.description)} +${a.coins} coins</small></span></div>`,
+      )
       .join('');
-    const missions = nw.missions.length ? `<p class="win-missions">${ICON.check}${nw.missions.length === 1 ? `Mission done: ${esc(nw.missions[0].title)}` : `${nw.missions.length} missions done`}. Claim on Home.</p>` : '';
+    const missions = nw.missions.length
+      ? `<p class="win-missions">${ICON.check}${nw.missions.length === 1 ? `Mission done: ${esc(nw.missions[0].title)}` : `${nw.missions.length} missions done`}. Claim on Home.</p>`
+      : '';
     return `<div class="win-news">${badges}${missions}</div>`;
   }
 
@@ -904,7 +1044,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     const rankUp = rank.index > rankFor(total - r.points).index;
     const nextName = rank.next !== null ? rankFor(rank.next).name : null;
     const pct = rank.next !== null ? Math.round(((total - rank.from) / (rank.next - rank.from)) * 100) : 100;
-    const line = rankUp ? `New Paw Rank: <b>${esc(rank.name)}</b>!` : nextName ? `${esc(rank.name)} · ${rank.next! - total} to ${esc(nextName)}` : esc(rank.name);
+    const line = rankUp
+      ? `New Paw Rank: <b>${esc(rank.name)}</b>!`
+      : nextName
+        ? `${esc(rank.name)} · ${rank.next! - total} to ${esc(nextName)}`
+        : esc(rank.name);
     return `<div class="win-points">
       <span class="win-points__amt">${ICON.sparkle}<b class="num">+<span data-count="${r.points}">${r.points}</span></b> Paw Points</span>
       <span class="rank-bar" role="progressbar" aria-label="Paw Rank progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span style="width:${pct}%"></span></span>
@@ -919,48 +1063,46 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     const missing: string[] = [];
     if (clear && !clear.clean) missing.push('with no mistakes');
     if (clear && !clear.hintFree) missing.push('without hints');
-    const text = rec.isBest && rec.prevBest !== null
-      ? `${fmtClock(rec.prevBest - seconds)} faster than your best.`
-      : missing.length
-        ? `${missing.length === 2 ? 'Two stars' : 'One star'} still to earn: solve it ${missing.join(' and ')}.`
-        : `All three stars here. Best time ${fmtClock(app.save.journey.bestTimes[`L${mode.level}`] ?? 0)}.`;
+    const text =
+      rec.isBest && rec.prevBest !== null
+        ? `${fmtClock(rec.prevBest - seconds)} faster than your best.`
+        : missing.length
+          ? `${missing.length === 2 ? 'Two stars' : 'One star'} still to earn: solve it ${missing.join(' and ')}.`
+          : `All three stars here. Best time ${fmtClock(app.save.journey.bestTimes[`L${mode.level}`] ?? 0)}.`;
     return `<p class="win-replay">${ICON.target}${esc(text)}</p>`;
   }
-  /** The next thing to look forward to on the Journey. */
-  function nextMarkup(): string {
-    if (mode.kind !== 'level') return '';
-    const next = nextArrival(app.save, app.save.journey.nextLevel - 1);
-    if (!next) return '';
-    const left = next.level - (app.save.journey.nextLevel - 1);
-    return `<p class="win-next">${ICON.paw}${left === 1 ? 'Someone new arrives after the next level' : `${left} levels until someone new arrives`}</p>`;
-  }
-
   function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary, news: MetaNews, cupScore: ScoreBreakdown | null, growth: GrowthNews | null): void {
     // A visit worth making: a new stage, a new friend, or a newly opened sanctuary.
-    const worldVisit = growth && (growth.stageUp || growth.arrived.length || growth.opened.length) ? (growth.growth > 0 ? growth.sanctuary : growth.opened[0]) : null;
+    const worldVisit: SanctuaryId | null =
+      growth && (growth.stageUp || growth.arrived.length || growth.opened.length) ? (growth.growth > 0 ? growth.sanctuary : growth.opened[0]) : null;
     const next = nextAfterWin(mode);
-    const meet = rewards.pets.length > 0;
+    const arrived = growth?.growth ? growth.arrived : [];
+    const meet = arrived.length > 0;
     const firstBoard = mode.kind === 'level' && mode.level === 1 && rec.firstClear;
-    const primaryLabel = firstBoard
-      ? 'Meet your residents'
-      : typeof next === 'object' && next.kind === 'level'
-        ? `Play level ${next.level}`
-        : next === 'cup'
-          ? 'Back to Paw Cup'
-          : 'Back home';
+    const primaryLabel =
+      firstBoard && meet
+        ? `Meet ${animalInfo(arrived[0]).name}`
+        : typeof next === 'object' && next.kind === 'level'
+          ? `Play level ${next.level}`
+          : next === 'cup'
+            ? 'Back to Paw Cup'
+            : 'Back home';
     const badges: string[] = [];
     if (rec.clean) badges.push(`<span class="chip chip--brand">${ICON.check}Clean solve</span>`);
     if (rec.isBest && rec.prevBest !== null) badges.push(`<span class="chip chip--gold">${ICON.sparkle}New best</span>`);
     if (mode.kind === 'daily' && rec.streak) badges.push(`<span class="chip chip--coral">${ICON.flame}${plural(rec.streak, 'day')} streak</span>`);
     if (rec.usedCozyDay) badges.push(`<span class="chip">Cozy Day kept your streak</span>`);
-    const stars = mode.kind === 'level' ? `<div class="win-stars" role="img" aria-label="${rec.stars} of 3 stars">${[1, 2, 3].map((i) => (i <= rec.stars ? ICON.star : ICON.starOff)).join('')}</div>` : '';
+    const stars =
+      mode.kind === 'level'
+        ? `<div class="win-stars" role="img" aria-label="${rec.stars} of 3 stars">${[1, 2, 3].map((i) => (i <= rec.stars ? ICON.star : ICON.starOff)).join('')}</div>`
+        : '';
     sheet = openSheet(scope, {
       title: 'Harmony restored!',
       center: true,
       dismissible: false,
       className: 'win-sheet',
       body: `
-        ${winPet ? `<div class="win-pet">${petSvg(winPet, { mood: 'proud' })}</div>` : ''}
+        ${winPet ? `<div class="win-pet">${animalSvg(winPet, { mood: 'proud' })}</div>` : ''}
         <div class="win-stage win-stage-1">
           ${stars}
           <div class="stats">
@@ -979,12 +1121,12 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
           ${rewardsMarkup(rewards)}
           ${growthMarkup(growth)}
           ${newsMarkup(news)}
-          ${nextMarkup()}
+          ${growth ? '' : nextFriendMarkup(activeSanctuary(app.save))}
         </div>
         <div class="sheet__actions">
-          <button class="btn btn--block" data-act="${firstBoard ? 'meet' : 'next'}" data-autofocus>${esc(primaryLabel)}</button>
+          <button class="btn btn--block" data-act="${firstBoard && meet ? 'meet' : 'next'}" data-autofocus>${esc(primaryLabel)}</button>
           <div class="win-secondary">
-            ${firstBoard ? '' : worldVisit && !meet ? `<button class="btn btn--quiet" data-act="region">${ICON.globe}Visit the ${esc(SANCTUARY_BY_ID[worldVisit].name.replace(/ Sanctuary$/, ''))}</button>` : `<button class="btn btn--quiet" data-act="${meet ? 'meet' : 'sanctuary'}">${ICON.home}${meet ? `Meet ${esc(PET_BY_ID[rewards.pets[0]].name)}` : 'Visit sanctuary'}</button>`}
+            ${firstBoard && meet ? '' : meet ? `<button class="btn btn--quiet" data-act="meet">${ICON.home}Meet ${esc(animalInfo(arrived[0]).name)}</button>` : worldVisit ? `<button class="btn btn--quiet" data-act="region">${ICON.globe}Visit the ${esc(SANCTUARY_BY_ID[worldVisit].short)}</button>` : `<button class="btn btn--quiet" data-act="sanctuary">${ICON.home}Visit sanctuary</button>`}
             <button class="btn btn--quiet" data-act="share" aria-label="Share result">${ICON.share}${firstBoard ? 'Share result' : 'Share'}</button>
           </div>
         </div>`,
@@ -1022,12 +1164,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       }
       leaving = true;
       ws.close();
-      if (a.act === 'meet' || a.act === 'sanctuary') {
-        app.router.go({ screen: 'sanctuary', welcome: a.act === 'meet' ? rewards.pets : [] });
-        return;
-      }
-      if (a.act === 'region' && worldVisit) {
-        app.router.go({ screen: 'region', id: worldVisit, fresh: growth?.stageUp && growth.sanctuary === worldVisit ? stageOf(app.save, worldVisit) : 0 });
+      if (a.act === 'meet' || a.act === 'sanctuary' || a.act === 'region') {
+        // The sanctuary the news is about: the Pet Garden's own screen, or the Farm's or a region's.
+        const where = a.act === 'sanctuary' ? (activeSanctuary(app.save) ?? 'harmony') : (worldVisit ?? growth?.sanctuary ?? 'harmony');
+        const welcome = a.act === 'meet' ? arrived : [];
+        if (isRegionId(where))
+          app.router.go({ screen: 'region', id: where, fresh: growth?.stageUp && growth.sanctuary === where ? stageOf(app.save, where) : 0, welcome });
+        else app.router.go({ screen: 'sanctuary', welcome });
         return;
       }
       // Celebration first, always. An interstitial (if any network is live) can only follow the player's tap.
@@ -1061,7 +1204,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       INTERSTITIALS_ENABLED &&
       ads.available &&
       shouldShowInterstitial(
-        { removeAds: app.removeAds, levelsCompleted: app.save.journey.nextLevel - 1, boardsSinceLast: cadence.boardsSinceLast, lastShownAt: cadence.lastShownAt, shownToday: cadence.shownToday },
+        {
+          removeAds: app.removeAds,
+          levelsCompleted: app.save.journey.nextLevel - 1,
+          boardsSinceLast: cadence.boardsSinceLast,
+          lastShownAt: cadence.lastShownAt,
+          shownToday: cadence.shownToday,
+        },
         { mode: mode.kind, outcome: 'won', now: Date.now() },
       );
     if (!ok) return;
@@ -1158,18 +1307,30 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     }
   });
   s.resume();
-  if (tutorial) {
-    app.save.onboarding.seenRules = true;
+  const ob = app.save.onboarding;
+  if (guided) {
+    // The guided boards teach their rule as they go.
+    ob.seenRules = true;
+    if (solo) ob.soloRulesSeen = true;
+    else ob.pairRulesSeen = true;
     app.persist();
     startGuide(1);
     paint();
-  } else if (!app.save.onboarding.seenRules) {
+  } else if (solo ? !ob.soloRulesSeen : !ob.pairRulesSeen) {
+    // The first board under a rule the player hasn't been shown (a returning player's first one-animal board, a Daily
+    // before the lesson): the short how-to sheet first.
     pauseBoard();
-    showRules(scope, () => {
-      app.save.onboarding.seenRules = true;
-      app.persist();
-      resumeIfOnScreen();
-    });
+    showRules(
+      scope,
+      () => {
+        ob.seenRules = true;
+        if (solo) ob.soloRulesSeen = true;
+        else ob.pairRulesSeen = true;
+        app.persist();
+        resumeIfOnScreen();
+      },
+      { rule: s.rule, cast },
+    );
   }
 }
 

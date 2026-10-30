@@ -1,5 +1,5 @@
 /**
- * The 20 sanctuary animals as soft toys (D34): plain data, read by `toy.ts` to build each model from rounded parts.
+ * The 27 sanctuary animals as soft toys (D34, D35): plain data, read by `toy.ts` to build each model from rounded parts.
  * Sizes are in units of the figure scale H the 2D art uses (a resident is H = 46 scene units), with the ground at
  * y = 0, x to the animal's left-to-right as you look at it, and z toward you. Colors come from the 2D palettes so each
  * animal is recognisably itself.
@@ -9,13 +9,28 @@ import { PET_BY_ID, type PetId } from '../meta/catalogs/pets';
 import type { CompanionId } from '../meta/catalogs/companions';
 
 export type BodyKind = 'sit' | 'upright' | 'big' | 'tall' | 'bird' | 'seal';
-export type EarKind = 'pointed' | 'round' | 'tufted' | 'floppy' | 'folded' | 'button' | 'disc' | 'fluffy' | 'tall' | 'small' | 'giant' | 'none';
-export type SnoutKind = 'cat' | 'dog' | 'fox' | 'round' | 'koala' | 'beak' | 'bigbeak' | 'trunk' | 'flat' | 'none';
-export type TailKind = 'cat' | 'dog' | 'fox' | 'panda' | 'kangaroo' | 'stub' | 'bird' | 'none';
+export type EarKind = 'pointed' | 'round' | 'tufted' | 'floppy' | 'folded' | 'button' | 'disc' | 'fluffy' | 'tall' | 'small' | 'giant' | 'side' | 'none';
+export type SnoutKind = 'cat' | 'dog' | 'fox' | 'round' | 'koala' | 'beak' | 'bigbeak' | 'trunk' | 'flat' | 'pig' | 'muzzle' | 'none';
+export type TailKind = 'cat' | 'dog' | 'fox' | 'panda' | 'kangaroo' | 'stub' | 'bird' | 'curl' | 'tuft' | 'horse' | 'puff' | 'none';
 export type EyeStyle = 'dot' | 'iris' | 'owl' | 'side';
 export type MouthKind = 'cat' | 'dog' | 'simple' | 'none';
-export type Marking = 'tabby' | 'mask' | 'patch' | 'redpanda' | 'meerkat' | 'sloth' | 'owl' | 'none';
-export type Extra = 'ossicones' | 'spots' | 'whiskers' | 'chestfluff' | 'mane' | 'claws' | 'lilypad' | 'flippers';
+export type Marking = 'tabby' | 'mask' | 'patch' | 'redpanda' | 'meerkat' | 'sloth' | 'owl' | 'blaze' | 'cowpatch' | 'none';
+export type Extra =
+  | 'ossicones'
+  | 'spots'
+  | 'whiskers'
+  | 'chestfluff'
+  | 'mane'
+  | 'claws'
+  | 'lilypad'
+  | 'flippers'
+  // Farm animals (D35)
+  | 'wool'
+  | 'horns'
+  | 'nubs'
+  | 'beard'
+  | 'crest'
+  | 'patches';
 
 export interface ToySpec {
   id: string;
@@ -30,6 +45,8 @@ export interface ToySpec {
   inner: string;
   /** Head size (width, height, depth) as a fraction of H. */
   head: [number, number, number];
+  /** The head's own color when it isn't the coat (a sheep's tan face under its wool). */
+  headFur?: string;
   ears: { kind: EarKind; size: number; color?: string; tip?: string; spread?: number };
   snout: { kind: SnoutKind; color: string; nose: string; size: number };
   eyes: { style: EyeStyle; color: string; iris?: string; size: number; spacing: number; y: number };
@@ -85,6 +102,146 @@ export const PET_TOYS: Record<PetId, ToySpec> = {
 };
 
 export const FRIEND_TOYS: Record<CompanionId, ToySpec> = {
+  // Meadow Farm
+  cotton: {
+    id: 'cotton',
+    body: 'sit',
+    fur: '#F6F1E7',
+    shade: '#E3DACB',
+    light: '#F6F1E7',
+    dark: '#5A4A40',
+    inner: '#F2B8B5',
+    head: [0.68, 0.6, 0.6],
+    headFur: '#ECD9C3',
+    ears: { kind: 'side', size: 1, color: '#ECD9C3' },
+    snout: { kind: 'round', color: '#F4E6D4', nose: '#C98F8A', size: 0.85 },
+    eyes: { style: 'dot', color: INK, size: 0.92, spacing: 0.27, y: 0 },
+    mouth: 'simple',
+    tail: { kind: 'stub', color: '#F6F1E7' },
+    marking: 'none',
+    cheek: '#F09C98',
+    brow: '#8C7A6A',
+    paws: '#5A4A40',
+    extras: ['wool'],
+  },
+  truffle: {
+    id: 'truffle',
+    body: 'sit',
+    fur: '#F5B9BB',
+    shade: '#E9A2A6',
+    light: '#FBD7D7',
+    dark: '#A65E66',
+    inner: '#EE9AA2',
+    head: [0.78, 0.64, 0.64],
+    ears: { kind: 'folded', size: 0.95, color: '#F5B9BB' },
+    snout: { kind: 'pig', color: '#EE9AA2', nose: '#A65E66', size: 1 },
+    eyes: { style: 'dot', color: INK, size: 0.9, spacing: 0.29, y: 0.05 },
+    mouth: 'simple',
+    tail: { kind: 'curl', color: '#F5B9BB' },
+    marking: 'none',
+    cheek: '#F08C94',
+    brow: '#C9848A',
+  },
+  buttercup: {
+    id: 'buttercup',
+    body: 'sit',
+    fur: '#F8F3EC',
+    shade: '#E8E0D4',
+    light: '#F8F3EC',
+    dark: '#6E4B3A',
+    inner: '#F6CFC6',
+    head: [0.8, 0.64, 0.64],
+    ears: { kind: 'side', size: 1.05, color: '#F8F3EC' },
+    snout: { kind: 'muzzle', color: '#F6CFC6', nose: '#6E4B3A', size: 1.05 },
+    eyes: { style: 'dot', color: INK, size: 0.95, spacing: 0.29, y: 0.05 },
+    mouth: 'simple',
+    tail: { kind: 'tuft', color: '#F8F3EC', tip: '#6E4B3A' },
+    marking: 'cowpatch',
+    markColor: '#6E4B3A',
+    cheek: '#F09C98',
+    brow: '#8C6A58',
+    paws: '#6E4B3A',
+    extras: ['nubs', 'patches'],
+  },
+  pepper: {
+    id: 'pepper',
+    body: 'sit',
+    fur: '#EDE7DF',
+    shade: '#DCD3C8',
+    light: '#FBF8F3',
+    dark: '#6D5D52',
+    inner: '#E9C2BC',
+    head: [0.7, 0.64, 0.62],
+    ears: { kind: 'side', size: 0.95, color: '#EDE7DF' },
+    snout: { kind: 'round', color: '#FBF8F3', nose: '#6D5D52', size: 0.95 },
+    eyes: { style: 'dot', color: INK, size: 0.9, spacing: 0.27, y: 0.04 },
+    mouth: 'simple',
+    tail: { kind: 'stub', color: '#EDE7DF' },
+    marking: 'none',
+    markColor: '#C7B39F',
+    cheek: '#F09C98',
+    brow: '#9A8A7E',
+    paws: '#6D5D52',
+    extras: ['horns', 'beard'],
+  },
+  marigold: {
+    id: 'marigold',
+    body: 'bird',
+    fur: '#F9D44A',
+    shade: '#F2B83A',
+    light: '#FFEFA1',
+    dark: '#E79A2C',
+    inner: '#F2B83A',
+    head: [0.6, 0.56, 0.54],
+    ears: { kind: 'none', size: 1 },
+    snout: { kind: 'beak', color: '#E79A2C', nose: '#E79A2C', size: 0.8 },
+    eyes: { style: 'dot', color: INK, size: 0.95, spacing: 0.28, y: 0.04 },
+    mouth: 'none',
+    tail: { kind: 'bird', color: '#F2B83A' },
+    marking: 'none',
+    cheek: '#F5A08E',
+    extras: ['crest'],
+  },
+  hazel: {
+    id: 'hazel',
+    body: 'sit',
+    fur: '#BC8458',
+    shade: '#A26F48',
+    light: '#EED3B6',
+    dark: '#5B3A28',
+    inner: '#E7AE8C',
+    head: [0.68, 0.7, 0.68],
+    ears: { kind: 'pointed', size: 0.85, color: '#BC8458' },
+    snout: { kind: 'muzzle', color: '#EED3B6', nose: '#5B3A28', size: 1.1 },
+    eyes: { style: 'dot', color: INK, size: 0.92, spacing: 0.27, y: 0.08 },
+    mouth: 'simple',
+    tail: { kind: 'horse', color: '#5B3A28' },
+    marking: 'blaze',
+    markColor: '#F6EEE4',
+    cheek: '#F09C98',
+    brow: '#7A5236',
+    paws: '#5B3A28',
+    extras: ['mane'],
+  },
+  // Pet Garden
+  juniper: {
+    id: 'juniper',
+    body: 'sit',
+    fur: '#D8CFCA',
+    shade: '#C6BCB6',
+    light: '#F7F2EE',
+    dark: '#5C524D',
+    inner: '#F3B3BE',
+    head: [0.72, 0.6, 0.6],
+    ears: { kind: 'tall', size: 1.4, color: '#D8CFCA' },
+    snout: { kind: 'round', color: '#F7F2EE', nose: '#E68A9A', size: 0.8 },
+    eyes: { style: 'dot', color: INK, size: 0.95, spacing: 0.28, y: 0.03 },
+    mouth: 'simple',
+    tail: { kind: 'puff', color: '#F7F2EE' },
+    marking: 'none',
+    cheek: '#F09C98',
+    brow: '#9A8E88',
+  },
   ember: {
     id: 'ember',
     body: 'sit',

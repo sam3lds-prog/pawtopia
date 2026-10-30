@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { COMPANIONS } from '../../src/meta/catalogs/companions';
 import { DECOR, decorHome } from '../../src/meta/catalogs/decor';
-import { REGIONS, SANCTUARY_BY_ID } from '../../src/meta/catalogs/sanctuaries';
+import { PETS } from '../../src/meta/catalogs/pets';
+import { EXOTIC, REGIONS, SANCTUARIES, SANCTUARY_BY_ID, homeOf } from '../../src/meta/catalogs/sanctuaries';
+import { nextArrivalIn } from '../../src/meta/animals';
+import { castFor, castWord, parseCast } from '../../src/meta/cast';
 import { balance, grant } from '../../src/meta/ledger';
 import { grantItem } from '../../src/meta/items';
 import { buyDecor, shownDecorIds } from '../../src/meta/sanctuary';
 import {
-  activeRegion,
+  activeSanctuary,
+  arrivalProgress,
   countsForGrowth,
   growOnSolve,
   isComplete,
@@ -57,86 +61,108 @@ describe('world map', () => {
     }
   });
 
-  it('regions open at their Journey levels, in order, for free', () => {
-    expect(openRegions(atLevel(0))).toEqual([]);
-    expect(nextToOpen(atLevel(0))).toMatchObject({ id: 'outback', left: 6 });
-    expect(openRegions(atLevel(6))).toEqual(['outback']);
-    expect(openRegions(atLevel(20))).toEqual(['outback', 'savanna']);
-    expect(openRegions(atLevel(60))).toEqual(['outback', 'savanna', 'arctic', 'amazon']);
+  it('the Farm and the Pet Garden are open from the start; exotic regions open at their levels, in order', () => {
+    expect(openRegions(atLevel(0))).toEqual(['farm']);
+    expect(isOpen(atLevel(0), 'harmony')).toBe(true);
+    expect(nextToOpen(atLevel(0))).toMatchObject({ id: 'outback', left: 10 });
+    expect(openRegions(atLevel(10))).toEqual(['farm', 'outback']);
+    expect(openRegions(atLevel(25))).toEqual(['farm', 'outback', 'savanna']);
+    expect(openRegions(atLevel(60))).toEqual(['farm', 'outback', 'savanna', 'arctic', 'amazon']);
     expect(nextToOpen(atLevel(60))).toBeNull();
-    const opens = REGIONS.map((r) => r.opensAfterLevel);
+    const opens = EXOTIC.map((r) => r.opensAfterLevel);
     expect([...opens].sort((a, b) => a - b)).toEqual(opens);
+    expect(SANCTUARIES.filter((x) => x.beginner).map((x) => x.id)).toEqual(['farm', 'harmony']);
   });
 
-  it('every regional animal arrives at a stage, three per region', () => {
-    for (const r of REGIONS) {
-      const here = COMPANIONS.filter((c) => c.sanctuary === r.id);
-      expect(here.map((c) => c.stage)).toEqual([1, 2, 3]);
-      expect(r.stages.map((s) => s.at)).toEqual([0, 3, 8, 15, 25]);
+  it('a sanctuary already being built stays open even if it now opens later', () => {
+    const s = atLevel(7);
+    expect(isOpen(s, 'outback')).toBe(false);
+    s.world.growth.outback = 2;
+    expect(isOpen(s, 'outback')).toBe(true);
+  });
+
+  it('every animal lives in exactly one sanctuary and arrives in order: sheep first on the Farm, a bunny first in the Pet Garden', () => {
+    const all = SANCTUARIES.flatMap((x) => x.arrivals.map((a) => a.id));
+    expect(new Set(all).size).toBe(all.length);
+    expect(all.sort()).toEqual([...PETS.map((p) => p.id), ...COMPANIONS.map((c) => c.id)].sort());
+    expect(SANCTUARY_BY_ID.farm.arrivals.map((a) => a.id)).toEqual(['cotton', 'truffle', 'buttercup', 'pepper', 'marigold', 'hazel']);
+    expect(SANCTUARY_BY_ID.harmony.arrivals[0].id).toBe('juniper');
+    for (const c of COMPANIONS) expect(homeOf(c.id), c.id).toBe(c.sanctuary);
+    for (const p of PETS) expect(homeOf(p.id)).toBe('harmony');
+    for (const x of SANCTUARIES) {
+      const at = x.arrivals.map((a) => a.at);
+      expect(
+        [...at].sort((a, b) => a - b),
+        x.id,
+      ).toEqual(at);
+      // Each animal takes a little longer to bring home than the one before (the gaps never shrink).
+      const gaps = at.map((v, i) => v - (i ? at[i - 1] : 0));
+      for (let i = 2; i < gaps.length; i++) expect(gaps[i], `${x.id} ${i}`).toBeGreaterThanOrEqual(gaps[i - 1] - 0);
+    }
+    for (const r of EXOTIC) {
+      expect(r.arrivals.map((a) => a.at)).toEqual([3, 8, 15]);
+      expect(r.stages.map((x) => x.at)).toEqual([0, 3, 8, 15, 25]);
     }
   });
 });
 
 describe('growing a sanctuary', () => {
-  it('only counts solved puzzles outside Paw Cup and the guided first board', () => {
+  it('counts every solved puzzle but the Paw Cup (the guided first board brings the first animal home)', () => {
     expect(countsForGrowth({ kind: 'level', level: 3 }, false)).toBe(true);
     expect(countsForGrowth({ kind: 'daily', dateKey: '2026-10-28' }, false)).toBe(true);
     expect(countsForGrowth({ kind: 'zen', size: 6, seed: 1 } as never, false)).toBe(true);
     expect(countsForGrowth({ kind: 'cup', week: '2026-W44', board: 1 } as never, false)).toBe(false);
-    expect(countsForGrowth({ kind: 'level', level: 1 }, true)).toBe(false);
+    expect(countsForGrowth({ kind: 'level', level: 1 }, true)).toBe(true);
   });
 
-  it('nothing grows before a region opens', () => {
-    const s = atLevel(3);
-    expect(growOnSolve(s, openRegions(s), NOW)).toBeNull();
-    expect(s.world.growth).toEqual({});
-  });
-
-  it('announces a region opening on the solve that opens it', () => {
-    const s = atLevel(5);
-    const before = openRegions(s);
-    s.journey.nextLevel = 7; // the win that clears level 6
-    const news = growOnSolve(s, before, NOW)!;
-    expect(news.opened).toEqual(['outback']);
-    expect(news.sanctuary).toBe('outback');
-    expect(news.growth).toBe(1);
-  });
-
-  it('grows through the stages, welcomes each animal once, and completes with one coin gift', () => {
-    const s = atLevel(10);
-    const news = solve(s, 25);
-    expect(news[1]!.stageUp).toBeNull();
-    expect(news[2]!.stageUp?.name).toBe('First friend');
-    expect(news[2]!.arrived).toEqual(['gumnut']);
-    expect(news[7]!.arrived).toEqual(['skipper']);
-    expect(news[14]!.arrived).toEqual(['dozer']);
-    expect(news.flatMap((n) => n!.arrived)).toEqual(['gumnut', 'skipper', 'dozer']);
-    expect(news[24]!.completed).toBe(true);
-    expect(news[24]!.coins).toBe(150);
-    expect(isComplete(s, 'outback')).toBe(true);
+  it('builds the Farm first: Cotton comes home on the first solve, the others one by one, then a coin gift', () => {
+    const s = atLevel(0);
+    expect(activeSanctuary(s)).toBe('farm');
+    expect(nextArrivalIn(s, 'farm')?.id).toBe('cotton');
+    const news = solve(s, 26);
+    expect(news[0]!.arrived).toEqual(['cotton']);
+    expect(news[0]!.stageUp?.name).toBe('First friend');
+    expect(news.flatMap((n) => n!.arrived)).toEqual(['cotton', 'truffle', 'buttercup', 'pepper', 'marigold', 'hazel']);
+    expect(news[3]!.arrived).toEqual(['truffle']);
+    expect(news[7]!.stageUp?.name).toBe('Barn raising');
+    expect(news[25]!.completed).toBe(true);
+    expect(news[25]!.coins).toBe(150);
+    expect(isComplete(s, 'farm')).toBe(true);
     expect(balance(s)).toBe(150);
-    // Complete: nothing else to build until the Savanna opens.
-    expect(activeRegion(s)).toBeNull();
-    expect(growOnSolve(s, openRegions(s), NOW)).toBeNull();
-    expect(s.world.growth.outback).toBe(25);
-    // The completion gift is idempotent even if the stage is re-derived.
-    expect(grant(s, 'world:complete:outback', 150, 'gift', NOW)).toBe(false);
+    // The Farm is finished: building moves on to the Pet Garden, whose bunny is next.
+    expect(activeSanctuary(s)).toBe('harmony');
+    expect(arrivalProgress(s, 'harmony')).toMatchObject({ next: { id: 'juniper' }, have: 0, need: 1, left: 1 });
+    expect(grant(s, 'world:complete:farm', 150, 'gift', NOW)).toBe(false);
+  });
+
+  it('progress toward the next animal counts from the last arrival', () => {
+    const s = atLevel(0);
+    solve(s, 2);
+    expect(arrivalProgress(s, 'farm')).toMatchObject({ next: { id: 'truffle' }, have: 2, need: 4, from: 1, left: 2 });
+  });
+
+  it('the Pet Garden has no stages: it completes when everyone is home', () => {
+    const s = atLevel(0);
+    setActive(s, 'harmony');
+    const news = solve(s, 53);
+    expect(news.flatMap((n) => n!.arrived)).toEqual(SANCTUARY_BY_ID.harmony.arrivals.map((a) => a.id));
+    expect(news.every((n) => n!.stageUp === null)).toBe(true);
+    expect(news[52]!.completed).toBe(true);
+    expect(news[52]!.coins).toBe(200);
+    expect(nextStage(s, 'harmony')).toBeNull();
   });
 
   it('you build one sanctuary at a time and can switch; progress elsewhere is kept', () => {
     const s = atLevel(25);
-    expect(activeRegion(s)).toBe('outback');
+    expect(activeSanctuary(s)).toBe('farm');
     solve(s, 4);
     expect(setActive(s, 'savanna')).toBe(true);
     solve(s, 2);
-    expect(s.world.growth).toEqual({ outback: 4, savanna: 2 });
+    expect(s.world.growth).toEqual({ farm: 4, savanna: 2 });
     expect(setActive(s, 'arctic')).toBe(false); // not open yet
-    expect(stageOf(s, 'outback')).toBe(1);
+    expect(stageOf(s, 'farm')).toBe(1);
     expect(nextStage(s, 'savanna')).toMatchObject({ have: 2, need: 3 });
-    const done = atLevel(25);
-    done.world.growth.outback = 25;
-    expect(setActive(done, 'outback')).toBe(false); // complete
-    expect(activeRegion(done)).toBe('savanna');
+    expect(setActive(s, 'harmony')).toBe(true);
   });
 
   it('a lost write is repaired at startup, and the world survives a save round trip', () => {
@@ -148,19 +174,78 @@ describe('growing a sanctuary', () => {
     const back = normalizeSave(JSON.parse(JSON.stringify(s)), NOW);
     expect(back.world).toEqual(s.world);
     expect(back.inventory.companions.zuri).toBeTruthy();
-    // Junk is dropped, not trusted.
     const junk = normalizeSave({ ...JSON.parse(JSON.stringify(s)), world: { active: 7, growth: { outback: 'lots' }, visited: null } }, NOW);
     expect(junk.world.active).toBeNull();
     expect(junk.world.growth.outback).toBeUndefined();
   });
 
+  it('players from before D35 keep their residents and start the Pet Garden where they are in its line', () => {
+    const s = atLevel(16);
+    for (const id of ['mochi', 'biscuit', 'pip', 'nori', 'clover'] as const) s.inventory.pets[id] = { unlockedAt: '2026-10-01T00:00:00Z' };
+    expect(s.world.growth.harmony).toBeUndefined();
+    const arrived = reconcileWorld(s, NOW);
+    // Clover (26 in the new line) is the latest one home, so growth starts there and the bunny moves in too.
+    expect(s.world.growth.harmony).toBe(26);
+    expect(arrived).toEqual(['juniper']);
+    expect(nextArrivalIn(s, 'harmony')?.id).toBe('peanut');
+    expect(arrivalProgress(s, 'harmony')).toMatchObject({ have: 26, need: 34, left: 8 });
+    // Idempotent; and a brand-new player starts the Pet Garden at zero.
+    expect(reconcileWorld(s, NOW)).toEqual([]);
+    const fresh = atLevel(0);
+    reconcileWorld(fresh, NOW);
+    expect(fresh.world.growth.harmony).toBeUndefined();
+    expect(nextArrivalIn(fresh, 'harmony')?.id).toBe('juniper');
+  });
+
   it('chats only about what happened', () => {
-    const s = atLevel(10);
-    expect(regionChat(s, 'outback', NOW)).toBeNull();
-    solve(s, 3);
-    expect(regionChat(s, 'outback', NOW)).toBe('Gumnut is still exploring the new home.');
+    const s = atLevel(0);
+    expect(regionChat(s, 'farm', NOW)).toBeNull();
+    solve(s, 1);
+    expect(regionChat(s, 'farm', NOW)).toBe('Cotton is still exploring the new home.');
     const later = new Date(2026, 10, 5, 12, 0, 0);
-    expect(regionChat(s, 'outback', later)).toBe('Gumnut is watching the land grow: 5 more puzzles until shelter.');
+    expect(regionChat(s, 'farm', later)).toBe('Cotton is getting ready for Truffle the piglet: 3 more puzzles.');
+  });
+});
+
+describe('what boards show (cast)', () => {
+  it('a one-animal board shows the animal being brought home', () => {
+    const s = atLevel(0);
+    expect(castFor(s, 'solo', 7)).toEqual({ a: 'cotton', sanctuary: 'farm' });
+    solve(s, 1);
+    expect(castFor(s, 'solo', 7).a).toBe('truffle');
+    setActive(s, 'harmony');
+    expect(castFor(s, 'solo', 7)).toEqual({ a: 'juniper', sanctuary: 'harmony' });
+  });
+
+  it('a two-animal board pairs it with someone already home, of another kind when there is one', () => {
+    const s = atLevel(30);
+    solve(s, 8); // Cotton, Truffle and Buttercup are home; Pepper is next
+    for (let seed = 0; seed < 20; seed++) {
+      const c = castFor(s, 'pair', seed);
+      expect(c.a).toBe('pepper');
+      expect(['cotton', 'truffle', 'buttercup']).toContain(c.b);
+    }
+    // Nobody home anywhere yet: the next in line keeps it company.
+    const fresh = atLevel(30);
+    const c = castFor(fresh, 'pair', 3);
+    expect(c.a).toBe('cotton');
+    expect(c.b).toBe('truffle');
+    // The Pet Garden: next is Pip (a cat) once the bunny, Biscuit and Mochi are home; partner is never another cat if a dog is home.
+    const g = atLevel(30);
+    setActive(g, 'harmony');
+    solve(g, 8);
+    for (let seed = 0; seed < 20; seed++) expect(['juniper', 'biscuit']).toContain(castFor(g, 'pair', seed).b);
+  });
+
+  it('a saved cast is checked before it is reused, and names stand in when both animals are one kind', () => {
+    expect(parseCast({ a: 'cotton', sanctuary: 'farm' }, 'solo')).toEqual({ a: 'cotton', sanctuary: 'farm' });
+    expect(parseCast({ a: 'cotton', sanctuary: 'farm' }, 'pair')).toBeNull();
+    expect(parseCast({ a: 'cotton', b: 'cotton', sanctuary: 'farm' }, 'pair')).toBeNull();
+    expect(parseCast({ a: 'dragon', sanctuary: 'farm' }, 'solo')).toBeNull();
+    expect(parseCast({ a: 'pip', b: 'mochi', sanctuary: 'harmony' }, 'pair')).toEqual({ a: 'pip', b: 'mochi', sanctuary: 'harmony' });
+    expect(castWord({ a: 'pip', b: 'mochi', sanctuary: 'harmony' }, 'a')).toBe('Pip');
+    expect(castWord({ a: 'pip', b: 'biscuit', sanctuary: 'harmony' }, 'b')).toBe('dog');
+    expect(castWord({ a: 'pepper', sanctuary: 'farm' }, 'a')).toBe('goat kid');
   });
 });
 
@@ -170,9 +255,12 @@ describe('regional decorations', () => {
     for (const id of Object.keys(REGION_DECOR_ART)) expect(decorHome(DECOR.find((d) => d.id === id)!), id).not.toBe('harmony');
     const s = atLevel(3);
     grant(s, 'test:coins', 500, 'gift', NOW);
+    // The Farm's are for sale from the start; a region's once it opens.
+    expect(buyDecor(s, 'scarecrow', NOW)).toBe('ok');
     expect(buyDecor(s, 'campfire', NOW)).toBe('locked');
-    expect(balance(s)).toBe(500);
-    s.journey.nextLevel = 7;
+    expect(balance(s)).toBe(500 - 120);
+    grant(s, 'test:coins2', 120, 'gift', NOW);
+    s.journey.nextLevel = 11;
     expect(buyDecor(s, 'campfire', NOW)).toBe('ok');
     expect(balance(s)).toBe(500 - 120);
     expect(shownDecorIds(s, 'outback')).toEqual(['campfire']);
@@ -207,12 +295,26 @@ describe('regional scenes', () => {
     expect(svg.indexOf('data-decor="aurora"')).toBeLessThan(svg.indexOf('url(#a-snow)'));
   });
 
+  it('the Farm grows a pasture, a barn, a pond and an orchard, and its animals stand in their spots', () => {
+    const wild = regionScene('farm', { stage: 0, companions: [], decor: [] });
+    expect(wild).not.toMatch(/data-stage=/);
+    const all = regionScene('farm', {
+      stage: 4,
+      companions: ['cotton', 'truffle', 'buttercup', 'pepper', 'marigold', 'hazel'],
+      decor: ['tireswing', 'tractor', 'scarecrow'],
+    });
+    for (const st of [1, 2, 3, 4]) expect(all).toMatch(new RegExp(`data-stage="${st}"`));
+    for (const id of ['cotton', 'truffle', 'buttercup', 'pepper', 'marigold', 'hazel']) expect(all).toMatch(new RegExp(`data-friend="${id}"`));
+    expect(all).toMatch(/class="sp-swing"/);
+    expect(all).toMatch(/class="sp-tractor"/);
+  });
+
   it('every region has a place, an accent and an honest blurb', () => {
     for (const r of REGIONS) {
       expect(SANCTUARY_BY_ID[r.id].place.length).toBeGreaterThan(3);
       expect(r.accent).toMatch(/^#[0-9A-F]{6}$/i);
       expect(isOpen(atLevel(r.opensAfterLevel), r.id as never)).toBe(true);
-      expect(isOpen(atLevel(r.opensAfterLevel - 1), r.id as never)).toBe(false);
+      if (r.opensAfterLevel > 0) expect(isOpen(atLevel(r.opensAfterLevel - 1), r.id as never)).toBe(false);
     }
   });
 });

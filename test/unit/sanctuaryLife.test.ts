@@ -4,7 +4,7 @@ import { ACTION_MS, AmbientDirector, GAP_MS, MAX_ACTIVE, type AmbientAction } fr
 import type { Clock } from '../../src/ui/animation/faceDirector';
 import { COMPANIONS } from '../../src/meta/catalogs/companions';
 import { PETS, isPetId } from '../../src/meta/catalogs/pets';
-import { applyLevelRewards, arrivalLevels, nextArrival, reconcileRewards, unlockedCompanions } from '../../src/meta/rewards';
+import { applyLevelRewards, reconcileRewards, unlockedCompanions } from '../../src/meta/rewards';
 import { patFriend, pattedToday, sanctuaryChat } from '../../src/meta/sanctuary';
 import { sanctuaryScene } from '../../src/ui/art/sanctuary';
 import { defaultSave, normalizeSave } from '../../src/services/storage';
@@ -159,39 +159,15 @@ describe('sanctuary motion stays in the sanctuary', () => {
 });
 
 describe('wildlife companions', () => {
-  it('are a separate model: never a puzzle species, and only the finished ones are listed', () => {
+  it('are their own catalog (residents are the cats and dogs), and arrive only with sanctuary growth, never at a level', () => {
     for (const c of COMPANIONS) expect(isPetId(c.id)).toBe(false);
-    expect(COMPANIONS.filter((c) => c.unlockLevel !== undefined).map((c) => [c.id, c.unlockLevel])).toEqual([
-      ['ember', 30],
-      ['maple', 45],
-    ]);
-    // Regional friends arrive with their sanctuary's stages, never at a level.
-    for (const c of COMPANIONS.filter((x) => x.sanctuary !== 'harmony')) expect(c.unlockLevel, c.id).toBeUndefined();
-  });
-
-  it('arrive on their level, once, and are back-dated for players already past it', () => {
     const s = defaultSave();
-    s.journey.clears.L30 = { firstClearAt: 'x', bestSeconds: 1, bestMistakes: 0, clean: false, hintFree: false, stars: 1 };
-    expect(applyLevelRewards(s, 30, s.journey.clears.L30).companions).toEqual(['ember']);
-    expect(applyLevelRewards(s, 30, s.journey.clears.L30).companions).toEqual([]);
-    const old = defaultSave();
-    for (let L = 1; L <= 50; L++) old.journey.clears[`L${L}`] = { firstClearAt: 'x', bestSeconds: 1, bestMistakes: 0, clean: false, hintFree: false, stars: 1 };
-    expect(reconcileRewards(old).companions).toEqual(['ember', 'maple']);
-    expect(unlockedCompanions(normalizeSave(JSON.parse(JSON.stringify(old))))).toEqual(['ember', 'maple']);
-  });
-
-  it('the path marks only levels where someone really arrives, and the next arrival is honest', () => {
-    const levels = arrivalLevels();
-    for (const p of PETS) expect(levels.has(p.unlockLevel)).toBe(true);
-    expect(levels.has(30) && levels.has(45)).toBe(true);
-    expect(levels.has(25) || levels.has(35) || levels.has(40)).toBe(false);
-    const s = defaultSave();
-    for (const p of PETS) s.inventory.pets[p.id] = { unlockedAt: 'x' };
-    expect(nextArrival(s, 24)).toEqual({ name: 'Ember', level: 30 });
-    s.inventory.companions.ember = { unlockedAt: 'x' };
-    expect(nextArrival(s, 31)).toEqual({ name: 'Maple', level: 45 });
-    s.inventory.companions.maple = { unlockedAt: 'x' };
-    expect(nextArrival(s, 46)).toBeNull();
+    for (let L = 1; L <= 50; L++) s.journey.clears[`L${L}`] = { firstClearAt: 'x', bestSeconds: 1, bestMistakes: 0, clean: false, hintFree: false, stars: 1 };
+    s.journey.nextLevel = 51;
+    expect(applyLevelRewards(s, 30, s.journey.clears.L30).decor).toEqual([]);
+    reconcileRewards(s);
+    expect(unlockedCompanions(normalizeSave(JSON.parse(JSON.stringify(s))))).toEqual([]);
+    expect(PETS.every((p) => !s.inventory.pets[p.id])).toBe(true);
   });
 
   it('appear in the scene only when welcomed; Maple naps in the blossom tree when it is out', () => {

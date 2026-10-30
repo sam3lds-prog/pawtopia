@@ -1,15 +1,16 @@
 /**
- * World: a map of every sanctuary. Harmony is home; each regional sanctuary opens at a Journey level and grows with the
- * puzzles you solve while you build it. The map shows where each one is and how far along it is; the cards below say
- * what's next. Nothing here is for sale: puzzles are what grow a sanctuary.
+ * World: a map of every sanctuary (D35). The Farm and the Pet Garden are open from the start; each exotic region opens
+ * at a Journey level. Whichever one you build grows with the puzzles you solve, and its animals come home one by one
+ * (the one on its way is the animal on your boards). The map shows where each one is and how far along it is; the
+ * cards below say what's next. Nothing here is for sale: puzzles are what grow a sanctuary.
  */
 
 import { app } from '../../app/app';
 import { playMode } from '../../app/gameFlow';
-import { COMPANIONS } from '../../meta/catalogs/companions';
-import { REGIONS, SANCTUARIES, SANCTUARY_BY_ID, type RegionId, type SanctuaryDef } from '../../meta/catalogs/sanctuaries';
-import { activeRegion, isComplete, isOpen, nextStage, nextToOpen, openRegions, progressOf, stageOf } from '../../meta/world';
-import { companionSvg } from '../art/companions';
+import { SANCTUARIES, SANCTUARY_BY_ID, isRegionId, type RegionId, type SanctuaryDef } from '../../meta/catalogs/sanctuaries';
+import { activeSanctuary, arrivalProgress, isComplete, isOpen, nextStage, nextToOpen, progressOf, stageOf } from '../../meta/world';
+import { animalInfo, homeAnimals } from '../../meta/animals';
+import { animalPortrait } from '../art/animals';
 import { regionThumb } from '../art/regions';
 import { pinPercent, worldMapSvg } from '../art/worldMap';
 import { esc, h, plural } from '../dom';
@@ -18,40 +19,38 @@ import type { ScreenDef } from '../router';
 import { walletPills } from '../components/wallet';
 import { sceneMarkup } from './sanctuary';
 
-const short = (d: SanctuaryDef) => d.name.replace(/ Sanctuary$/, '');
+const short = (d: SanctuaryDef) => d.short;
 
-type Status = 'home' | 'building' | 'open' | 'complete' | 'locked';
+type Status = 'building' | 'open' | 'complete' | 'locked';
 
 function statusOf(id: SanctuaryDef['id']): Status {
-  if (id === 'harmony') return 'home';
-  const r = id as RegionId;
-  if (!isOpen(app.save, r)) return 'locked';
-  if (isComplete(app.save, r)) return 'complete';
-  return activeRegion(app.save) === r ? 'building' : 'open';
+  if (!isOpen(app.save, id)) return 'locked';
+  if (isComplete(app.save, id)) return 'complete';
+  return activeSanctuary(app.save) === id ? 'building' : 'open';
 }
 
 function statusLine(def: SanctuaryDef): string {
   const st = statusOf(def.id);
   const cleared = app.save.journey.nextLevel - 1;
-  if (st === 'home') return 'Your home garden';
   if (st === 'locked') return `Opens after level ${def.opensAfterLevel} · ${plural(def.opensAfterLevel - cleared, 'level')} to go`;
-  const r = def.id as RegionId;
   if (st === 'complete') return 'Complete · every friend has a home';
-  const next = nextStage(app.save, r)!;
-  return `${st === 'building' ? '' : 'Paused · '}${plural(next.need - next.have, 'puzzle')} to ${next.stage.name.toLowerCase()}`;
+  const coming = arrivalProgress(app.save, def.id);
+  const paused = st === 'building' ? '' : 'Paused · ';
+  if (coming) return `${paused}${animalInfo(coming.next.id).name} comes home in ${plural(coming.left, 'puzzle')}`;
+  const next = nextStage(app.save, def.id);
+  return next ? `${paused}${plural(next.need - next.have, 'puzzle')} to ${next.stage.name.toLowerCase()}` : `${paused}Almost complete`;
 }
 
-/** The friend who stands for a sanctuary on its map pin: the first one welcomed there, if any. */
+/** The friend who stands for a sanctuary on its map pin: the first one home there, if any. */
 function pinFace(def: SanctuaryDef): string {
-  if (def.id === 'harmony') return ICON.home;
   if (statusOf(def.id) === 'locked') return ICON.lock;
-  const c = COMPANIONS.find((x) => x.sanctuary === def.id && app.save.inventory.companions[x.id]);
-  return c ? companionSvg(c.id, 'happy') : ICON.sprout;
+  const first = homeAnimals(app.save, def.id)[0];
+  return first ? animalPortrait(first, 'happy') : def.beginner ? ICON.home : ICON.sprout;
 }
 
 function pinLabel(def: SanctuaryDef): string {
   const st = statusOf(def.id);
-  const pct = def.id === 'harmony' ? '' : `, ${Math.round(progressOf(app.save, def.id as RegionId) * 100)}% grown`;
+  const pct = `, ${Math.round(progressOf(app.save, def.id) * 100)}% grown`;
   return `${def.name}, ${def.place}. ${statusLine(def)}${st === 'locked' ? '' : pct}`;
 }
 
@@ -60,15 +59,15 @@ export const worldScreen: ScreenDef = {
   title: 'World',
   mount(root, scope) {
     const save = app.save;
-    const building = activeRegion(save);
+    const building = activeSanctuary(save);
     const upcoming = nextToOpen(save);
-    const open = openRegions(save);
+    const openCount = SANCTUARIES.filter((d) => isOpen(save, d.id)).length;
     const level = save.journey.nextLevel;
 
     const pins = SANCTUARIES.map((d) => {
       const p = pinPercent(d.lon, d.lat);
       const st = statusOf(d.id);
-      const prog = d.id === 'harmony' ? 1 : progressOf(save, d.id as RegionId);
+      const prog = progressOf(save, d.id);
       return `<button class="world-pin is-${st}" data-go="${d.id}" style="left:${p.left.toFixed(2)}%;top:${p.top.toFixed(2)}%;--accent:${d.accent};--p:${prog.toFixed(3)}" aria-label="${esc(pinLabel(d))}">
         <span class="world-pin__ring" aria-hidden="true"><span class="world-pin__face">${pinFace(d)}</span></span>
         <span class="world-pin__label" aria-hidden="true">${esc(short(d))}</span>
@@ -78,20 +77,30 @@ export const worldScreen: ScreenDef = {
     let focus = '';
     if (building) {
       const def = SANCTUARY_BY_ID[building];
-      const next = nextStage(save, building)!;
-      const pct = Math.round(((next.have - next.from) / (next.need - next.from)) * 100);
+      const coming = arrivalProgress(save, building);
+      const next = nextStage(save, building);
+      const bar = (have: number, from: number, need: number, label: string) =>
+        `<div class="progress world-progress" role="progressbar" aria-label="${esc(label)}" aria-valuemin="${from}" aria-valuemax="${need}" aria-valuenow="${have}"><span style="width:${Math.round(((have - from) / Math.max(1, need - from)) * 100)}%"></span></div>`;
+      const body = coming
+        ? (() => {
+            const a = animalInfo(coming.next.id);
+            return `<div class="coming-home"><span class="coming-home__art portrait is-shy">${animalPortrait(coming.next.id, 'idle')}</span><span class="coming-home__body"><span><b>${esc(a.name)} the ${esc(a.noun)}</b> is on your boards: ${plural(coming.left, 'more puzzle')} to come home.</span>${bar(coming.have, coming.from, coming.need, `${a.name} coming home`)}</span></div>`;
+          })()
+        : next
+          ? `<p class="muted">Next: <b>${esc(next.stage.name)}</b>. ${esc(next.stage.change)}.</p>${bar(next.have, next.from, next.need, `Progress to ${next.stage.name}`)}`
+          : '';
       focus = `<section class="card world-focus" style="--accent:${def.accent}" aria-labelledby="focus-title">
         <p class="world-focus__eyebrow">${ICON.sprout}Building now</p>
         <h2 id="focus-title">${esc(def.name)}</h2>
-        <p class="muted">Stage ${stageOf(save, building)} of 4 · next: <b>${esc(next.stage.name)}</b>. ${esc(next.stage.change)}.</p>
-        <div class="progress world-progress" role="progressbar" aria-label="Progress to ${esc(next.stage.name)}" aria-valuemin="${next.from}" aria-valuemax="${next.need}" aria-valuenow="${next.have}"><span style="width:${pct}%"></span></div>
-        <p class="world-focus__count"><span class="num">${next.have - next.from}</span> of <span class="num">${next.need - next.from}</span> puzzles · every puzzle you solve helps (Paw Cup aside)</p>
+        ${def.stages.length ? `<p class="muted">Stage ${stageOf(save, building)} of ${def.stages.length - 1}</p>` : ''}
+        ${body}
+        <p class="world-focus__count">Every puzzle you solve helps (Paw Cup aside)</p>
         <div class="world-focus__actions">
           <button class="btn" data-act="play">Play level ${level}</button>
           <button class="btn btn--secondary" data-go="${building}">Visit</button>
         </div>
       </section>`;
-    } else if (!open.length && upcoming) {
+    } else if (!openCount && upcoming) {
       const pct = Math.round(((level - 1) / upcoming.def.opensAfterLevel) * 100);
       focus = `<section class="card world-focus" style="--accent:${upcoming.def.accent}" aria-labelledby="focus-title">
         <p class="world-focus__eyebrow">${ICON.pin}Your first journey</p>
@@ -114,19 +123,17 @@ export const worldScreen: ScreenDef = {
 
     const cards = SANCTUARIES.map((d) => {
       const st = statusOf(d.id);
-      const stage = d.id === 'harmony' ? 0 : stageOf(save, d.id as RegionId);
-      const art = d.id === 'harmony' ? sceneMarkup(`wt-${d.id}`) : regionThumb(d.id as RegionId, stage, `wt-${d.id}`);
-      const prog = d.id === 'harmony' ? null : st === 'locked' ? (level - 1) / d.opensAfterLevel : progressOf(save, d.id as RegionId);
-      const friends = COMPANIONS.filter((c) => c.sanctuary === d.id);
-      const have = friends.filter((c) => save.inventory.companions[c.id]).length;
+      const art = isRegionId(d.id) ? regionThumb(d.id, stageOf(save, d.id), `wt-${d.id}`) : sceneMarkup(`wt-${d.id}`);
+      const prog = st === 'locked' ? (level - 1) / Math.max(1, d.opensAfterLevel) : progressOf(save, d.id);
+      const have = homeAnimals(save, d.id).length;
       return `<li><button class="world-card card card--tap is-${st}" data-go="${d.id}" style="--accent:${d.accent}" aria-label="${esc(pinLabel(d))}">
         <span class="world-card__thumb"><svg viewBox="0 40 360 220" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${art}</svg>${st === 'locked' ? `<span class="world-card__lock"><span>${ICON.lock}</span></span>` : ''}</span>
         <span class="world-card__body">
           <span class="world-card__name">${esc(d.name)}</span>
           <span class="world-card__place">${esc(d.place)}</span>
           <span class="world-card__status">${st === 'building' ? `<span class="chip chip--brand">${ICON.sprout}Building</span>` : ''}${esc(statusLine(d))}</span>
-          ${prog === null ? `<span class="world-card__friends">${plural(have, 'wildlife friend')} · and your cats and dogs</span>` : `<span class="progress world-card__bar"><span style="width:${Math.round(Math.min(1, prog) * 100)}%"></span></span>`}
-          ${d.id !== 'harmony' && st !== 'locked' ? `<span class="world-card__friends">${have} of ${friends.length} animals welcomed</span>` : ''}
+          <span class="progress world-card__bar"><span style="width:${Math.round(Math.min(1, prog) * 100)}%"></span></span>
+          ${st !== 'locked' ? `<span class="world-card__friends">${have} of ${d.arrivals.length} animals home</span>` : ''}
         </span>
         ${ICON.chevron}
       </button></li>`;
@@ -145,7 +152,7 @@ export const worldScreen: ScreenDef = {
         </div>
         ${focus}
         <section aria-labelledby="sanct-title">
-          <div class="section-head"><h2 id="sanct-title">Sanctuaries</h2><span class="muted num">${open.length + 1} of ${REGIONS.length + 1} open</span></div>
+          <div class="section-head"><h2 id="sanct-title">Sanctuaries</h2><span class="muted num">${openCount} of ${SANCTUARIES.length} open</span></div>
           <ul class="world-list">${cards}</ul>
         </section>
         <button class="btn btn--secondary btn--block" data-act="album">${ICON.paw}Animal album</button>
@@ -157,8 +164,8 @@ export const worldScreen: ScreenDef = {
       const go = t.closest('[data-go]') as HTMLElement | null;
       if (go) {
         const id = go.dataset.go!;
-        if (id === 'harmony') app.router.go({ screen: 'sanctuary' });
-        else app.router.go({ screen: 'region', id: id as RegionId });
+        if (isRegionId(id)) app.router.go({ screen: 'region', id: id as RegionId });
+        else app.router.go({ screen: 'sanctuary' });
         return;
       }
       const a = t.closest('[data-act]') as HTMLElement | null;

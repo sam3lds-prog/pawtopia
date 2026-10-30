@@ -99,7 +99,10 @@
 }
 .world-pin.is-building .world-pin__ring {
   --size: 38px;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 0 0 5px var(--accent), 0 3px 8px -1px rgba(40, 52, 52, 0.35);
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.9),
+    0 0 0 5px var(--accent),
+    0 3px 8px -1px rgba(40, 52, 52, 0.35);
 }
 .world-pin.is-home .world-pin__face {
   color: var(--brand);
@@ -456,6 +459,36 @@
 }
 .win-growth .progress {
   height: 6px;
+}
+
+/* The next animal on its way (win sheet). */
+.win-next-friend {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  font-size: var(--t-sm);
+  text-align: left;
+}
+.win-next-friend__art {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.win-next-friend__art > svg {
+  width: 100%;
+  height: 100%;
+}
+.win-next-friend .progress {
+  height: 6px;
+}
+.reward-item--arrival .reward-item__art svg {
+  width: 100%;
+  height: 100%;
 }
 
 /* ------------------------------------------------------------------ Animal album */

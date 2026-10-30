@@ -1,19 +1,24 @@
 /**
- * The Harmony Sanctuary: the illustrated garden with every owned decoration and welcomed resident, the resident row,
- * and the decorations you own (show / hide). New residents are introduced here, and after the very first board the
- * player picks one of two free starter gifts.
+ * The Pet Garden on Harmony Isle (D35): the illustrated garden with every owned decoration and every animal who has come
+ * home, its animals in the order they arrive (the bunny, the cats and dogs, two woodland visitors), who is coming home
+ * next, and the decorations you own (show / hide). New arrivals are introduced here, and after the very first board the
+ * player picks one of two free starter gifts (here or on the Farm, whichever they visit first).
  */
 
 import { app } from '../../app/app';
 import { startGame } from '../../app/gameFlow';
 import { DECOR, DECOR_BY_ID, STARTER_DECOR, decorHome, decorOf, type DecorId } from '../../meta/catalogs/decor';
-import { PET_BY_ID, PETS, type PetId } from '../../meta/catalogs/pets';
+import type { PetId } from '../../meta/catalogs/pets';
 import { chooseStarter, isShown, owns, sanctuaryChat, setShown, shownDecorIds } from '../../meta/sanctuary';
 import { bindFriendPanel, friendPanelMarkup, type FeedEvents } from '../components/feedPanel';
 import { unlockedCompanions, unlockedPets } from '../../meta/rewards';
-import { COMPANIONS, COMPANION_BY_ID, type CompanionId } from '../../meta/catalogs/companions';
-import { SANCTUARY_BY_ID } from '../../meta/catalogs/sanctuaries';
+import { COMPANION_BY_ID, type CompanionId } from '../../meta/catalogs/companions';
+import { SANCTUARY_BY_ID, type SanctuaryId } from '../../meta/catalogs/sanctuaries';
 import { companionSvg } from '../art/companions';
+import { animalInfo, animalsOf, isHome, nextArrivalIn, type AnimalId } from '../../meta/animals';
+import { activeSanctuary, arrivalLine, arrivalProgress, setActive } from '../../meta/world';
+import { isPetId } from '../../meta/catalogs/pets';
+import { animalPortrait } from '../art/animals';
 import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
 import { animalName, startSceneActivities, type ActivityRunner } from '../components/activities';
 import { mountTrickTray } from '../components/tricks';
@@ -30,8 +35,6 @@ import { actionOf, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { Route, Scope, ScreenDef } from '../router';
 import { coinPill } from './home';
-
-const HARMONY_FRIENDS = COMPANIONS.filter((c) => c.sanctuary === 'harmony');
 
 export function shownDecor(): DecorId[] {
   return shownDecorIds(app.save);
@@ -120,13 +123,15 @@ export const sanctuaryScreen: ScreenDef = {
     function render(): void {
       const save = app.save;
       const pets = unlockedPets(save);
-      const friends = unlockedCompanions(save);
       const ownedDecor = DECOR.filter((d) => decorHome(d) === 'harmony' && owns(save, d.id));
       const chat = sanctuaryChat(save);
+      const animals = animalsOf('harmony');
+      const home = animals.filter((a) => isHome(save, a));
+      const nextId = nextArrivalIn(save, 'harmony')?.id;
       el.innerHTML = `
         <header class="screen-head">
           <button class="icon-btn" data-act="back" aria-label="Back to Home">${ICON.back}</button>
-          <h1 data-autofocus>Sanctuary</h1>
+          <h1 data-autofocus>Pet Garden</h1>
           <div class="screen-head__end">${coinPill()}</div>
         </header>
         <figure class="sanctuary__scene card is-live">
@@ -136,28 +141,21 @@ export const sanctuaryScreen: ScreenDef = {
           <p class="sanctuary__chat" data-chat ${chat ? '' : 'hidden'}>${ICON.heart}<span>${esc(chat ?? '')}</span></p>
           <button class="scene-tricks" data-act="tricks" aria-controls="${trayHost.id}" aria-expanded="${tray.isOpen}" hidden>${trickBadge('sparkle')}Tricks</button>
         </div>
+        ${gardenProgress()}
         <section aria-labelledby="res-title">
-          <div class="section-head"><h2 id="res-title">Residents</h2><span class="muted num">${pets.length} of ${PETS.length}</span></div>
-          <ul class="resident-row">
-            ${PETS.map((p) => {
-              const has = pets.includes(p.id);
-              return `<li><button class="resident" data-pet="${p.id}" aria-label="${esc(has ? `${p.name}, ${p.trait}` : `${p.name}, arrives at level ${p.unlockLevel}`)}">
-                ${portrait(p.id, 'idle', !has)}
-                <span class="resident__name">${has ? esc(p.name) : `Lv ${p.unlockLevel}`}</span>
-              </button></li>`;
-            }).join('')}
-          </ul>
-        </section>
-        <section aria-labelledby="friends-title">
-          <div class="section-head"><h2 id="friends-title">Wildlife friends</h2><span class="muted num">${friends.filter((f) => COMPANION_BY_ID[f].sanctuary === 'harmony').length} of ${HARMONY_FRIENDS.length}</span></div>
+          <div class="section-head"><h2 id="res-title">Animals</h2><span class="muted num">${home.length} of ${animals.length}</span></div>
           <ul class="resident-row resident-row--friends">
-            ${HARMONY_FRIENDS.map((c) => {
-              const has = friends.includes(c.id);
-              return `<li><button class="resident" data-friend-card="${c.id}" aria-label="${esc(has ? `${c.name} the ${c.kind.toLowerCase()}, ${c.trait}` : `A ${c.kind.toLowerCase()}, arrives at level ${c.unlockLevel}`)}">
-                ${friendPortrait(c.id, !has)}
-                <span class="resident__name">${has ? esc(c.name) : `Lv ${c.unlockLevel}`}</span>
-              </button></li>`;
-            }).join('')}
+            ${animals
+              .map((id) => {
+                const a = animalInfo(id);
+                const has = home.includes(id);
+                const isNext = !has && id === nextId;
+                const attr = isPetId(id) ? `data-pet="${id}"` : `data-friend-card="${id}"`;
+                const label = has ? `${a.name} the ${a.noun}, ${a.trait}` : isNext ? `${a.name} the ${a.noun}, coming home next` : `A ${a.noun}, arrives later`;
+                const art = isPetId(id) ? portrait(id, 'idle', !has && !isNext) : friendPortrait(id as CompanionId, !has && !isNext);
+                return `<li><button class="resident ${isNext ? 'is-next' : ''}" ${attr} aria-label="${esc(label)}">${art}<span class="resident__name">${has || isNext ? esc(a.name) : 'Later'}</span></button></li>`;
+              })
+              .join('')}
           </ul>
         </section>
         <section aria-labelledby="decor-title">
@@ -178,6 +176,31 @@ export const sanctuaryScreen: ScreenDef = {
           <button class="btn btn--secondary btn--block" data-act="shop">${ICON.bag}Find decorations in the Shop</button>
         </section>`;
       wireLife();
+    }
+
+    /** Who is coming home next, and building here. */
+    function gardenProgress(): string {
+      const save = app.save;
+      const coming = arrivalProgress(save, 'harmony');
+      if (!coming) return '';
+      const a = animalInfo(coming.next.id);
+      const building = activeSanctuary(save) === 'harmony';
+      const span = Math.max(1, coming.need - coming.from);
+      const pct = Math.round(((coming.have - coming.from) / span) * 100);
+      return `<section class="card region-progress" aria-labelledby="gp-title">
+        <div class="region-progress__head"><h2 id="gp-title">Coming home</h2>${building ? `<span class="chip chip--brand">${ICON.sprout}Building now</span>` : ''}</div>
+        <div class="coming-home">
+          <span class="coming-home__art portrait is-shy">${animalPortrait(coming.next.id, 'idle')}</span>
+          <span class="coming-home__body"><span><b>${esc(a.name)} the ${esc(a.noun)}</b> is on the way${building ? ' and is on your boards' : ''}.</span>
+            <span class="progress world-progress" role="progressbar" aria-label="${esc(a.name)} coming home" aria-valuemin="${coming.from}" aria-valuemax="${coming.need}" aria-valuenow="${coming.have}"><span style="width:${pct}%"></span></span>
+            <small class="num">${plural(coming.left, 'more puzzle')}${building ? '' : ' while you build here'}</small></span>
+        </div>
+        ${
+          building
+            ? `<button class="btn btn--block" data-act="play">Play level ${save.journey.nextLevel}</button><p class="muted region-progress__note">Journey, Daily and Zen puzzles all count.</p>`
+            : `<button class="btn btn--block" data-act="build">${ICON.sprout}Build here</button><p class="muted region-progress__note">You build one sanctuary at a time. Progress elsewhere is kept.</p>`
+        }
+      </section>`;
     }
     render();
 
@@ -237,30 +260,35 @@ export const sanctuaryScreen: ScreenDef = {
       if (!a) return;
       if (a.act === 'back') app.router.go({ screen: 'home' });
       else if (a.act === 'shop') app.router.go({ screen: 'shop', sanctuary: 'harmony' });
+      else if (a.act === 'play') startGame({ kind: 'level', level: app.save.journey.nextLevel });
+      else if (a.act === 'build' && setActive(app.save, 'harmony')) {
+        app.persist();
+        sfx('coin');
+        track('region_build', { region: 'harmony' });
+        toast('Now building the Pet Garden. Your boards will show who is coming home here.');
+        render();
+      }
     });
 
-    // First visit after the first board: meet the residents, then pick a starter gift.
-    const intro = () => {
-      if (app.save.onboarding.tutorialDone && !app.save.onboarding.starterDecorChosen) offerStarter(scope, render);
-    };
-    if (welcome.length) introduce(scope, welcome, intro);
+    // First visit after the first board: meet the newcomer, then pick a starter gift.
+    const intro = () => offerStarterGift(scope, 'harmony', render);
+    const arrivals = welcome.filter((w) => isHome(app.save, w));
+    if (arrivals.length) introduce(scope, arrivals, intro);
     else intro();
   },
 };
 
 function sceneLabel(pets: PetId[], decorCount: number): string {
-  const names = pets.map((p) => PET_BY_ID[p].name);
-  const who = names.length ? `${names.join(', ')} ${names.length === 1 ? 'lives' : 'live'} here` : 'No residents yet';
-  return `The Harmony Sanctuary garden. ${who}. ${plural(decorCount, 'decoration')}.`;
+  const here = animalsOf('harmony').filter((a) => isHome(app.save, a));
+  void pets;
+  const names = here.map((p) => animalInfo(p).name);
+  const who = names.length ? `${names.join(', ')} ${names.length === 1 ? 'lives' : 'live'} here` : 'Nobody lives here yet';
+  return `The Pet Garden. ${who}. ${plural(decorCount, 'decoration')}.`;
 }
 
-/** When a friend who hasn't arrived yet will come. */
-export function arrivalText(id: CompanionId): string {
-  const c = COMPANION_BY_ID[id];
-  if (c.unlockLevel !== undefined) return `Arrives when you first clear level ${c.unlockLevel}.`;
-  const def = SANCTUARY_BY_ID[c.sanctuary];
-  const st = def.stages[c.stage ?? 1];
-  return `Arrives when the ${def.name} reaches stage ${c.stage}: ${st ? st.name.toLowerCase() : 'its next stage'}. Solve puzzles while you build it.`;
+/** When an animal who hasn't arrived yet will come. */
+export function arrivalText(id: AnimalId): string {
+  return arrivalLine(app.save, id);
 }
 
 /** A wildlife friend's card, with the once-a-day pat and feeding. */
@@ -273,13 +301,13 @@ export function showFriendSheet(scope: Scope, id: CompanionId, ev: FeedEvents = 
     onClose: ev.onClose,
     body: `
       <div class="pet-sheet__hero">${friendPortrait(id, !owned)}</div>
-      <p class="pet-sheet__trait">${esc(owned ? c.trait : c.sanctuary === 'harmony' ? 'Someone is watching the garden from the hedge.' : `Someone is waiting for a home in the ${SANCTUARY_BY_ID[c.sanctuary].place}.`)}</p>
+      <p class="pet-sheet__trait">${esc(owned ? c.trait : c.sanctuary === 'harmony' ? 'Someone is watching the garden from the hedge.' : `Someone is waiting for a home at the ${SANCTUARY_BY_ID[c.sanctuary].short}.`)}</p>
       <p class="sheet__lead">${esc(owned ? c.bio : arrivalText(id))}</p>
       ${
         owned
           ? `<dl class="pet-sheet__facts">
               <div><dt>Lives</dt><dd>${esc(habitatLabel(id))}</dd></div>
-              <div><dt>Kind</dt><dd>${esc(c.kind)} · Wildlife friend</dd></div>
+              <div><dt>Kind</dt><dd>${esc(c.kind)}</dd></div>
             </dl>
             ${friendPanelMarkup(id, c.name)}
             <p class="muted">Pats and food are just for fun. They make friends happy and change nothing in your puzzles.</p>`
@@ -291,14 +319,16 @@ export function showFriendSheet(scope: Scope, id: CompanionId, ev: FeedEvents = 
 
 function habitatLabel(id: CompanionId): string {
   const c = COMPANION_BY_ID[id];
-  if (c.sanctuary !== 'harmony') return `${SANCTUARY_BY_ID[c.sanctuary].name}, ${SANCTUARY_BY_ID[c.sanctuary].place}`;
+  if (c.sanctuary !== 'harmony') return `${SANCTUARY_BY_ID[c.sanctuary].name}, ${SANCTUARY_BY_ID[c.sanctuary].place.replace(/ · beginner$/, '')}`;
+  if (c.habitat === 'ground') return 'In a burrow under the garden hedge';
   return c.habitat === 'woodland' ? 'By the woodland log' : 'In the blossom tree (when it is out)';
 }
 
-/** "New residents" sheet. */
-export function introduce(scope: Scope, pets: PetId[], then?: () => void): void {
+/** "Came home" sheet for new arrivals. */
+export function introduce(scope: Scope, pets: AnimalId[], then?: () => void): void {
+  const first = animalInfo(pets[0]);
   const sh = openSheet(scope, {
-    title: pets.length > 1 ? 'New residents!' : `${PET_BY_ID[pets[0]].name} moved in!`,
+    title: pets.length > 1 ? 'New friends came home!' : `${first.name} came home!`,
     center: true,
     className: 'intro-sheet',
     onClose: () => then?.(),
@@ -306,12 +336,12 @@ export function introduce(scope: Scope, pets: PetId[], then?: () => void): void 
       <div class="intro-pets">
         ${pets
           .map((id) => {
-            const p = PET_BY_ID[id];
-            return `<div class="intro-pet">${portrait(id, 'happy')}<b>${esc(p.name)}</b><span class="muted">${esc(p.trait)}</span></div>`;
+            const p = animalInfo(id);
+            return `<div class="intro-pet">${isPetId(id) ? portrait(id, 'happy') : friendPortrait(id as CompanionId)}<b>${esc(p.name)}</b><span class="muted">${esc(p.trait)}</span></div>`;
           })
           .join('')}
       </div>
-      <p class="sheet__lead">${pets.length > 1 ? 'They found a home in your sanctuary.' : esc(PET_BY_ID[pets[0]].bio)}</p>
+      <p class="sheet__lead">${pets.length > 1 ? 'They found a home here.' : esc(first.bio)}</p>
       <div class="sheet__actions"><button class="btn btn--block" data-act="ok">Welcome home</button></div>`,
   });
   sh.scope.on(sh.el, 'click', (e) => {
@@ -319,23 +349,31 @@ export function introduce(scope: Scope, pets: PetId[], then?: () => void): void 
   });
 }
 
-/** One of two free starter decorations, once. */
-function offerStarter(scope: Scope, rerender: () => void): void {
+/**
+ * One of two free starter decorations, once, after the first board: offered by whichever beginner sanctuary the player
+ * visits first (the Farm's or the Pet Garden's own pair).
+ */
+export function offerStarterGift(scope: Scope, where: SanctuaryId, rerender: () => void): void {
+  if (!app.save.onboarding.tutorialDone || app.save.onboarding.starterDecorChosen) return;
+  const choices = STARTER_DECOR.filter((id) => decorHome(DECOR_BY_ID[id]) === where);
+  if (choices.length < 2) return;
   const sh = openSheet(scope, {
     title: 'Pick a welcome gift',
     center: true,
     dismissible: false,
     className: 'starter-sheet',
     body: `
-      <p class="sheet__lead">Choose one for the garden. The other stays in the Shop for later.</p>
+      <p class="sheet__lead">Choose one for the ${esc(SANCTUARY_BY_ID[where].short)}. The other stays in the Shop for later.</p>
       <div class="starter-choices">
-        ${STARTER_DECOR.map((id) => {
-          const d = DECOR_BY_ID[id];
-          return `<button class="starter-choice card card--tap" data-choose="${id}">
+        ${choices
+          .map((id) => {
+            const d = DECOR_BY_ID[id];
+            return `<button class="starter-choice card card--tap" data-choose="${id}">
             <span class="starter-choice__art">${decorIcon(id)}</span>
             <b>${esc(d.name)}</b><span class="muted">${esc(d.blurb)}</span>
           </button>`;
-        }).join('')}
+          })
+          .join('')}
       </div>`,
   });
   sh.scope.on(sh.el, 'click', (e) => {
@@ -349,7 +387,7 @@ function offerStarter(scope: Scope, rerender: () => void): void {
       track('onboarding_step', { step: 'starter_gift', item: id });
       sh.close();
       rerender();
-      toast(`${DECOR_BY_ID[id].name} is in the garden.`);
+      toast(`${DECOR_BY_ID[id].name} is in the ${SANCTUARY_BY_ID[where].short}.`);
       offerNext(scope);
     }
   });
@@ -359,8 +397,8 @@ function offerNext(scope: Scope): void {
   const next = app.save.journey.nextLevel;
   const sh = openSheet(scope, {
     title: 'Ready for the next puzzle?',
-    body: `<p class="sheet__lead">More neighbors are on their way. Each new resident arrives as you solve the Journey.</p>
-      <div class="sheet__actions"><button class="btn btn--block" data-act="play">Play level ${next}</button><button class="btn btn--quiet" data-act="stay">Stay in the garden</button></div>`,
+    body: `<p class="sheet__lead">More friends are on their way. Each one comes home as you solve puzzles while you build here, and the next one is already on your boards.</p>
+      <div class="sheet__actions"><button class="btn btn--block" data-act="play">Play level ${next}</button><button class="btn btn--quiet" data-act="stay">Stay a while</button></div>`,
   });
   sh.scope.on(sh.el, 'click', (e) => {
     const a = actionOf(e);

@@ -29,6 +29,7 @@ export type AnalyticsEvent =
   | 'food_bought'
   | 'animal_fed'
   | 'companion_unlocked'
+  | 'animal_arrived'
   | 'region_open'
   | 'region_build'
   | 'region_stage'

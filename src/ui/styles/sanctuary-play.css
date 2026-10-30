@@ -38,6 +38,73 @@
   transform-origin: 50% 100%;
 }
 
+/* ------------------------------------------------------------------ Tire swing: four swings back and forth */
+.sanctuary__scene.is-live [data-decor].is-act-tireswing .sp-swing {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  animation: sp-act-tireswing 5600ms ease-in-out;
+}
+@keyframes sp-act-tireswing {
+  0%,
+  100% {
+    transform: none;
+  }
+  12.5%,
+  62.5% {
+    transform: rotate(13deg);
+  }
+  37.5%,
+  87.5% {
+    transform: rotate(-12deg);
+  }
+}
+
+/* ------------------------------------------------------------------ Tractor: a slow lap of the field */
+.sanctuary__scene.is-live [data-decor].is-act-tractor .sp-tractor {
+  animation: sp-act-tractor 6200ms ease-in-out;
+}
+@keyframes sp-act-tractor {
+  0%,
+  100% {
+    transform: none;
+  }
+  10% {
+    transform: translate(0, -1px);
+  }
+  40% {
+    transform: translate(-70px, 1px);
+  }
+  48% {
+    transform: translate(-74px, -1px);
+  }
+  80% {
+    transform: translate(26px, 0);
+  }
+  90% {
+    transform: translate(8px, -1px);
+  }
+}
+.sanctuary__scene.is-live .sp-act.is-act-tractor .sp-act-puffs {
+  animation: sp-act-puff 1550ms ease-out 4;
+}
+@keyframes sp-act-puff {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  30% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(6px, -10px) scale(1.3);
+  }
+}
+.sanctuary__scene .sp-act-puffs {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
 /* ------------------------------------------------------------------ Hot-air balloon: a ride across the sky */
 .sanctuary__scene.is-live [data-decor].is-act-balloon .sp-balloon {
   animation: sp-act-balloon 6200ms ease-in-out;

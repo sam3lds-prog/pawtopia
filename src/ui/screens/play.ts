@@ -6,10 +6,9 @@ import { hasMeaningfulProgress } from '../../game/sessionPersistence';
 import { localDateKey } from '../../engine/levels';
 import { displayDifficulty } from '../../game/grading';
 import { puzzleFor, sizeFor } from '../../game/puzzles';
-import { dailyFor, playsSolo } from '../../game/modes';
+import { FIRST_PAIR_LEVEL, dailyFor, playsSolo } from '../../game/modes';
 import { MAX_NEW_BOARD_SIZE } from '../../game/specs';
 import { chapterAt, chapterOf, visibleChapters, type Chapter } from '../../meta/chapters';
-import { arrivalLevels } from '../../meta/rewards';
 import { toast } from '../components/sheet';
 import { actionOf, capitalize, esc, h } from '../dom';
 import { ICON } from '../icons';
@@ -22,14 +21,12 @@ const ZEN_SIZES = Array.from({ length: MAX_NEW_BOARD_SIZE - 4 }, (_, i) => i + 5
 const XS = [50, 70, 78, 66, 46, 28, 22, 34];
 const ROW = 84;
 
-/** Levels that award something on first clear (shown on the path). */
+/** Levels that mark something on the path: chapter gifts, and the level where boards get a second animal (D35). */
 export function milestoneOf(level: number): 'pet' | 'chapter' | null {
   if (level % 20 === 0) return 'chapter';
-  // Only levels where someone really arrives (residents and sanctuary companions), not every fifth level.
-  if (ARRIVALS.has(level)) return 'pet';
+  if (level === FIRST_PAIR_LEVEL) return 'pet';
   return null;
 }
-const ARRIVALS = arrivalLevels();
 
 function pathMarkup(ch: Chapter): string {
   const save = app.save;
@@ -76,7 +73,7 @@ function pathMarkup(ch: Chapter): string {
           </button>
           ${state === 'done' ? `<span class="node__stars" aria-hidden="true">${[1, 2, 3].map((s) => (s <= stars ? ICON.star : ICON.starOff)).join('')}</span>` : ''}
           ${state === 'current' ? `<span class="node__tag">${size}×${size}${tier ? ` · ${tier}` : ''}</span>` : ''}
-          ${ms ? `<span class="node__ms node__ms--${ms}" title="${ms === 'pet' ? 'Someone new arrives' : 'Chapter reward'}" aria-hidden="true">${ms === 'pet' ? ICON.paw : ICON.gift}</span>` : ''}
+          ${ms ? `<span class="node__ms node__ms--${ms}" title="${ms === 'pet' ? 'A second animal joins the boards' : 'Chapter reward'}" aria-hidden="true">${ms === 'pet' ? ICON.paw : ICON.gift}</span>` : ''}
         </li>`;
     })
     .join('');
@@ -99,7 +96,7 @@ export const playScreen: ScreenDef = {
     let current = route.screen === 'play' && route.chapter !== undefined ? route.chapter : chapterOf(next).index;
     const dailyKey = localDateKey();
     const dailyMode = dailyFor(dailyKey, next);
-    const daily = { dateKey: dailyKey, size: sizeFor(dailyMode) };
+    const daily = { dateKey: dailyKey, size: sizeFor(dailyMode), solo: dailyMode.kind === 'daily' && dailyMode.rule === 'solo' };
     const dailyDone = !!save.daily.done[daily.dateKey];
     // The level you're on, with the board it will really open (a saved board keeps its own spec).
     const curMode = { kind: 'level' as const, level: next };
@@ -124,7 +121,7 @@ export const playScreen: ScreenDef = {
           <button class="card card--tap mini-card ${dailyDone ? 'is-done' : ''}" data-act="daily">
             <span class="card__icon card__icon--coral">${dailyDone ? ICON.check : ICON.calendar}</span>
             <span class="card__title">Daily</span>
-            <span class="card__sub">${dailyDone ? 'Done today' : `${daily.size}×${daily.size} for everyone`}</span>
+            <span class="card__sub">${dailyDone ? 'Done today' : daily.solo ? `One animal · ${daily.size}×${daily.size}` : `${daily.size}×${daily.size} for everyone`}</span>
           </button>
           <div class="card mini-card zen-card">
             <span class="card__icon">${ICON.leaf}</span>

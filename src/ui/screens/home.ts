@@ -13,7 +13,6 @@ import { DECOR_BY_ID } from '../../meta/catalogs/decor';
 import { claimMissionDetailed, missionStates, type MissionDef } from '../../meta/missions';
 import { CASUAL_HEARTS, dailyFor } from '../../game/modes';
 import { itemBalance } from '../../meta/items';
-import { nextPetMilestone } from '../../meta/rewards';
 import { addDaysKey, localWeekStart } from '../../game/dates';
 import { sfx } from '../../services/audio';
 import { track } from '../../services/analytics';
@@ -23,8 +22,13 @@ import { actionOf, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { ScreenDef } from '../router';
 import { showSettings } from './settings';
-import { SANCTUARY_BY_ID, type RegionId } from '../../meta/catalogs/sanctuaries';
-import { activeRegion, nextStage, nextToOpen } from '../../meta/world';
+import { SANCTUARY_BY_ID, isRegionId, type RegionId, type SanctuaryId } from '../../meta/catalogs/sanctuaries';
+import { activeSanctuary, arrivalProgress, nextStage, nextToOpen, stageOf } from '../../meta/world';
+import { animalInfo, homeAnimals } from '../../meta/animals';
+import type { CompanionId } from '../../meta/catalogs/companions';
+import { regionScene } from '../art/regions';
+import { shownDecorIds } from '../../meta/sanctuary';
+import { isEvening } from './sanctuary';
 
 const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -49,20 +53,40 @@ function weekStrip(): string {
   return `<ol class="week-strip" aria-label="This week's daily puzzles">${days.join('')}</ol>`;
 }
 
-/** The sanctuary being built on the world map, and how close its next stage is (or when the first one opens). */
+/** The picture of a sanctuary as it is now (the Pet Garden's garden, or the Farm's or a region's land). */
+export function sanctuaryPicture(id: SanctuaryId, svgId: string): string {
+  if (!isRegionId(id)) return sceneMarkup(svgId);
+  const save = app.save;
+  return regionScene(
+    id,
+    { stage: stageOf(save, id), companions: homeAnimals(save, id) as CompanionId[], decor: shownDecorIds(save, id), evening: isEvening() },
+    svgId,
+  );
+}
+
+/** The sanctuary being built, who is coming home next and how close (or how close its next stage is). */
 function worldStrip(): string {
   const save = app.save;
-  const id = activeRegion(save);
+  const id = activeSanctuary(save);
   if (id) {
     const def = SANCTUARY_BY_ID[id];
-    const next = nextStage(save, id)!;
-    const pct = Math.round(((next.have - next.from) / (next.need - next.from)) * 100);
-    const left = next.need - next.have;
+    const coming = arrivalProgress(save, id);
+    const next = nextStage(save, id);
+    let sub = '';
+    let pct = 0;
+    if (coming) {
+      const a = animalInfo(coming.next.id);
+      sub = `${a.name} the ${a.noun}: ${plural(coming.left, 'more puzzle')} to come home`;
+      pct = Math.round(((coming.have - coming.from) / Math.max(1, coming.need - coming.from)) * 100);
+    } else if (next) {
+      sub = `${plural(next.need - next.have, 'more puzzle')} to ${next.stage.name.toLowerCase()}`;
+      pct = Math.round(((next.have - next.from) / Math.max(1, next.need - next.from)) * 100);
+    }
     return `<button class="card card--tap world-strip" data-act="region" data-region="${id}" style="--accent:${def.accent}">
       <span class="card__icon world-strip__icon">${ICON.globe}</span>
       <span class="card__body">
-        <span class="card__title">${esc(def.name)}</span>
-        <span class="card__sub">${left === 1 ? 'One more puzzle' : `${left} more puzzles`} to ${esc(next.stage.name.toLowerCase())}</span>
+        <span class="card__title">Building the ${esc(def.short)}</span>
+        <span class="card__sub">${esc(sub)}</span>
         <span class="progress world-strip__bar" aria-hidden="true"><span style="width:${pct}%"></span></span>
       </span>
       ${ICON.chevron}
@@ -80,6 +104,12 @@ function worldStrip(): string {
   </button>`;
 }
 
+/** "Truffle is on this board: 3 more puzzles to bring her home." */
+function comingLine(id: Parameters<typeof animalInfo>[0], left: number): string {
+  const a = animalInfo(id);
+  return left === 1 ? `Solve this one to bring ${a.name} the ${a.noun} home` : `${a.name} the ${a.noun} is on your boards: ${left} more puzzles to come home`;
+}
+
 export const homeScreen: ScreenDef = {
   tab: 'home',
   title: 'Pawtopia',
@@ -94,7 +124,9 @@ export const homeScreen: ScreenDef = {
     const dailyDone = !!save.daily.done[daily.dateKey];
     const streak = liveStreak(save, localDateKey());
     const weekday = WEEKDAY[new Date().getDay()];
-    const nextPet = nextPetMilestone(save);
+    const building = activeSanctuary(save);
+    const coming = building ? arrivalProgress(save, building) : null;
+    const where: SanctuaryId = building ?? 'harmony';
 
     const continueTitle = resumeMode
       ? `Resume ${modeTitle(resumeMode)
@@ -117,9 +149,9 @@ export const homeScreen: ScreenDef = {
           </div>
         </header>
 
-        <button class="scene-card" data-act="sanctuary" aria-label="Visit the Harmony Sanctuary">
-          <svg class="scene-card__art" viewBox="0 52 360 216" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${sceneMarkup('home')}</svg>
-          <span class="scene-card__label">Harmony Sanctuary</span>
+        <button class="scene-card" data-act="region" data-region="${where}" aria-label="Visit the ${esc(SANCTUARY_BY_ID[where].name)}">
+          <svg class="scene-card__art" viewBox="0 52 360 216" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${sanctuaryPicture(where, 'home')}</svg>
+          <span class="scene-card__label">${esc(SANCTUARY_BY_ID[where].name)}</span>
         </button>
 
         <section class="continue card" aria-labelledby="continue-title">
@@ -127,7 +159,7 @@ export const homeScreen: ScreenDef = {
             <p class="continue__eyebrow">${resumeMode ? 'Board in progress' : esc(`Chapter ${chapter.index + 1}: ${chapter.name}`)}</p>
             <h2 id="continue-title">${esc(resumeMode ? modeTitle(resumeMode) : `Level ${level}`)}</h2>
             <p class="muted" data-board-desc>${thumbSize}×${thumbSize} board${resumeMode ? ', saved where you left it' : ''}</p>
-            ${nextPet && !resumeMode ? `<p class="continue__next">${ICON.paw}${nextPet.level === level ? 'A new resident arrives when you solve this one' : `Next resident at level ${nextPet.level}`}</p>` : ''}
+            ${coming && !resumeMode ? `<p class="continue__next">${ICON.paw}${esc(comingLine(coming.next.id, coming.left))}</p>` : ''}
           </div>
           <div class="continue__thumb" data-thumb style="--n:${thumbSize}"></div>
           <button class="btn btn--block continue__go" data-act="continue">${esc(continueTitle)}</button>
@@ -141,7 +173,7 @@ export const homeScreen: ScreenDef = {
           <span class="card__icon card__icon--coral">${dailyDone ? ICON.check : ICON.calendar}</span>
           <span class="card__body">
             <span class="card__title">Daily Cozy Puzzle</span>
-            <span class="card__sub">${dailyDone ? `Done for today. Back tomorrow for a new board.` : `${weekday}'s ${daily.size}×${daily.size}, the same board for everyone`}</span>
+            <span class="card__sub">${dailyDone ? `Done for today. Back tomorrow for a new board.` : daily.solo ? `${weekday}'s one-animal ${daily.size}×${daily.size}, the same for everyone on one animal` : `${weekday}'s ${daily.size}×${daily.size}, the same board for everyone`}</span>
           </span>
           ${streak > 0 ? `<span class="daily-card__streak" aria-label="${plural(streak, 'day')} streak">${ICON.flame}<b class="num">${streak}</b></span>` : ''}
         </button>
@@ -236,7 +268,6 @@ export const homeScreen: ScreenDef = {
         body: `<p class="sheet__lead">Cats vs Dogs has grown into Pawtopia. Every level you solved is still solved, and it earned you a head start:</p>
           <div class="win-rewards">
             ${gift.coins ? `<div class="reward-coins"><span class="reward-coins__amt">${ICON.coin}<b class="num">+${gift.coins}</b></span><span class="muted">Paw Coins for ${plural(Object.keys(app.save.journey.clears).length, 'solved level')}</span></div>` : ''}
-            ${gift.pets.length ? `<p><b>${gift.pets.length} residents</b> moved into your sanctuary.</p>` : ''}
             ${gift.decor.length ? `<p>Chapter gifts: ${esc(gift.decor.map((d) => DECOR_BY_ID[d].name).join(', '))}.</p>` : ''}
           </div>
           <div class="sheet__actions"><button class="btn btn--block" data-act="see">See the sanctuary</button><button class="btn btn--quiet" data-act="later">Later</button></div>`,
@@ -245,7 +276,7 @@ export const homeScreen: ScreenDef = {
         const a = actionOf(e);
         if (!a) return;
         gs.close();
-        if (a.act === 'see') app.router.go({ screen: 'sanctuary', welcome: gift.pets });
+        if (a.act === 'see') app.router.go({ screen: 'sanctuary' });
       });
     }
 
@@ -303,7 +334,9 @@ export const homeScreen: ScreenDef = {
           break;
         case 'region': {
           const r = (e.target as HTMLElement).closest('[data-region]') as HTMLElement | null;
-          if (r) app.router.go({ screen: 'region', id: r.dataset.region as RegionId });
+          const id = r?.dataset.region;
+          if (id && isRegionId(id)) app.router.go({ screen: 'region', id: id as RegionId });
+          else if (id) app.router.go({ screen: 'sanctuary' });
           break;
         }
         case 'world':

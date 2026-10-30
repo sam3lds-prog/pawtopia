@@ -9,23 +9,24 @@
 
 import type { ToySpec } from './species';
 
-export type Expr =
-  | 'idle'
-  | 'happy'
-  | 'blink'
-  | 'sleepy'
-  | 'lookL'
-  | 'lookR'
-  | 'surprised'
-  | 'love'
-  | 'stars'
-  | 'laugh'
-  | 'shy'
-  | 'proud'
-  | 'yawn'
-  | 'focused';
+export type Expr = 'idle' | 'happy' | 'blink' | 'sleepy' | 'lookL' | 'lookR' | 'surprised' | 'love' | 'stars' | 'laugh' | 'shy' | 'proud' | 'yawn' | 'focused';
 
-export const EXPRESSIONS: readonly Expr[] = ['idle', 'happy', 'blink', 'sleepy', 'lookL', 'lookR', 'surprised', 'love', 'stars', 'laugh', 'shy', 'proud', 'yawn', 'focused'];
+export const EXPRESSIONS: readonly Expr[] = [
+  'idle',
+  'happy',
+  'blink',
+  'sleepy',
+  'lookL',
+  'lookR',
+  'surprised',
+  'love',
+  'stars',
+  'laugh',
+  'shy',
+  'proud',
+  'yawn',
+  'focused',
+];
 
 /** The part of the head the eye shell covers. */
 export const HEAD_SHELL = { phiLen: 2.1, thetaStart: 0.32, thetaLen: 1.9 } as const;
@@ -66,7 +67,7 @@ interface Mapper {
 
 function mapper(shell: { phiLen: number; thetaStart: number; thetaLen: number }, px: number, aspect: number): Mapper {
   // A wide head stretches the painting sideways; paint narrower to keep circles round.
-  const kx = (px / shell.phiLen) / aspect;
+  const kx = px / shell.phiLen / aspect;
   const ky = px / shell.thetaLen;
   return { x: (phi) => px / 2 + phi * (px / shell.phiLen), y: (theta) => (theta - shell.thetaStart) * ky, kx, ky };
 }
@@ -222,12 +223,13 @@ export function paintEyes(canvas: HTMLCanvasElement, s: ToySpec, e: Expr): boole
 
 function openEye(c: CanvasRenderingContext2D, s: ToySpec, x: number, y: number, rx: number, ry: number, dx: number, dy: number): void {
   if (s.eyes.style === 'owl' || s.eyes.style === 'side' || s.eyes.style === 'iris') {
-    const ring = s.eyes.style === 'owl' ? INK : s.eyes.style === 'side' ? s.eyes.iris ?? '#6CC3E8' : INK;
+    const ring = s.eyes.style === 'owl' ? INK : s.eyes.style === 'side' ? (s.eyes.iris ?? '#6CC3E8') : INK;
     const iris = s.eyes.iris ?? '#F2C230';
     const r = Math.min(rx, ry);
     ellipse(c, x, y, r * 1.12, r * 1.12, ring);
     ellipse(c, x, y, r, r, s.eyes.style === 'side' ? INK : iris);
-    if (s.eyes.style !== 'side') ellipse(c, x + dx * 0.6, y + dy * 0.6, r * (s.eyes.style === 'iris' ? 0.32 : 0.5), r * (s.eyes.style === 'iris' ? 0.78 : 0.5), INK);
+    if (s.eyes.style !== 'side')
+      ellipse(c, x + dx * 0.6, y + dy * 0.6, r * (s.eyes.style === 'iris' ? 0.32 : 0.5), r * (s.eyes.style === 'iris' ? 0.78 : 0.5), INK);
     ellipse(c, x + r * 0.32 + dx * 0.4, y - r * 0.38, r * 0.24, r * 0.24, '#fff');
     return;
   }
@@ -241,10 +243,11 @@ function markings(c: CanvasRenderingContext2D, s: ToySpec, m: Mapper, eyesX: num
   const top = m.y(0.55);
   switch (s.marking) {
     case 'tabby':
-      for (const dx of [-0.16, 0, 0.16]) stroke(c, col, rx * 0.5, () => {
-        c.moveTo(m.x(dx), top);
-        c.lineTo(m.x(dx * 0.7), top + (dx ? ry * 1.4 : ry * 1.9));
-      });
+      for (const dx of [-0.16, 0, 0.16])
+        stroke(c, col, rx * 0.5, () => {
+          c.moveTo(m.x(dx), top);
+          c.lineTo(m.x(dx * 0.7), top + (dx ? ry * 1.4 : ry * 1.9));
+        });
       for (const [i, x] of eyesX.entries()) {
         const side = i ? 1 : -1;
         stroke(c, col, rx * 0.4, () => {
@@ -287,6 +290,27 @@ function markings(c: CanvasRenderingContext2D, s: ToySpec, m: Mapper, eyesX: num
       }
       break;
     }
+    case 'blaze': {
+      // A white stripe from the forelock down to the muzzle (pony), a little wider at the bottom.
+      const x = m.x(0);
+      const y0 = top + ry * 0.6;
+      const y1 = ey + ry * 2.4;
+      c.beginPath();
+      c.moveTo(x - rx * 0.45, y0);
+      c.quadraticCurveTo(x, y0 - ry * 0.5, x + rx * 0.45, y0);
+      c.lineTo(x + rx * 0.75, y1);
+      c.quadraticCurveTo(x, y1 + ry * 0.6, x - rx * 0.75, y1);
+      c.closePath();
+      c.fillStyle = col;
+      c.fill();
+      break;
+    }
+    case 'cowpatch':
+      // A calf's patch over the top of the head on its right side.
+      c.globalAlpha = 0.95;
+      ellipse(c, eyesX[1] + rx * 1.6, top + ry * 0.4, rx * 3, ry * 2.1, col);
+      c.globalAlpha = 1;
+      break;
     case 'owl':
       c.globalAlpha = 0.7;
       for (const [x, y] of [
@@ -317,8 +341,7 @@ export function paintMouth(canvas: HTMLCanvasElement, s: ToySpec, e: Expr): bool
 
   if (s.extras?.includes('whiskers')) {
     c.globalAlpha = 0.6;
-    for (const side of [-1, 1])
-      for (const k of [0, 1, 2]) ellipse(c, cx + side * w * (0.95 + k * 0.32), y0 - w * 0.55 + k * w * 0.2, 1.6, 1.6, s.dark);
+    for (const side of [-1, 1]) for (const k of [0, 1, 2]) ellipse(c, cx + side * w * (0.95 + k * 0.32), y0 - w * 0.55 + k * w * 0.2, 1.6, 1.6, s.dark);
     c.globalAlpha = 1;
   }
 

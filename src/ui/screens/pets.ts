@@ -1,21 +1,23 @@
 /**
- * Animal album: the resident cats and dogs (portraits, personalities, who's still on the way, favorites and filters),
- * then every wildlife friend, sanctuary by sanctuary. Reached from the World map.
+ * Animal album (D35): every animal, sanctuary by sanctuary in the order they come home, with who is on the way next
+ * and favorites. Reached from the World map.
  */
 
 import { app } from '../../app/app';
-import { PETS, type PetId } from '../../meta/catalogs/pets';
-import { nextPetMilestone, unlockedPets } from '../../meta/rewards';
+import type { PetId } from '../../meta/catalogs/pets';
+import { isPetId } from '../../meta/catalogs/pets';
 import { portrait, showPetSheet } from '../components/petSheet';
-import { esc, h } from '../dom';
+import { esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { ScreenDef } from '../router';
 import { coinPill } from './home';
-import { COMPANIONS, type CompanionId } from '../../meta/catalogs/companions';
+import type { CompanionId } from '../../meta/catalogs/companions';
 import { SANCTUARIES } from '../../meta/catalogs/sanctuaries';
+import { animalInfo, animalsOf, isHome, nextArrivalIn } from '../../meta/animals';
+import { activeSanctuary, arrivalProgress, isOpen } from '../../meta/world';
 import { friendPortrait, showFriendSheet } from './sanctuary';
 
-type Filter = 'all' | 'cat' | 'dog' | 'fav';
+type Filter = 'all' | 'home' | 'fav';
 let lastFilter: Filter = 'all';
 
 export const petsScreen: ScreenDef = {
@@ -27,77 +29,71 @@ export const petsScreen: ScreenDef = {
 
     function render(): void {
       const save = app.save;
-      const have = unlockedPets(save);
-      const next = nextPetMilestone(save);
-      const level = save.journey.nextLevel;
-      const list = PETS.filter((p) => (lastFilter === 'all' ? true : lastFilter === 'fav' ? save.inventory.favorites[p.id] : p.species === lastFilter));
+      const building = activeSanctuary(save);
+      const all = SANCTUARIES.flatMap((s) => animalsOf(s.id));
+      const homeCount = all.filter((a) => isHome(save, a)).length;
+      const coming = building ? arrivalProgress(save, building) : null;
       const filters: Array<[Filter, string]> = [
         ['all', 'All'],
-        ['cat', 'Cats'],
-        ['dog', 'Dogs'],
+        ['home', 'Home'],
         ['fav', 'Favorites'],
       ];
+      const show = (id: string) => (lastFilter === 'all' ? true : lastFilter === 'home' ? isHome(save, id as PetId) : !!save.inventory.favorites[id]);
+      const groups = SANCTUARIES.map((sd) => {
+        const ids = animalsOf(sd.id).filter(show);
+        if (!ids.length) return '';
+        const n = animalsOf(sd.id).filter((a) => isHome(save, a)).length;
+        const nextId = nextArrivalIn(save, sd.id)?.id;
+        const open = isOpen(save, sd.id);
+        return `<section class="album__group" aria-label="${esc(sd.name)}">
+          <div class="section-head"><h3>${esc(sd.name)}</h3><span class="muted num">${n} of ${sd.arrivals.length}</span></div>
+          <ul class="pet-grid">${ids
+            .map((id) => {
+              const a = animalInfo(id);
+              const ownsIt = isHome(save, id);
+              const fav = !!save.inventory.favorites[id];
+              const isNext = !ownsIt && id === nextId;
+              const when = !open ? `Opens after level ${sd.opensAfterLevel}` : isNext ? 'Coming home next' : 'Arrives later';
+              const attr = isPetId(id) ? `data-pet="${id}"` : `data-friend="${id}"`;
+              const art = isPetId(id) ? portrait(id, ownsIt ? 'happy' : 'idle', !ownsIt) : friendPortrait(id as CompanionId, !ownsIt);
+              return `<li><button class="pet-card card card--tap ${ownsIt ? '' : 'is-locked'}" ${attr} aria-label="${esc(ownsIt ? `${a.name} the ${a.noun}, ${a.trait}${fav ? ', favorite' : ''}` : `${isNext ? a.name : `A ${a.noun}`}. ${when}`)}">
+                ${fav ? `<span class="pet-card__fav" aria-hidden="true">${ICON.heart}</span>` : ''}
+                ${art}
+                <span class="pet-card__name">${ownsIt || isNext ? esc(a.name) : '???'}</span>
+                <span class="pet-card__trait">${ownsIt ? esc(a.trait) : esc(when)}</span>
+                <span class="chip">${esc(a.kind)}</span>
+              </button></li>`;
+            })
+            .join('')}</ul>
+        </section>`;
+      }).join('');
       el.innerHTML = `
         <header class="screen-head">
           <button class="icon-btn" data-act="back" aria-label="Back to the World map">${ICON.back}</button>
           <h1 data-autofocus>Animal album</h1>
           <div class="screen-head__end">${coinPill()}</div>
         </header>
-        <h2 class="album__title">Residents</h2>
-        <p class="muted pets__count">${have.length} of ${PETS.length} welcomed${next ? ` · next arrival at level ${next.level}` : ' · the whole family is home'}</p>
+        <p class="muted pets__count">${homeCount} of ${all.length} animals have come home</p>
         ${
-          next
-            ? `<div class="next-arrival card">
-                ${portrait(next.id, 'idle', true)}
-                <div class="next-arrival__body">
-                  <b>Someone new is on the way</b>
-                  <span class="muted">Clear level ${next.level} to welcome them.</span>
-                  <div class="progress" role="progressbar" aria-label="Progress to the next resident" aria-valuemin="0" aria-valuemax="${next.level}" aria-valuenow="${Math.min(level - 1, next.level)}"><span style="width:${Math.min(100, ((level - 1) / next.level) * 100)}%"></span></div>
-                </div>
-              </div>`
+          coming && building
+            ? (() => {
+                const a = animalInfo(coming.next.id);
+                const span = Math.max(1, coming.need - coming.from);
+                return `<div class="next-arrival card">
+                  ${isPetId(coming.next.id) ? portrait(coming.next.id, 'idle', true) : friendPortrait(coming.next.id as CompanionId, true)}
+                  <div class="next-arrival__body">
+                    <b>${esc(a.name)} the ${esc(a.noun)} is on the way</b>
+                    <span class="muted">${plural(coming.left, 'more puzzle')} while you build the ${esc(SANCTUARIES.find((s) => s.id === building)!.short)}.</span>
+                    <div class="progress" role="progressbar" aria-label="${esc(a.name)} coming home" aria-valuemin="${coming.from}" aria-valuemax="${coming.need}" aria-valuenow="${coming.have}"><span style="width:${Math.round(((coming.have - coming.from) / span) * 100)}%"></span></div>
+                  </div>
+                </div>`;
+              })()
             : ''
         }
-        <div class="segmented" role="tablist" aria-label="Filter residents">
+        <div class="segmented" role="tablist" aria-label="Filter animals">
           ${filters.map(([f, l]) => `<button role="tab" data-filter="${f}" aria-selected="${lastFilter === f}">${l}</button>`).join('')}
         </div>
-        ${
-          list.length
-            ? `<ul class="pet-grid">${list
-                .map((p) => {
-                  const ownsIt = have.includes(p.id);
-                  const fav = !!save.inventory.favorites[p.id];
-                  return `<li><button class="pet-card card card--tap ${ownsIt ? '' : 'is-locked'}" data-pet="${p.id}" aria-label="${esc(ownsIt ? `${p.name}, ${p.trait}${fav ? ', favorite' : ''}` : `Locked resident, arrives at level ${p.unlockLevel}`)}">
-                    ${fav ? `<span class="pet-card__fav" aria-hidden="true">${ICON.heart}</span>` : ''}
-                    ${portrait(p.id, ownsIt ? 'happy' : 'idle', !ownsIt)}
-                    <span class="pet-card__name">${ownsIt ? esc(p.name) : '???'}</span>
-                    <span class="pet-card__trait">${ownsIt ? esc(p.trait) : `Arrives at level ${p.unlockLevel}`}</span>
-                    <span class="chip">${p.species === 'cat' ? 'Cat' : 'Dog'}</span>
-                  </button></li>`;
-                })
-                .join('')}</ul>`
-            : `<p class="empty">${lastFilter === 'fav' ? 'Tap a resident and add them to your favorites.' : 'No residents here yet.'}</p>`
-        }
-        <h2 class="album__title">Wildlife friends</h2>
-        ${SANCTUARIES.map((sd) => {
-          const list = COMPANIONS.filter((c) => c.sanctuary === sd.id);
-          if (!list.length) return '';
-          const n = list.filter((c) => save.inventory.companions[c.id]).length;
-          return `<section class="album__group" aria-label="${esc(sd.name)}">
-            <div class="section-head"><h3>${esc(sd.name)}</h3><span class="muted num">${n} of ${list.length}</span></div>
-            <ul class="pet-grid">${list
-              .map((c) => {
-                const ownsIt = !!save.inventory.companions[c.id];
-                const when = c.unlockLevel !== undefined ? `Arrives at level ${c.unlockLevel}` : `Arrives at stage ${c.stage}`;
-                return `<li><button class="pet-card card card--tap ${ownsIt ? '' : 'is-locked'}" data-friend="${c.id}" aria-label="${esc(ownsIt ? `${c.name} the ${c.kind.toLowerCase()}, ${c.trait}` : `A ${c.kind.toLowerCase()}. ${when}`)}">
-                  ${friendPortrait(c.id, !ownsIt)}
-                  <span class="pet-card__name">${ownsIt ? esc(c.name) : '???'}</span>
-                  <span class="pet-card__trait">${ownsIt ? esc(c.trait) : esc(when)}</span>
-                  <span class="chip">${esc(c.kind)}</span>
-                </button></li>`;
-              })
-              .join('')}</ul>
-          </section>`;
-        }).join('')}`;
+        ${groups || `<p class="empty">${lastFilter === 'fav' ? 'Tap an animal who has come home and add them to your favorites.' : 'Nobody has come home yet.'}</p>`}`;
     }
     render();
 

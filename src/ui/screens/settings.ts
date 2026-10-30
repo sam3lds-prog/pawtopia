@@ -3,14 +3,14 @@
 import { app } from '../../app/app';
 import { resetProgress, type Settings } from '../../services/storage';
 import { ITEM_CAP, grantStarterItems } from '../../meta/items';
-import { setPantry, skipToLevel } from '../../app/qaTools';
+import { growActive, setPantry, skipToLevel } from '../../app/qaTools';
 import { iap } from '../../services/iap';
 import { ads } from '../../services/ads';
 import { track } from '../../services/analytics';
 import { leaderboard } from '../../services/leaderboard';
 import { resetLeaderboardLocal } from '../../app/leaderboardSync';
 import { openSheet, toast } from '../components/sheet';
-import { actionOf, esc } from '../dom';
+import { actionOf, esc, plural } from '../dom';
 import type { Scope } from '../router';
 import { featureFlags } from '../../config/featureFlags';
 import { showRules } from './rules';
@@ -40,8 +40,8 @@ function controlsPreview(c: Settings['controls']): string {
   const step = (icon: string, label: string) => `<span class="cp-step">${icon}<small>${esc(label)}</small></span>`;
   const arrow = `<span class="cp-arrow" aria-hidden="true">→</span>`;
   if (c === 'classic')
-    return `<span class="cp-steps" aria-label="Tap cycle: each tap goes empty, then cross, then your pet, then empty">${step(ICON.mark, '1st tap: ✕')}${arrow}${step(ICON.paw, '2nd: pet')}${arrow}${step(ICON.erase, '3rd: clear')}</span>`;
-  return `<span class="cp-steps" aria-label="Quick place: pick Cat, Dog or Empty, then one tap places it">${step(ICON.paw, 'Pick Cat or Dog')}${arrow}${step(ICON.check, 'One tap places')}${arrow}${step(ICON.mark, 'Empty marks ✕')}</span>`;
+    return `<span class="cp-steps" aria-label="Tap cycle: each tap goes empty, then cross, then the animal, then empty">${step(ICON.mark, '1st tap: ✕')}${arrow}${step(ICON.paw, '2nd: animal')}${arrow}${step(ICON.erase, '3rd: clear')}</span>`;
+  return `<span class="cp-steps" aria-label="Tap marks a cross, double-tap places the animal, Erase takes things back">${step(ICON.mark, 'Tap: ✕')}${arrow}${step(ICON.paw, 'Double-tap: animal')}${arrow}${step(ICON.erase, 'Erase: undo a tile')}</span>`;
 }
 
 export interface SettingsOptions {
@@ -64,13 +64,13 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
     body: `
       <div class="rows-title">Play</div>
       <div class="rows">
-        <button class="row" data-act="rules"><span class="row__label">How to play<small>The two rules, with pictures</small></span>${ICON.chevron}</button>
+        <button class="row" data-act="rules"><span class="row__label">How to play<small>The rules, with pictures</small></span>${ICON.chevron}</button>
         ${choice('controls', 'Controls', [
-          ['tools', 'Quick place'],
+          ['tap', 'Tap and double-tap'],
           ['classic', 'Tap cycle'],
         ])}
         <p class="controls-preview" data-controls-preview aria-live="polite">${controlsPreview(app.settings.controls)}</p>
-        ${sw('autoMark', 'Dot impossible tiles', 'A small dot shows where no pet can go')}
+        ${sw('autoMark', 'Dot impossible tiles', 'A small dot shows where no animal can go')}
         ${sw('showTimer', 'Show the clock')}
         ${sw('largeBoard', 'Large board', 'Bigger tiles you can scroll around on small phones')}
       </div>
@@ -113,9 +113,10 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
         featureFlags.qaTools
           ? `<div class="rows-title">Tester shortcuts</div>
       <div class="rows">
-        <button class="row" data-qa="skip:31"><span class="row__label">Skip to level 31<small>Marks 1–30 solved: all six residents and Ember the fox</small></span>${ICON.chevron}</button>
-        <button class="row" data-qa="skip:46"><span class="row__label">Skip to level 46<small>Adds Maple the red panda (in the Blossom Tree)</small></span>${ICON.chevron}</button>
-        <button class="row" data-qa="skip:76"><span class="row__label">Skip to level 76<small>The new 5×5–8×8 ladder starts at 71</small></span>${ICON.chevron}</button>
+        <button class="row" data-qa="skip:11"><span class="row__label">Skip to level 11<small>Marks 1–10 solved; the Outback opens</small></span>${ICON.chevron}</button>
+        <button class="row" data-qa="skip:21"><span class="row__label">Skip to level 21<small>The first two-animal board, with its lesson</small></span>${ICON.chevron}</button>
+        <button class="row" data-qa="skip:41"><span class="row__label">Skip to level 41<small>Two-animal boards; the Savanna and the Arctic are open</small></span>${ICON.chevron}</button>
+        <button class="row" data-qa="grow:5"><span class="row__label">Solve 5 puzzles for this sanctuary<small>Grows the sanctuary you're building; animals come home</small></span>${ICON.chevron}</button>
         <button class="row" data-qa="empty"><span class="row__label">Empty extra lives and hints<small>See "no hints left" and the loss sheet without extra lives</small></span>${ICON.chevron}</button>
         <button class="row" data-qa="fill"><span class="row__label">Fill extra lives and hints to 10<small>Earning more turns into coins</small></span>${ICON.chevron}</button>
       </div>`
@@ -134,8 +135,12 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
         skipToLevel(app.save, Number(arg));
         app.save.lastSession = null;
         app.persist();
-        // Reload so the normal startup catch-up hands out the skipped levels' residents, gifts and points, once.
+        // Reload so the normal startup catch-up hands out the skipped levels' gifts and points, once.
         location.reload();
+      } else if (what === 'grow') {
+        const came = growActive(app.save, Number(arg));
+        app.persist();
+        toast(came.length ? `${plural(came.length, 'animal')} came home.` : 'The sanctuary grew.');
       } else {
         setPantry(app.save, 'life', what === 'fill' ? ITEM_CAP.life : 0);
         setPantry(app.save, 'hint', what === 'fill' ? ITEM_CAP.hint : 0);
@@ -230,7 +235,9 @@ function confirmErase(scope: Scope, done: () => void): void {
       } catch {
         // Offline or unreachable: keep everything, so the player can leave the leaderboard first and try again.
         busy = false;
-        if (cs.scope.alive) (cs.el.querySelector('.lb-field__error') as HTMLElement).textContent = "Couldn't reach the leaderboard to delete your entry there. Check your connection and try again, or leave it first in League.";
+        if (cs.scope.alive)
+          (cs.el.querySelector('.lb-field__error') as HTMLElement).textContent =
+            "Couldn't reach the leaderboard to delete your entry there. Check your connection and try again, or leave it first in League.";
         return;
       }
       resetLeaderboardLocal(app.save);

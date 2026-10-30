@@ -90,9 +90,10 @@ const PERSONALITY: Record<PetId, Partial<Record<Exclude<FaceMood, 'blink'>, Part
   },
 };
 
-export function poseFor(petId: PetId, mood: FaceMood, blinking = false, look: Look = [0, 0]): Pose {
+/** The pose for a face. Residents bring their personality; every other animal uses the shared poses. */
+export function poseFor(petId: string, mood: FaceMood, blinking = false, look: Look = [0, 0]): Pose {
   const m = mood === 'blink' ? 'idle' : mood;
-  const p: Pose = { ...BASE[m], ...(PERSONALITY[petId][m] ?? {}) };
+  const p: Pose = { ...BASE[m], ...((PERSONALITY as Record<string, (typeof PERSONALITY)[PetId] | undefined>)[petId]?.[m] ?? {}) };
   if (m === 'curious' || m === 'confused') {
     const [lx, ly] = clampLook(look);
     if (lx !== 0 || ly !== 0) {
@@ -104,8 +105,8 @@ export function poseFor(petId: PetId, mood: FaceMood, blinking = false, look: Lo
   return p;
 }
 
-/** Applies a face view to a mounted rig. Only attributes and custom properties change; no layout. */
-export function applyFace(svg: SVGElement, petId: PetId, view: FaceView): void {
+/** Applies a face view to a mounted rig (a resident's or any friend's). Only attributes and custom properties change; no layout. */
+export function applyFace(svg: SVGElement, petId: string, view: FaceView): void {
   const p = poseFor(petId, view.mood, view.blinking, view.look);
   svg.dataset.mood = view.mood;
   svg.dataset.eyes = p.eyes;
@@ -140,8 +141,7 @@ function eyesOf(def: PetDefinition): [EyeGeo, EyeGeo] {
 }
 
 /** Mirrors a path across x = 32. Paths passed here use only absolute M/L/C/Q/Z with "x y" pairs (no H/V/A). */
-const mirrorX = (d: string) =>
-  d.replace(/(-?\d+(?:\.\d+)?)[ ,](-?\d+(?:\.\d+)?)/g, (_m, x, y) => `${Math.round((64 - Number(x)) * 100) / 100} ${y}`);
+const mirrorX = (d: string) => d.replace(/(-?\d+(?:\.\d+)?)[ ,](-?\d+(?:\.\d+)?)/g, (_m, x, y) => `${Math.round((64 - Number(x)) * 100) / 100} ${y}`);
 
 function pair(d: string, attrs: string): string {
   return `<path d="${d}" ${attrs}/><path d="${mirrorX(d)}" ${attrs}/>`;
@@ -158,7 +158,8 @@ function catEars(def: PetDefinition): string {
   }
   const ear = pair('M11.8 29.6 L13.2 9.4 C13.4 7.6 15 7 16.2 8.1 L29.6 19.4 Z', `fill="${P.ear}" ${stroke}`);
   const inner = pair('M15.2 25.4 L16 12.6 L25.4 19.8 Z', `fill="${P.innerEar}"`);
-  const tufts = def.ears === 'tufted' ? pair('M14.6 9.6 L13.2 5.6 M16.4 9.8 L16.6 5.4', `stroke="${P.shade}" stroke-width="1.3" stroke-linecap="round" fill="none"`) : '';
+  const tufts =
+    def.ears === 'tufted' ? pair('M14.6 9.6 L13.2 5.6 M16.4 9.8 L16.6 5.4', `stroke="${P.shade}" stroke-width="1.3" stroke-linecap="round" fill="none"`) : '';
   return ear + inner + tufts;
 }
 
@@ -181,7 +182,10 @@ function catHead(def: PetDefinition): string {
     muzzle = `<ellipse cx="32" cy="46.2" rx="9.4" ry="6.6" fill="${P.muzzle}"/>`;
   }
   const nose = `<path d="M29.5 41.6 Q32 40.4 34.5 41.6 Q33.7 43.7 32 44.2 Q30.3 43.7 29.5 41.6 Z" fill="${P.nose}"/>`;
-  const whiskers = pair('M8.4 42.6 L17 43.8 M8.9 47.2 L17.2 46.3', `stroke="${P.whisker}" stroke-width="1.1" stroke-linecap="round" opacity="0.75" fill="none"`);
+  const whiskers = pair(
+    'M8.4 42.6 L17 43.8 M8.9 47.2 L17.2 46.3',
+    `stroke="${P.whisker}" stroke-width="1.1" stroke-linecap="round" opacity="0.75" fill="none"`,
+  );
   return head + fluff + marks + muzzle + nose + whiskers;
 }
 
@@ -254,8 +258,7 @@ function brows(def: PetDefinition, [l, r]: [EyeGeo, EyeGeo]): string {
   const y = l.cy - l.ry - 3.4;
   const w = def.species === 'dog' ? 2.6 : 2;
   const a = `stroke="${def.palette.brow}" stroke-width="${w}" stroke-linecap="round" fill="none"`;
-  const curve = (e: EyeGeo, side: -1 | 1) =>
-    `M${e.cx - 3.1} ${y + (side < 0 ? 0.5 : 0.1)} Q${e.cx} ${y - 1.9} ${e.cx + 3.1} ${y + (side < 0 ? 0.1 : 0.5)}`;
+  const curve = (e: EyeGeo, side: -1 | 1) => `M${e.cx - 3.1} ${y + (side < 0 ? 0.5 : 0.1)} Q${e.cx} ${y - 1.9} ${e.cx + 3.1} ${y + (side < 0 ? 0.1 : 0.5)}`;
   return `<path class="pf-brow pf-brow--l" d="${curve(l, -1)}" ${a}/><path class="pf-brow pf-brow--r" d="${curve(r, 1)}" ${a}/>`;
 }
 
@@ -297,8 +300,7 @@ function rigBody(id: PetId): string {
   const def = PET_BY_ID[id];
   const eyes = eyesOf(def);
   const sparkle = id === 'pip';
-  const head =
-    def.species === 'cat' ? catEars(def) + catHead(def) : dogEarsBehind(def) + dogHead(def) + dogEarsFront(def);
+  const head = def.species === 'cat' ? catEars(def) + catHead(def) : dogEarsBehind(def) + dogHead(def) + dogEarsFront(def);
   const lidLeft = def.markings === 'patch' ? def.palette.ear : def.palette.fur;
   const body =
     `<g data-layer="head-static">${head}</g>` +

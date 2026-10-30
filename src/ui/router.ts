@@ -4,7 +4,7 @@
  * (the v1 stale-callback bug class). Async code checks `scope.alive` after every await.
  */
 
-import type { PetId } from '../meta/catalogs/pets';
+import type { AnimalId } from '../meta/animals';
 import type { RegionId, SanctuaryId } from '../meta/catalogs/sanctuaries';
 
 export class Scope {
@@ -102,9 +102,9 @@ export type Route =
   | { screen: 'pets' }
   | { screen: 'league'; tab?: 'leaderboard' | 'week' | 'daily' }
   | { screen: 'shop'; sanctuary?: SanctuaryId; tab?: 'decor' | 'tricks' | 'food' | 'gems' }
-  | { screen: 'sanctuary'; welcome?: PetId[] }
+  | { screen: 'sanctuary'; welcome?: AnimalId[] }
   | { screen: 'world' }
-  | { screen: 'region'; id: RegionId; fresh?: number }
+  | { screen: 'region'; id: RegionId; fresh?: number; welcome?: AnimalId[] }
   | { screen: 'game' }
   | { screen: 'gallery' }
   | { screen: 'welcome' }

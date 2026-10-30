@@ -29,10 +29,9 @@ export function chooseStarter(save: SaveV2, id: DecorId, now = new Date()): bool
 
 export type BuyResult = 'ok' | 'owned' | 'not-for-sale' | 'insufficient' | 'locked';
 
-/** A regional decoration can be bought once its sanctuary is open; Harmony's always can. */
-export function decorUnlocked(save: Pick<SaveV2, 'journey'>, id: DecorId): boolean {
-  const home = decorHome(DECOR_BY_ID[id]);
-  return home === 'harmony' || isOpen(save, home);
+/** A decoration can be bought once its sanctuary is open (the Farm's and the Pet Garden's always can). */
+export function decorUnlocked(save: Pick<SaveV2, 'journey' | 'world'>, id: DecorId): boolean {
+  return isOpen(save, decorHome(DECOR_BY_ID[id]));
 }
 
 /** What a decoration costs, in the one currency it is sold for (null: not for sale, e.g. a chapter gift). */
@@ -62,7 +61,8 @@ export function buyDecor(save: SaveV2, id: DecorId, now = new Date()): BuyResult
   if (!price) return 'not-for-sale';
   if (!decorUnlocked(save, id)) return 'locked';
   const spendId = `buy:decor:${id}`;
-  const r = price.currency === 'coins' ? spend(save, spendId, price.amount, 'shop', now, d.name) : spendItem(save, spendId, price.currency, price.amount, now, d.name);
+  const r =
+    price.currency === 'coins' ? spend(save, spendId, price.amount, 'shop', now, d.name) : spendItem(save, spendId, price.currency, price.amount, now, d.name);
   if (r === 'insufficient' || r === 'none') return 'insufficient';
   // 'already' means a previous purchase was charged but not recorded as owned (e.g. a crash between writes): own it.
   save.inventory.decor[id] = { ownedAt: now.toISOString() };
@@ -131,14 +131,18 @@ const TIER_WORD = { easy: 'Easy', medium: 'Medium', hard: 'Hard', expert: 'Exper
  */
 export function sanctuaryChat(save: SaveV2, now = new Date()): string | null {
   const residents = PETS.filter((p) => save.inventory.pets[p.id]).map((p) => ({ name: p.name, at: save.inventory.pets[p.id].unlockedAt }));
-  const friends = COMPANIONS.filter((c) => c.sanctuary === 'harmony' && save.inventory.companions[c.id]).map((c) => ({ name: c.name, at: save.inventory.companions[c.id].unlockedAt }));
+  const friends = COMPANIONS.filter((c) => c.sanctuary === 'harmony' && save.inventory.companions[c.id]).map((c) => ({
+    name: c.name,
+    at: save.inventory.companions[c.id].unlockedAt,
+  }));
   const all = [...residents, ...friends];
   if (!all.length) return null;
   const day = localDateKey(now);
   const who = all[hashString(`chat-${day}`) % all.length].name;
   const lw = save.stats.lastWin;
   const ago = lw && lw.at && !Number.isNaN(Date.parse(lw.at)) ? daysBetween(localDateKey(new Date(lw.at)), day) : Infinity;
-  if (lw && ago <= 2 && (lw.tier === 'hard' || lw.tier === 'expert')) return `${who} thinks your last ${TIER_WORD[lw.tier]} ${lw.size}×${lw.size} was impressive!`;
+  if (lw && ago <= 2 && (lw.tier === 'hard' || lw.tier === 'expert'))
+    return `${who} thinks your last ${TIER_WORD[lw.tier]} ${lw.size}×${lw.size} was impressive!`;
   const streak = liveStreak(save, day);
   if (streak >= 2) return `${who} has been counting your ${streak}-day streak.`;
   const newest = [...all].filter((a) => a.at && !Number.isNaN(Date.parse(a.at))).sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];

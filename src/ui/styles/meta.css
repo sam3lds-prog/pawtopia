@@ -10,7 +10,9 @@
   height: 64px;
   border-radius: 50%;
   background: var(--tint);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55), 0 1px 0 rgba(40, 52, 52, 0.06);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.55),
+    0 1px 0 rgba(40, 52, 52, 0.06);
   flex: none;
 }
 .portrait > .pet {
@@ -1278,7 +1280,9 @@ ul.rows {
 .seg__btn[aria-selected='true'] {
   background: var(--surface);
   color: var(--brand-dark);
-  box-shadow: 0 0 0 1.5px var(--brand), 0 2px 6px -2px rgba(40, 52, 52, 0.2);
+  box-shadow:
+    0 0 0 1.5px var(--brand),
+    0 2px 6px -2px rgba(40, 52, 52, 0.2);
 }
 .shop__body {
   display: flex;
@@ -1296,10 +1300,14 @@ ul.rows {
   height: 18px;
 }
 .shop-card--video {
-  box-shadow: inset 0 0 0 1.5px #c3b8fb, var(--shadow-1);
+  box-shadow:
+    inset 0 0 0 1.5px #c3b8fb,
+    var(--shadow-1);
 }
 .shop-card--premium {
-  box-shadow: inset 0 0 0 1.5px #9be3f1, var(--shadow-1);
+  box-shadow:
+    inset 0 0 0 1.5px #9be3f1,
+    var(--shadow-1);
   background: linear-gradient(180deg, var(--surface), #f1fbfd);
 }
 .chip--video {
@@ -1474,4 +1482,39 @@ ul.rows {
 .feed-btn__fav .ico {
   width: 13px;
   height: 13px;
+}
+
+/* ---------- Coming home (D35): the animal on its way to the sanctuary you build ---------- */
+.coming-home {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 10px;
+}
+.coming-home__art {
+  width: 56px;
+  height: 56px;
+}
+.coming-home__body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  font-size: var(--t-sm);
+}
+.coming-home__body small {
+  color: var(--muted-ink);
+  font-weight: 700;
+}
+.portrait.is-shy > .pet,
+.portrait.is-shy > .friend {
+  opacity: 0.9;
+}
+.resident.is-next .portrait {
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.55),
+    0 0 0 2px var(--accent, var(--brand));
+}
+.resident.is-next .resident__name {
+  color: var(--brand-dark);
 }

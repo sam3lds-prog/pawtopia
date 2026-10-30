@@ -28,7 +28,14 @@ export class ToyKit {
     let m = this.mats.get(key);
     if (!m) {
       const c = new THREE.Color(color);
-      m = new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.92, metalness: 0, sheen: 0.55, sheenRoughness: 0.6, sheenColor: c.clone().lerp(new THREE.Color('#ffffff'), 0.55) });
+      m = new THREE.MeshPhysicalMaterial({
+        color: c,
+        roughness: 0.92,
+        metalness: 0,
+        sheen: 0.55,
+        sheenRoughness: 0.6,
+        sheenColor: c.clone().lerp(new THREE.Color('#ffffff'), 0.55),
+      });
       this.mats.set(key, m);
     }
     return m;
@@ -154,7 +161,14 @@ export class Toy {
     this.inner.position.y = -this.layout.center;
     this.root.rotation.y = spec.turn ?? 0;
 
-    this.eyeMat = new THREE.MeshStandardMaterial({ transparent: true, roughness: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    this.eyeMat = new THREE.MeshStandardMaterial({
+      transparent: true,
+      roughness: 0.6,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    });
     this.buildBody();
     this.buildHead();
     this.buildTail();
@@ -167,7 +181,14 @@ export class Toy {
 
   // ---------------------------------------------------------------- building
 
-  private part(geo: THREE.BufferGeometry, mat: THREE.Material, pos: THREE.Vector3, scale: THREE.Vector3, parent: THREE.Object3D = this.body, rot?: THREE.Euler): THREE.Mesh {
+  private part(
+    geo: THREE.BufferGeometry,
+    mat: THREE.Material,
+    pos: THREE.Vector3,
+    scale: THREE.Vector3,
+    parent: THREE.Object3D = this.body,
+    rot?: THREE.Euler,
+  ): THREE.Mesh {
     const m = new THREE.Mesh(geo, mat);
     m.position.copy(pos);
     m.scale.copy(scale);
@@ -258,6 +279,23 @@ export class Toy {
             [0.02, 0.84, 0.13],
           ])
             this.ball(s.markColor ?? s.shade, v3(x, y, z), v3(0.045, 0.038, 0.03), this.body, true);
+        // A sheep's wool: puffs all over the coat.
+        if (s.extras?.includes('wool'))
+          for (let i = 0; i < 9; i++) {
+            const a = (i / 9) * Math.PI * 2;
+            const y = tc + Math.sin(a) * torso.y * 0.72;
+            const x = Math.cos(a) * torso.x * 0.86;
+            this.ball(s.fur, v3(x, y, torso.z * 0.42), v3(0.1, 0.095, 0.09), this.body, true);
+            this.ball(s.shade, v3(x * 0.9, y, -torso.z * 0.5), v3(0.09, 0.085, 0.08), this.body, true);
+          }
+        // A calf's patches.
+        if (s.extras?.includes('patches'))
+          for (const [x, y, z, r] of [
+            [-0.16, 0.34, 0.15, 0.08],
+            [0.18, 0.2, 0.14, 0.065],
+            [0.08, 0.38, -0.16, 0.09],
+          ])
+            this.ball(s.markColor ?? s.dark, v3(x, y, z), v3(r, r * 0.85, r * 0.55), this.body, true);
       }
     }
   }
@@ -278,7 +316,7 @@ export class Toy {
     const skull = new THREE.Group();
     skull.scale.set(hx, hy, hz);
     this.head.add(skull);
-    this.part(this.kit.sphere, this.kit.fur(s.fur), v3(0, 0, 0), v3(1, 1, 1), skull);
+    this.part(this.kit.sphere, this.kit.fur(s.headFur ?? s.fur), v3(0, 0, 0), v3(1, 1, 1), skull);
     const shellGeo = this.own(
       new THREE.SphereGeometry(1.004, 32, 24, Math.PI / 2 - HEAD_SHELL.phiLen / 2, HEAD_SHELL.phiLen, HEAD_SHELL.thetaStart, HEAD_SHELL.thetaLen),
     );
@@ -301,13 +339,66 @@ export class Toy {
         this.part(stalk, this.kit.fur(s.fur), v3(0, 0.05, 0), v3(1, 1, 1), g);
         this.ball(s.dark, v3(0, 0.115, 0), v3(0.035, 0.03, 0.035), g);
       }
+    const ex = s.extras ?? [];
+    if (ex.includes('wool')) {
+      // A crown of wool over the forehead and round the back of the head.
+      for (const [x, y, z, r] of [
+        [-0.5, 0.7, 0.35, 0.12],
+        [0, 0.86, 0.38, 0.14],
+        [0.5, 0.7, 0.35, 0.12],
+        [-0.25, 0.92, 0, 0.13],
+        [0.25, 0.92, 0, 0.13],
+        [-0.72, 0.42, -0.2, 0.11],
+        [0.72, 0.42, -0.2, 0.11],
+        [0, 0.6, -0.65, 0.14],
+      ])
+        this.ball(s.fur, v3(x * hx, y * hy, z * hz), v3(r, r * 0.9, r * 0.85), this.head, true);
+    }
+    if (ex.includes('horns'))
+      for (const side of [-1, 1]) {
+        const g = new THREE.Group();
+        g.position.set(side * hx * 0.36, hy * 0.78, hz * 0.05);
+        g.rotation.set(-0.45, 0, -side * 0.28);
+        this.head.add(g);
+        this.part(this.kit.cone(0.25), this.kit.fur(s.markColor ?? s.shade), v3(0, 0.07, 0), v3(0.05, 0.14, 0.045), g);
+      }
+    if (ex.includes('nubs'))
+      for (const side of [-1, 1]) this.ball('#EAD7B6', v3(side * hx * 0.38, hy * 0.86, -hz * 0.02), v3(0.035, 0.032, 0.035), this.head, true);
+    if (ex.includes('beard'))
+      this.part(
+        this.kit.cone(0.35),
+        this.kit.fur(s.shade),
+        v3(0, -hy * 0.9, hz * 0.72),
+        v3(0.035, 0.07, 0.03),
+        this.head,
+        new THREE.Euler(Math.PI + 0.3, 0, 0),
+      );
+    if (ex.includes('crest'))
+      for (const [x, r] of [
+        [-0.04, -0.3],
+        [0, 0],
+        [0.04, 0.3],
+      ]) {
+        const g = new THREE.Group();
+        g.position.set(x, hy * 0.86, 0);
+        g.rotation.z = -r;
+        this.head.add(g);
+        this.part(this.kit.cone(0.3), this.kit.fur(s.shade), v3(0, 0.04, 0), v3(0.028, 0.075, 0.022), g);
+      }
+    if (ex.includes('mane')) {
+      // A forelock between the ears and a mane down the back of the head.
+      this.ball(s.dark, v3(0, hy * 0.82, hz * 0.45), v3(hx * 0.36, hy * 0.2, hz * 0.3), this.head, true);
+      for (let i = 0; i < 4; i++) this.ball(s.dark, v3(0, hy * (0.7 - i * 0.42), -hz * (0.75 + i * 0.04)), v3(0.07, 0.09, 0.06), this.head, true);
+    }
   }
 
   private buildMuzzle(hx: number, hy: number, hz: number): void {
     const s = this.spec;
     const k = s.snout.size;
     const mouthGeo = () =>
-      this.own(new THREE.SphereGeometry(1.006, 20, 16, Math.PI / 2 - MUZZLE_SHELL.phiLen / 2, MUZZLE_SHELL.phiLen, MUZZLE_SHELL.thetaStart, MUZZLE_SHELL.thetaLen));
+      this.own(
+        new THREE.SphereGeometry(1.006, 20, 16, Math.PI / 2 - MUZZLE_SHELL.phiLen / 2, MUZZLE_SHELL.phiLen, MUZZLE_SHELL.thetaStart, MUZZLE_SHELL.thetaLen),
+      );
     const muzzle = (c: THREE.Vector3, r: THREE.Vector3, color: string, nose: THREE.Vector3 | null, noseR: THREE.Vector3) => {
       const g = new THREE.Group();
       g.position.copy(c);
@@ -315,7 +406,14 @@ export class Toy {
       this.head.add(g);
       this.part(this.kit.sphere, this.kit.fur(color), v3(0, 0, 0), v3(1, 1, 1), g);
       if (s.mouth !== 'none') {
-        this.mouthMat = new THREE.MeshStandardMaterial({ transparent: true, roughness: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+        this.mouthMat = new THREE.MeshStandardMaterial({
+          transparent: true,
+          roughness: 0.6,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -2,
+          polygonOffsetUnits: -2,
+        });
         const shell = new THREE.Mesh(mouthGeo(), this.mouthMat);
         shell.renderOrder = 2;
         g.add(shell);
@@ -327,10 +425,22 @@ export class Toy {
         muzzle(v3(0, -hy * 0.34, hz * 0.8), v3(hx * 0.4 * k, hy * 0.27 * k, hz * 0.26 * k), s.snout.color, v3(0, -hy * 0.2, hz * 1.04), v3(0.04, 0.03, 0.03));
         break;
       case 'dog':
-        muzzle(v3(0, -hy * 0.34, hz * 0.82), v3(hx * 0.42 * k, hy * 0.3 * k, hz * 0.38 * k), s.snout.color, v3(0, -hy * 0.16, hz * 1.17), v3(0.065, 0.045, 0.045));
+        muzzle(
+          v3(0, -hy * 0.34, hz * 0.82),
+          v3(hx * 0.42 * k, hy * 0.3 * k, hz * 0.38 * k),
+          s.snout.color,
+          v3(0, -hy * 0.16, hz * 1.17),
+          v3(0.065, 0.045, 0.045),
+        );
         break;
       case 'fox':
-        muzzle(v3(0, -hy * 0.36, hz * 0.86), v3(hx * 0.3 * k, hy * 0.24 * k, hz * 0.48 * k), s.snout.color, v3(0, -hy * 0.28, hz * 1.32), v3(0.045, 0.035, 0.04));
+        muzzle(
+          v3(0, -hy * 0.36, hz * 0.86),
+          v3(hx * 0.3 * k, hy * 0.24 * k, hz * 0.48 * k),
+          s.snout.color,
+          v3(0, -hy * 0.28, hz * 1.32),
+          v3(0.045, 0.035, 0.04),
+        );
         break;
       case 'round':
       case 'flat':
@@ -342,6 +452,20 @@ export class Toy {
           v3(0.055, 0.04, 0.04),
         );
         break;
+      case 'pig': {
+        // A round disc of a snout with two nostrils; the mouth sits just below it.
+        muzzle(v3(0, -hy * 0.26, hz * 0.84), v3(hx * 0.34 * k, hy * 0.24 * k, hz * 0.3 * k), s.snout.color, null, v3(0, 0, 0));
+        for (const side of [-1, 1])
+          this.part(this.kit.sphere, this.kit.gloss(s.snout.nose), v3(side * hx * 0.12 * k, -hy * 0.26, hz * 1.13), v3(0.022, 0.032, 0.014), this.head);
+        break;
+      }
+      case 'muzzle': {
+        // A big soft muzzle (calf, pony) with nostrils.
+        muzzle(v3(0, -hy * 0.38, hz * 0.8), v3(hx * 0.46 * k, hy * 0.34 * k, hz * 0.36 * k), s.snout.color, null, v3(0, 0, 0));
+        for (const side of [-1, 1])
+          this.part(this.kit.sphere, this.kit.fur(s.snout.nose), v3(side * hx * 0.2 * k, -hy * 0.3, hz * 1.13), v3(0.022, 0.03, 0.012), this.head);
+        break;
+      }
       case 'koala':
         muzzle(v3(0, -hy * 0.5, hz * 0.84), v3(hx * 0.3, hy * 0.2, hz * 0.2), s.fur, null, v3(0, 0, 0));
         this.part(this.kit.sphere, this.kit.gloss(s.snout.nose), v3(0, -hy * 0.14, hz * 0.95), v3(hx * 0.2, hy * 0.33, hz * 0.17), this.head);
@@ -440,6 +564,13 @@ export class Toy {
           this.ball(color, v3(0, 0.03, 0), v3(0.075 * k, 0.065 * k, 0.04), g);
           inner(v3(0, 0.025, 0.02), v3(0.045 * k, 0.04 * k, 0.03));
           break;
+        case 'side':
+          // Sticking out to the sides and drooping a little (sheep, calf, goat).
+          g.position.set(side * hx * 0.9, hy * 0.22, -hz * 0.05);
+          g.rotation.z = side * 0.3;
+          this.ball(color, v3(side * 0.1 * k, 0, 0), v3(0.12 * k, 0.055 * k, 0.045), g);
+          inner(v3(side * 0.1 * k, 0, 0.026), v3(0.08 * k, 0.032 * k, 0.03));
+          break;
         case 'giant':
           g.position.set(side * hx * 0.92, hy * 0.05, -hz * 0.25);
           g.rotation.y = side * 0.35;
@@ -473,23 +604,106 @@ export class Toy {
     };
     switch (t.kind) {
       case 'cat':
-        chain(7, 0.072, (i) => 0.046 - i * 0.003, 0.2, () => t.color, new THREE.Euler(-0.4, 0.3, -1.25));
+        chain(
+          7,
+          0.072,
+          (i) => 0.046 - i * 0.003,
+          0.2,
+          () => t.color,
+          new THREE.Euler(-0.4, 0.3, -1.25),
+        );
         break;
       case 'dog':
-        chain(4, 0.07, (i) => 0.042 - i * 0.004, 0.32, () => t.color, new THREE.Euler(-0.5, 0.2, -0.85));
+        chain(
+          4,
+          0.07,
+          (i) => 0.042 - i * 0.004,
+          0.32,
+          () => t.color,
+          new THREE.Euler(-0.5, 0.2, -0.85),
+        );
         break;
       case 'fox':
-        chain(5, 0.085, (i) => [0.07, 0.095, 0.1, 0.09, 0.07][i], 0.24, (i) => (i === 4 ? t.tip ?? s.light : t.color), new THREE.Euler(-0.2, 0.3, -1.45));
+        chain(
+          5,
+          0.085,
+          (i) => [0.07, 0.095, 0.1, 0.09, 0.07][i],
+          0.24,
+          (i) => (i === 4 ? (t.tip ?? s.light) : t.color),
+          new THREE.Euler(-0.2, 0.3, -1.45),
+        );
         break;
       case 'panda':
-        chain(6, 0.075, (i) => [0.065, 0.075, 0.078, 0.075, 0.068, 0.058][i], 0.2, (i) => (i % 2 ? t.ring ?? s.light : t.color), new THREE.Euler(-0.3, 0.3, -1.35));
+        chain(
+          6,
+          0.075,
+          (i) => [0.065, 0.075, 0.078, 0.075, 0.068, 0.058][i],
+          0.2,
+          (i) => (i % 2 ? (t.ring ?? s.light) : t.color),
+          new THREE.Euler(-0.3, 0.3, -1.35),
+        );
         break;
       case 'kangaroo':
-        chain(5, 0.085, (i) => 0.075 - i * 0.012, -0.1, (i) => (i === 4 && t.tip ? t.tip : t.color), new THREE.Euler(-0.3, 0.6, -1.85));
+        chain(
+          5,
+          0.085,
+          (i) => 0.075 - i * 0.012,
+          -0.1,
+          (i) => (i === 4 && t.tip ? t.tip : t.color),
+          new THREE.Euler(-0.3, 0.6, -1.85),
+        );
         break;
       case 'stub':
-        chain(1, 0.05, () => 0.055, 0, () => t.color, new THREE.Euler(-1.2, 0, -0.6));
+        chain(
+          1,
+          0.05,
+          () => 0.055,
+          0,
+          () => t.color,
+          new THREE.Euler(-1.2, 0, -0.6),
+        );
         if (t.tip) this.ball(t.tip, v3(0, 0.07, 0), v3(0.03, 0.04, 0.03), this.tail[0], true);
+        break;
+      case 'curl':
+        // A piglet's corkscrew.
+        chain(
+          5,
+          0.032,
+          () => 0.02,
+          1.15,
+          () => t.color,
+          new THREE.Euler(-0.9, 0.2, -1.1),
+        );
+        break;
+      case 'tuft':
+        chain(
+          3,
+          0.08,
+          (i) => (i === 2 ? 0.034 : 0.018),
+          0.12,
+          (i) => (i === 2 ? (t.tip ?? s.dark) : t.color),
+          new THREE.Euler(0.5, 0.2, -0.35),
+        );
+        break;
+      case 'horse':
+        chain(
+          4,
+          0.085,
+          (i) => [0.05, 0.058, 0.055, 0.045][i],
+          0.14,
+          () => t.color,
+          new THREE.Euler(0.6, 0.25, -0.35),
+        );
+        break;
+      case 'puff':
+        chain(
+          1,
+          0.03,
+          () => 0.075,
+          0,
+          () => t.color,
+          new THREE.Euler(-1.3, 0, -0.5),
+        );
         break;
       case 'bird':
         for (const a of [-0.35, 0, 0.35]) {
@@ -668,16 +882,70 @@ function layoutFor(s: ToySpec): Layout {
   const hy = s.head[1] / 2;
   switch (s.body) {
     case 'bird':
-      return { center: 0.42, headAt: v3(0, 0.6 + hy * 0.62, 0.02), shoulder: [v3(-0.22, 0.48, 0), v3(0.22, 0.48, 0)], paw: 0, armR: 0, hip: [v3(-0.1, 0.1, 0), v3(0.1, 0.1, 0)], tailAt: v3(0, 0.12, -0.18), shadowW: 0.7 };
+      return {
+        center: 0.42,
+        headAt: v3(0, 0.6 + hy * 0.62, 0.02),
+        shoulder: [v3(-0.22, 0.48, 0), v3(0.22, 0.48, 0)],
+        paw: 0,
+        armR: 0,
+        hip: [v3(-0.1, 0.1, 0), v3(0.1, 0.1, 0)],
+        tailAt: v3(0, 0.12, -0.18),
+        shadowW: 0.7,
+      };
     case 'seal':
-      return { center: 0.22, headAt: v3(-0.24, 0.42, 0.06), shoulder: [v3(-0.24, 0.12, 0.14), v3(0.04, 0.12, 0.14)], paw: 0, armR: 0, hip: [v3(0.4, 0.1, 0), v3(0.4, 0.1, 0)], tailAt: v3(0.5, 0.1, 0), shadowW: 1.15 };
+      return {
+        center: 0.22,
+        headAt: v3(-0.24, 0.42, 0.06),
+        shoulder: [v3(-0.24, 0.12, 0.14), v3(0.04, 0.12, 0.14)],
+        paw: 0,
+        armR: 0,
+        hip: [v3(0.4, 0.1, 0), v3(0.4, 0.1, 0)],
+        tailAt: v3(0.5, 0.1, 0),
+        shadowW: 1.15,
+      };
     case 'big':
-      return { center: 0.36, headAt: v3(0, 0.5 + hy, 0.08), shoulder: [v3(-0.16, 0.3, 0.15), v3(0.16, 0.3, 0.15)], paw: 0.06, armR: 0.085, hip: [v3(-0.24, 0.15, 0), v3(0.24, 0.15, 0)], tailAt: v3(0.12, 0.18, -0.24), shadowW: 0.95 };
+      return {
+        center: 0.36,
+        headAt: v3(0, 0.5 + hy, 0.08),
+        shoulder: [v3(-0.16, 0.3, 0.15), v3(0.16, 0.3, 0.15)],
+        paw: 0.06,
+        armR: 0.085,
+        hip: [v3(-0.24, 0.15, 0), v3(0.24, 0.15, 0)],
+        tailAt: v3(0.12, 0.18, -0.24),
+        shadowW: 0.95,
+      };
     case 'upright':
-      return { center: 0.42, headAt: v3(0, 0.62 + hy, 0.02), shoulder: [v3(-0.13, 0.46, 0.12), v3(0.13, 0.46, 0.12)], paw: 0.3, armR: 0.042, hip: [v3(-0.16, 0.15, 0), v3(0.16, 0.15, 0)], tailAt: v3(0.06, 0.14, -0.16), shadowW: 0.75 };
+      return {
+        center: 0.42,
+        headAt: v3(0, 0.62 + hy, 0.02),
+        shoulder: [v3(-0.13, 0.46, 0.12), v3(0.13, 0.46, 0.12)],
+        paw: 0.3,
+        armR: 0.042,
+        hip: [v3(-0.16, 0.15, 0), v3(0.16, 0.15, 0)],
+        tailAt: v3(0.06, 0.14, -0.16),
+        shadowW: 0.75,
+      };
     case 'tall':
-      return { center: 0.5, headAt: v3(0, 0.96 + hy * 0.7, 0.1), shoulder: [v3(-0.1, 0.33, 0.13), v3(0.1, 0.33, 0.13)], paw: 0.05, armR: 0.058, hip: [v3(-0.19, 0.13, 0), v3(0.19, 0.13, 0)], tailAt: v3(0.1, 0.22, -0.2), shadowW: 0.8 };
+      return {
+        center: 0.5,
+        headAt: v3(0, 0.96 + hy * 0.7, 0.1),
+        shoulder: [v3(-0.1, 0.33, 0.13), v3(0.1, 0.33, 0.13)],
+        paw: 0.05,
+        armR: 0.058,
+        hip: [v3(-0.19, 0.13, 0), v3(0.19, 0.13, 0)],
+        tailAt: v3(0.1, 0.22, -0.2),
+        shadowW: 0.8,
+      };
     default:
-      return { center: 0.4, headAt: v3(0, 0.47 + hy, 0.04), shoulder: [v3(-0.1, 0.33, 0.13), v3(0.1, 0.33, 0.13)], paw: 0.05, armR: 0.058, hip: [v3(-0.19, 0.13, 0), v3(0.19, 0.13, 0)], tailAt: v3(0.12, 0.1, -0.16), shadowW: 0.85 };
+      return {
+        center: 0.4,
+        headAt: v3(0, 0.47 + hy, 0.04),
+        shoulder: [v3(-0.1, 0.33, 0.13), v3(0.1, 0.33, 0.13)],
+        paw: 0.05,
+        armR: 0.058,
+        hip: [v3(-0.19, 0.13, 0), v3(0.19, 0.13, 0)],
+        tailAt: v3(0.12, 0.1, -0.16),
+        shadowW: 0.85,
+      };
   }
 }

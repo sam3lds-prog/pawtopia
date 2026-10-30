@@ -39,6 +39,30 @@ const note = (x: number, y: number, c = '#8a6a4f') =>
   `<g fill="${c}"><ellipse cx="${x}" cy="${y}" rx="2.2" ry="1.6" transform="rotate(-20 ${x} ${y})"/><rect x="${x + 1.6}" y="${y - 8}" width="0.9" height="8"/><path d="M${x + 2.5} ${y - 8} q3 1 3 4" stroke="${c}" stroke-width="0.9" fill="none"/></g>`;
 
 export const ACTIVITIES: Record<string, ActivityDef> = {
+  // Meadow Farm
+  tireswing: {
+    decor: 'tireswing',
+    name: 'Tire swinging',
+    line: (who) => `${who} is swinging on the tire swing!`,
+    ms: 5600,
+    x: 68,
+    y: 192,
+    H: 16,
+    mood: 'happy',
+    seat: '.sp-swing',
+  },
+  tractor: {
+    decor: 'tractor',
+    name: 'Tractor rides',
+    line: (who) => `${who} is driving the little red tractor!`,
+    ms: 6200,
+    x: 224,
+    y: 252,
+    H: 16,
+    mood: 'happy',
+    seat: '.sp-tractor',
+    extras: `<g class="sp-act-puffs" fill="#e8e4dc" opacity="0">${[0, 1, 2].map((i) => `<circle cx="${252 + i * 3}" cy="${244 - i * 6}" r="${2.4 + i}"/>`).join('')}</g>`,
+  },
   balloon: {
     decor: 'balloon',
     name: 'Balloon rides',

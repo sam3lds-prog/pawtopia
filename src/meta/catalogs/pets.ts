@@ -1,7 +1,7 @@
 /**
- * The resident catalog. Six original characters for the alpha: three cats, three dogs. Personality shapes how a
- * pet's face reacts (see ui/art/pets.ts) and its sanctuary bio. It never changes puzzle rules or gives any
- * competitive advantage. Unlocks are deterministic milestones, never random or purchasable.
+ * The resident catalog: three cats and three dogs who live in the Pet Garden. Personality shapes how a pet's face reacts
+ * (see ui/art/pets.ts) and its bio. It never changes puzzle rules or gives any competitive advantage. They arrive as the
+ * Pet Garden grows (its `arrivals` list, D35), never at random and never for sale.
  */
 
 import type { FaceMood } from '../../ui/animation/faceMachine';
@@ -35,8 +35,6 @@ export interface PetDefinition {
   /** The little thing this pet does that the others don't. */
   signature: string;
   palette: PetPalette;
-  /** Journey level whose first clear welcomes this pet. */
-  unlockLevel: number;
   /** Purely aesthetic label. Never purchasable, never affects play. */
   rarity: 'founding' | 'neighbor' | 'rare';
   /** Moods this pet's rig expresses (all pets support the full set; listed for the gallery and docs). */
@@ -68,7 +66,6 @@ export const PETS: readonly PetDefinition[] = [
       cheek: '#F09C98',
       whisker: '#9E8667',
     },
-    unlockLevel: 1,
     rarity: 'founding',
     expressions: ALL_MOODS,
     ears: 'round',
@@ -93,7 +90,6 @@ export const PETS: readonly PetDefinition[] = [
       cheek: '#EF8572',
       whisker: '#8F5A33',
     },
-    unlockLevel: 5,
     rarity: 'neighbor',
     expressions: ALL_MOODS,
     ears: 'pointed',
@@ -119,7 +115,6 @@ export const PETS: readonly PetDefinition[] = [
       cheek: '#E68F9B',
       whisker: '#D9D5CF',
     },
-    unlockLevel: 15,
     rarity: 'rare',
     expressions: ALL_MOODS,
     ears: 'tufted',
@@ -144,7 +139,6 @@ export const PETS: readonly PetDefinition[] = [
       cheek: '#EE8C79',
       whisker: '#9A6038',
     },
-    unlockLevel: 1,
     rarity: 'founding',
     expressions: ALL_MOODS,
     ears: 'floppy',
@@ -169,7 +163,6 @@ export const PETS: readonly PetDefinition[] = [
       cheek: '#E895A3',
       whisker: '#5D6C82',
     },
-    unlockLevel: 10,
     rarity: 'neighbor',
     expressions: ALL_MOODS,
     ears: 'folded',
@@ -194,7 +187,6 @@ export const PETS: readonly PetDefinition[] = [
       cheek: '#EF8580',
       whisker: '#B9844C',
     },
-    unlockLevel: 20,
     rarity: 'neighbor',
     expressions: ALL_MOODS,
     ears: 'button',
@@ -204,14 +196,9 @@ export const PETS: readonly PetDefinition[] = [
 
 export const PET_BY_ID: Record<PetId, PetDefinition> = Object.fromEntries(PETS.map((p) => [p.id, p])) as Record<PetId, PetDefinition>;
 
-/** The pets every board can show before anything is unlocked. */
+/** The pets shown where a generic cat or dog is meant (the Paw Cup's boards, the rules sheet). */
 export const FOUNDING: Record<PetSpecies, PetId> = { cat: 'mochi', dog: 'biscuit' };
 
 export function isPetId(x: unknown): x is PetId {
   return typeof x === 'string' && x in PET_BY_ID;
-}
-
-/** Pets whose unlock level has been cleared, in catalog order. */
-export function petsUnlockedBy(clearedLevel: (level: number) => boolean): PetDefinition[] {
-  return PETS.filter((p) => clearedLevel(p.unlockLevel));
 }

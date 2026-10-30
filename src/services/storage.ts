@@ -41,7 +41,8 @@ export interface ProgressV1 {
 // ------------------------------------------------------------------ v2 shape
 
 export type ReducedMotionPref = 'system' | 'reduce' | 'full';
-export type ControlScheme = 'tools' | 'classic';
+/** 'tap': tap marks ✕, double-tap places (D35; the old pick-a-tool scheme, 'tools', becomes it). 'classic': tap cycle. */
+export type ControlScheme = 'tap' | 'classic';
 
 export interface Settings {
   autoMark: boolean;
@@ -194,6 +195,12 @@ export interface SaveV2 {
     sessions: number;
     /** The one-time Home card explaining hearts, extra lives and hints has been dismissed. */
     seenPantryIntro: boolean;
+    /** The one-animal rule has been taught (the guided first board or its how-to sheet, D35). */
+    soloRulesSeen: boolean;
+    /** The two-animal rule has been taught (its lesson or how-to sheet; true for players from before D35). */
+    pairRulesSeen: boolean;
+    /** The guided two-animal lesson (level 21) has been solved. */
+    pairLessonDone: boolean;
   };
   lastSession: SavedSession | null;
 }
@@ -205,6 +212,8 @@ export interface SavedSession {
   generatorVersion: number;
   /** Puzzle spec the board was issued under (src/game/specs.ts). Missing in older saves, which were all spec 1. */
   specVersion?: 1 | 2 | 3 | 4;
+  /** Which animals the board shows (meta/cast.ts), so a resumed board looks the same. Validated on resume. */
+  cast?: { a: string; b?: string; sanctuary: string };
   savedAt: string;
   snap: SessionSnapshot;
 }
@@ -219,7 +228,7 @@ export function defaultSettings(): Settings {
     highContrast: false,
     regionPatterns: false,
     leftHanded: false,
-    controls: 'tools',
+    controls: 'tap',
     showTimer: true,
     largeBoard: false,
     toys3d: true,
@@ -311,7 +320,17 @@ export function defaultSave(now = new Date()): SaveV2 {
     stats: { solved: 0, clean: 0, hintFree: 0, losses: 0, comebacks: 0, bestBySize: {}, sizesThisWeek: {}, playDays: {}, lastWin: null },
     settings: defaultSettings(),
     purchases: { removeAds: { active: false, source: null, verifiedAt: null }, owned: {} },
-    onboarding: { seenRules: false, tutorialDone: false, starterDecorChosen: false, seenLeagueIntro: false, sessions: 0, seenPantryIntro: false },
+    onboarding: {
+      seenRules: false,
+      tutorialDone: false,
+      starterDecorChosen: false,
+      seenLeagueIntro: false,
+      sessions: 0,
+      seenPantryIntro: false,
+      soloRulesSeen: false,
+      pairRulesSeen: false,
+      pairLessonDone: false,
+    },
     lastSession: null,
   };
 }
@@ -353,7 +372,7 @@ function normSettings(x: unknown): Settings {
     highContrast: bool(x.highContrast, d.highContrast),
     regionPatterns: bool(x.regionPatterns, d.regionPatterns),
     leftHanded: bool(x.leftHanded, d.leftHanded),
-    controls: oneOf(x.controls, ['tools', 'classic'] as const, d.controls),
+    controls: oneOf(x.controls, ['tap', 'classic'] as const, d.controls),
     showTimer: bool(x.showTimer, d.showTimer),
     largeBoard: bool(x.largeBoard, d.largeBoard),
     toys3d: bool(x.toys3d, d.toys3d),
@@ -426,6 +445,9 @@ function normSavedSession(x: unknown): SavedSession | null {
     digest: x.digest,
     generatorVersion: int(x.generatorVersion, 1),
     ...(x.specVersion === 1 || x.specVersion === 2 || x.specVersion === 3 || x.specVersion === 4 ? { specVersion: x.specVersion } : {}),
+    ...(isObj(x.cast) && typeof x.cast.a === 'string' && typeof x.cast.sanctuary === 'string'
+      ? { cast: { a: x.cast.a, sanctuary: x.cast.sanctuary, ...(typeof x.cast.b === 'string' ? { b: x.cast.b } : {}) } }
+      : {}),
     savedAt: str(x.savedAt, ''),
     snap: x.snap as unknown as SessionSnapshot,
   };
@@ -549,6 +571,10 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       seenLeagueIntro: bool(ob.seenLeagueIntro, false),
       sessions: int(ob.sessions, 0, 0),
       seenPantryIntro: bool(ob.seenPantryIntro, false),
+      // Players from before D35 learned the two-animal rule on their first boards; those past level 21 had its lesson.
+      soloRulesSeen: bool(ob.soloRulesSeen, false),
+      pairRulesSeen: bool(ob.pairRulesSeen, ob.seenRules === true && ob.tutorialDone === true),
+      pairLessonDone: bool(ob.pairLessonDone, isObj(x.journey) && int(x.journey.nextLevel, 1) > 21),
     },
     lastSession: normSavedSession(x.lastSession),
   };

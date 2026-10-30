@@ -81,7 +81,9 @@ describe('v1 → v2 migration', () => {
   });
 
   it('survives a v1 save with wrong types', () => {
-    const kv = new MemoryKV({ [V1_KEY]: JSON.stringify({ level: 'seven', bestTimes: { L1: 'fast', L2: -5, L3: 40 }, dailyDone: 7, streak: null, settings: 'x' }) });
+    const kv = new MemoryKV({
+      [V1_KEY]: JSON.stringify({ level: 'seven', bestTimes: { L1: 'fast', L2: -5, L3: 40 }, dailyDone: 7, streak: null, settings: 'x' }),
+    });
     const { save } = loadSave(kv, NOW);
     expect(save.journey.nextLevel).toBe(1);
     expect(save.journey.bestTimes).toEqual({ L3: 40 });
@@ -109,7 +111,7 @@ describe('v2 normalization', () => {
     const s = normalizeSave({ progressVersion: 2, journey: { nextLevel: 9 } }, NOW);
     expect(s.journey.nextLevel).toBe(9);
     expect(s.inventory.ledger).toEqual([]);
-    expect(s.settings.controls).toBe('tools');
+    expect(s.settings.controls).toBe('tap');
   });
 
   it('drops duplicate or malformed ledger entries', () => {
@@ -200,7 +202,10 @@ describe('regressions from review', () => {
   it('erasing progress keeps Paw Cup attempt records (no fresh attempts)', () => {
     const kv = new MemoryKV();
     const s = defaultSave();
-    s.cup.attempts['C2026-W44-0'] = [{ at: 'x', completed: true, seconds: 90, mistakes: 0, score: 850 }, { at: 'y', completed: false, seconds: 0, mistakes: 0, score: 0 }];
+    s.cup.attempts['C2026-W44-0'] = [
+      { at: 'x', completed: true, seconds: 90, mistakes: 0, score: 850 },
+      { at: 'y', completed: false, seconds: 0, mistakes: 0, score: 0 },
+    ];
     const fresh = resetProgress(s, kv);
     expect(fresh.cup.attempts['C2026-W44-0']).toHaveLength(2);
     expect(fresh.journey.nextLevel).toBe(1);

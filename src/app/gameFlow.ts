@@ -11,6 +11,7 @@ import { track } from '../services/analytics';
 import { isTutorial } from '../meta/onboarding';
 import { startAttempt } from '../competitions/localCup';
 import type { SavedSession } from '../services/storage';
+import { castFor, parseCast } from '../meta/cast';
 
 /** Starts a fresh board. Paw Cup boards open a new attempt; returns false when none are left. */
 export function startGame(mode: ModeRef): boolean {
@@ -23,7 +24,8 @@ export function startGame(mode: ModeRef): boolean {
   // The guided first board is forgiving: mistakes are explained, never punished.
   const rules = rulesFor(mode);
   const session = new Session(puzzle, { hearts: rules.hearts && !isTutorial(mode, app.save), maxHearts: rules.maxHearts });
-  app.active = { mode, session, spec };
+  // Which animals this board shows is decided once, when it starts, and kept with it (D35).
+  app.active = { mode, session, spec, cast: castFor(app.save, session.rule, puzzle.seed) };
   track('puzzle_start', { mode: mode.kind, size: puzzle.size, difficulty: displayDifficulty(puzzle) });
   app.router.go({ screen: 'game' });
   return true;
@@ -47,7 +49,7 @@ export function resumeGame(saved: SavedSession | null = app.save.lastSession): b
     app.persist();
     return false;
   }
-  app.active = r;
+  app.active = { ...r, cast: parseCast(r.cast, r.session.rule) ?? castFor(app.save, r.session.rule, r.session.puzzle.seed) };
   app.router.go({ screen: 'game' });
   return true;
 }

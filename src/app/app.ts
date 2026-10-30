@@ -11,6 +11,7 @@ import type { Router } from '../ui/router';
 import { modeKey, type ModeRef } from '../game/modes';
 import type { Session } from '../game/session';
 import type { SpecVersion } from '../game/specs';
+import type { Cast } from '../meta/cast';
 import { captureSession } from '../game/sessionPersistence';
 import { reconcileRewards, type RewardSummary } from '../meta/rewards';
 import { balance } from '../meta/ledger';
@@ -27,7 +28,7 @@ class App {
   save: SaveV2;
   router!: Router;
   /** The board on screen (or last on screen), for saving on background. */
-  active: { mode: ModeRef; session: Session; spec?: SpecVersion } | null = null;
+  active: { mode: ModeRef; session: Session; spec?: SpecVersion; cast?: Cast } | null = null;
   /** Development or tester build: test purchases and dev entitlements count here (never in release). */
   readonly isDev = TEST_BUILD;
   private listeners = new Set<Listener>();
@@ -44,10 +45,13 @@ class App {
     const gift = reconcileRewards(this.save, new Date(), (level, clear) => packedLevelTier(level, clear.spec ?? 1));
     // Everyone, new or returning, gets the starter pantry once (rewards are not back-dated in treats or tickets).
     const pantry = grantStarterItems(this.save);
-    // Any regional friend whose sanctuary stage was reached but not recorded (an interrupted save) arrives now.
+    // Saves from before D35 start the Pet Garden at their residents' place in its line, and any arrival that was reached
+    // but not recorded (an interrupted save) happens now.
+    const growthBefore = JSON.stringify(this.save.world.growth);
     const friends = reconcileWorld(this.save);
-    if (gift.coins > 0 || gift.pets.length || gift.decor.length) this.upgradeGift = gift;
-    if (gift.coins > 0 || gift.pets.length || gift.decor.length || gift.points > 0 || pantry || friends.length) saveSave(this.save);
+    if (gift.coins > 0 || gift.decor.length) this.upgradeGift = gift;
+    if (gift.coins > 0 || gift.decor.length || gift.points > 0 || pantry || friends.length || growthBefore !== JSON.stringify(this.save.world.growth))
+      saveSave(this.save);
     try {
       const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
       this.systemReduced = mq.matches;
@@ -123,8 +127,8 @@ class App {
   /** Saves the in-progress board (called on every move and when the app is backgrounded). */
   saveActive(): void {
     if (!this.active) return;
-    const { mode, session, spec } = this.active;
-    const snap = captureSession(mode, session, new Date(), spec);
+    const { mode, session, spec, cast } = this.active;
+    const snap = captureSession(mode, session, new Date(), spec, cast);
     if (mode.kind === 'cup') {
       const k = modeKey(mode);
       if (snap) this.save.cup.open[k] = snap;

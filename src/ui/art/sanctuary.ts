@@ -126,7 +126,9 @@ const DECOR_ART: Record<HarmonyDecorId, DecorArt> = {
           const t = i / n;
           const x = x0 + (x1 - x0) * t;
           const y = y0 + (y1 - y0) * t + Math.sin(Math.PI * t) * 3 + 2.5;
-          bulbs.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="${colors[(i + k0) % 4]}" opacity="0.35"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.7" fill="${colors[(i + k0) % 4]}"/>`);
+          bulbs.push(
+            `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="${colors[(i + k0) % 4]}" opacity="0.35"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.7" fill="${colors[(i + k0) % 4]}"/>`,
+          );
         }
       };
       edge(206, 97, 250, 62, 7, 0);
@@ -164,7 +166,10 @@ const DECOR_ART: Record<HarmonyDecorId, DecorArt> = {
         [200, 292],
       ];
       return stones
-        .map(([x, y], i) => `<ellipse cx="${x}" cy="${y}" rx="${11 + i * 0.4}" ry="${4.8 + i * 0.2}" fill="#f0e5ce" stroke="#d4c1a0" stroke-width="1"/>${i % 2 ? paw(x, y) : ''}`)
+        .map(
+          ([x, y], i) =>
+            `<ellipse cx="${x}" cy="${y}" rx="${11 + i * 0.4}" ry="${4.8 + i * 0.2}" fill="#f0e5ce" stroke="#d4c1a0" stroke-width="1"/>${i % 2 ? paw(x, y) : ''}`,
+        )
         .join('');
     },
   },
@@ -173,7 +178,8 @@ const DECOR_ART: Record<HarmonyDecorId, DecorArt> = {
     box: [298, 126, 62, 40],
     draw: () => {
       let s = `<rect x="300" y="142" width="58" height="3.2" rx="1.2" fill="#f3ead9" stroke="${OUT}" stroke-width="0.8"/><rect x="300" y="152" width="58" height="3.2" rx="1.2" fill="#f3ead9" stroke="${OUT}" stroke-width="0.8"/>`;
-      for (let x = 302; x <= 352; x += 8) s += `<path d="M${x} 160 V134 L${x + 2.6} 130.5 L${x + 5.2} 134 V160 Z" fill="#fbf6ec" stroke="${OUT}" stroke-width="0.9"/>`;
+      for (let x = 302; x <= 352; x += 8)
+        s += `<path d="M${x} 160 V134 L${x + 2.6} 130.5 L${x + 5.2} 134 V160 Z" fill="#fbf6ec" stroke="${OUT}" stroke-width="0.9"/>`;
       const fl: Array<[number, number, string]> = [
         [305, 138, '#f2a6bd'],
         [313, 147, '#c9b4f0'],
@@ -406,6 +412,7 @@ interface FriendSpot {
 }
 
 const FRIEND_SPOTS: Partial<Record<CompanionId, FriendSpot>> = {
+  juniper: { x: 74, y: 278, H: 34, mood: 'happy' },
   ember: { x: 46, y: 224, H: 40, mood: 'happy' },
   maple: { x: 196, y: 160, H: 32, mood: 'sleepy', on: { decor: 'tree', x: 58, y: 117, H: 32 } },
 };

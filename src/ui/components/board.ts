@@ -30,8 +30,10 @@ export interface BoardOptions {
   pet: PetFactory;
   /** Called when a pet element leaves the board (cleared / undone) so its animator can stop. */
   onPetRemoved?: (r: number, c: number) => void;
-  /** The resident's name on a tile, for screen-reader labels. */
+  /** The animal's name on a tile, for screen-reader labels. */
   petName?: (r: number, c: number) => string | null;
+  /** What each of the board's animals is called ("sheep"); defaults to cat and dog. */
+  speciesName?: (species: Species) => string;
 }
 
 const SPECIES_NAME: Record<number, string> = { [CAT]: 'cat', [DOG]: 'dog' };
@@ -194,10 +196,11 @@ export class Board {
     const where = `Row ${r + 1}, column ${c + 1}, ${this.regionName(this.puzzle.regions[r][c])}`;
     if (val === CAT || val === DOG) {
       const name = this.opts.petName?.(r, c);
-      return `${where}: ${SPECIES_NAME[val]}${name ? `, ${name}` : ''}${given ? ', already home' : ''}`;
+      const kind = this.opts.speciesName?.(val as Species) ?? SPECIES_NAME[val];
+      return `${where}: ${kind}${name && name.toLowerCase() !== kind.toLowerCase() ? `, ${name}` : ''}${given ? ', already home' : ''}`;
     }
     if (val === MARK) return `${where}: marked empty`;
-    return `${where}: empty${dead ? ', no pet can go here' : ''}`;
+    return `${where}: empty${dead ? ', no animal can go here' : ''}`;
   }
 
   /** Adds a class to cells for `ms`, then removes it. Cancelled with the screen. */

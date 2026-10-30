@@ -45,9 +45,9 @@ interface Entry {
 }
 
 /** Decoration parts drawn in front of a rider. */
-const CUTS: Record<string, string[]> = { balloon: ['.sp-basket'] };
+const CUTS: Record<string, string[]> = { balloon: ['.sp-basket'], tireswing: ['.sp-tire-front'] };
 /** Activities where the rider travels, and turns to face where it goes. */
-const TRAVELS: ReadonlySet<string> = new Set(['kite', 'icelanterns', 'waterfall']);
+const TRAVELS: ReadonlySet<string> = new Set(['kite', 'icelanterns', 'waterfall', 'tractor']);
 
 const TRACKED = /^is-(blink|look|yawn|wag|stretch|hop|love|greet|stroll|flutter)$/;
 
@@ -275,13 +275,22 @@ export class SceneStage {
     const box = this.sceneBox(el);
     const still = act.classList.contains('is-act-still');
     const host = act.closest('[data-decor]') ?? this.svg!.querySelector(`[data-decor="${decor}"]`);
-    const cuts = (CUTS[decor] ?? []).flatMap((sel) => [...(host?.querySelectorAll(sel) ?? [])]).map((c) => {
-      const mesh = new THREE.Mesh(this.cutGeo, this.cutMat);
-      mesh.renderOrder = -10;
-      this.scene.add(mesh);
-      return { el: c, mesh };
-    });
-    e.ride = { decor, el, h0: box?.h || 1, gh: Number(el.closest('[data-rh]')?.getAttribute('data-rh') ?? (el as unknown as HTMLElement).dataset?.rh ?? e.home.gh), lastX: null, cuts };
+    const cuts = (CUTS[decor] ?? [])
+      .flatMap((sel) => [...(host?.querySelectorAll(sel) ?? [])])
+      .map((c) => {
+        const mesh = new THREE.Mesh(this.cutGeo, this.cutMat);
+        mesh.renderOrder = -10;
+        this.scene.add(mesh);
+        return { el: c, mesh };
+      });
+    e.ride = {
+      decor,
+      el,
+      h0: box?.h || 1,
+      gh: Number(el.closest('[data-rh]')?.getAttribute('data-rh') ?? (el as unknown as HTMLElement).dataset?.rh ?? e.home.gh),
+      lastX: null,
+      cuts,
+    };
     e.actor.ride(decor, now, still);
     e.actor.away = false;
   }
