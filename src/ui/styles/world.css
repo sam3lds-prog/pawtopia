@@ -496,10 +496,18 @@
   margin: var(--s2) 0 0;
 }
 .album__group .pet-grid {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .album__group .pet-card {
   padding: var(--s2) 6px;
+  min-width: 0;
+}
+/* Long kinds ("Polar bear cub") wrap inside their card instead of widening the grid on narrow phones. */
+.album__group .pet-card .chip {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
 }
 .album__group .pet-card .portrait {
   width: 56px;

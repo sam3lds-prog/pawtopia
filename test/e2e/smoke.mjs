@@ -207,8 +207,28 @@ try {
   check('the pause sheet has undo, redo and How to play', !!(await page.$('.sheet [data-act="undo"]')) && !!(await page.$('.sheet [data-act="rules"]')));
   await page.click('.sheet [data-act="rules"]');
   check('How to play explains the one-animal rule with the board animal', /One piglet/.test((await page.textContent('.rules')) ?? ''));
+  check('How to play uses real plurals', /Piglets never touch/.test((await page.textContent('.rules')) ?? ''));
   await page.click('[data-act="ok"]');
   await page.waitForTimeout(200);
+
+  // One Undo after a double-tap empties the tile (the first tap's ✕ goes with it); Space never takes an animal away
+  const right = await page.evaluate(() => {
+    const s = window.__pt.app.active.session;
+    for (let r = 0; r < s.size; r++) for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] === 0 && s.puzzle.solution[r][c] === 1) return [r, c];
+    return null;
+  });
+  const cellAt = () => page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], right);
+  await dblTap(right[0], right[1]);
+  check('a double-tap on the right tile places the animal', (await cellAt()) === 1);
+  await page.click('[data-act="pause"]');
+  await page.click('.sheet [data-act="undo"]');
+  await page.waitForTimeout(150);
+  check('one Undo after a double-tap empties the tile', (await cellAt()) === 0);
+  await page.waitForTimeout(450);
+  await dblTap(right[0], right[1]);
+  await page.focus(`.cell[data-r="${right[0]}"][data-c="${right[1]}"]`);
+  await page.keyboard.press('Space');
+  check('Space never takes an animal away', (await cellAt()) === 1);
 
   // Hints: the board's first look is free, the exact cell costs one hint, placing that cell costs nothing more
   const hintCount = () => page.evaluate(() => window.__pt.app.save.inventory.items.filter((e) => e.item === 'hint').reduce((a, e) => a + e.delta, 0));

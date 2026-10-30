@@ -57,10 +57,10 @@ export const petsScreen: ScreenDef = {
               const attr = isPetId(id) ? `data-pet="${id}"` : `data-friend="${id}"`;
               const shown = ownsIt || (isNext && open);
               const art = isPetId(id) ? portrait(id, ownsIt ? 'happy' : 'idle', !shown) : friendPortrait(id as CompanionId, !shown);
-              return `<li><button class="pet-card card card--tap ${ownsIt ? '' : 'is-locked'}" ${attr} aria-label="${esc(ownsIt ? `${a.name} the ${a.noun}, ${a.trait}${fav ? ', favorite' : ''}` : `${isNext ? a.name : `A ${a.noun}`}. ${when}`)}">
+              return `<li><button class="pet-card card card--tap ${ownsIt ? '' : 'is-locked'}" ${attr} aria-label="${esc(ownsIt ? `${a.name} the ${a.noun}, ${a.trait}${fav ? ', favorite' : ''}` : `${shown ? a.name : `A ${a.noun}`}. ${when}`)}">
                 ${fav ? `<span class="pet-card__fav" aria-hidden="true">${ICON.heart}</span>` : ''}
                 ${art}
-                <span class="pet-card__name">${ownsIt || isNext ? esc(a.name) : '???'}</span>
+                <span class="pet-card__name">${shown ? esc(a.name) : '???'}</span>
                 <span class="pet-card__trait">${ownsIt ? esc(a.trait) : esc(when)}</span>
                 <span class="chip">${esc(a.kind)}</span>
               </button></li>`;

@@ -7,7 +7,7 @@ import { app } from '../../app/app';
 import type { Rule } from '../../engine/types';
 import { playsSolo } from '../../game/modes';
 import type { AnimalId } from '../../meta/animals';
-import { withArticle } from '../../meta/animals';
+import { pluralNoun, withArticle } from '../../meta/animals';
 import { castFor, castWord, type Cast } from '../../meta/cast';
 import { animalSvg } from '../art/animals';
 import { openSheet } from '../components/sheet';
@@ -53,9 +53,9 @@ export function showRules(scope: Scope, onClose?: () => void, o: RulesOptions = 
           <p><b>One ${esc(wa)}</b> in every row, every column, and every color.</p>
         </li>
         <li>
-          ${diagram(['a', '', '', '', '', 'a', '', '', ''], [1, 1, 1, 1, 1, 1, 1, 1, 1], 'ok', a, undefined)}
-          ${diagram(['a', '', '', '', 'a', '', '', '', ''], [4, 4, 4, 4, 4, 4, 4, 4, 4], 'no', a, undefined)}
-          <p>${esc(capitalize(wa))}s never <b>touch</b>, not even at a corner.</p>
+          ${diagram(['a', '', '', '', '', 'a', '', '', ''], [1, 1, 4, 1, 4, 4, 1, 4, 4], 'ok', a, undefined)}
+          ${diagram(['a', '', '', '', 'a', '', '', '', ''], [4, 4, 1, 4, 1, 1, 4, 1, 1], 'no', a, undefined)}
+          <p>${esc(capitalize(pluralNoun(wa)))} never <b>touch</b>, not even at a corner.</p>
         </li>`
       : `
         <li>
@@ -75,7 +75,11 @@ export function showRules(scope: Scope, onClose?: () => void, o: RulesOptions = 
         ${items}
         <li>
           <span class="rules__icon">${ICON.mark}</span>
-          <p><b>Tap</b> a tile to mark it ✕. <b>Double-tap</b> to place ${rule === 'solo' ? esc(withArticle(wa)) : 'the animal you picked below the board'}; a wrong guess costs a heart. Every board has one answer you can reach by logic alone.</p>
+          <p>${
+            app.settings.controls === 'classic'
+              ? `<b>Tap</b> a tile once to mark it ✕, again to place ${rule === 'solo' ? esc(withArticle(wa)) : 'the animal you picked below the board'}, and once more to clear it.`
+              : `<b>Tap</b> a tile to mark it ✕. <b>Double-tap</b> to place ${rule === 'solo' ? esc(withArticle(wa)) : 'the animal you picked below the board'}. No quick double tap? Settings → Controls → Tap cycle.`
+          } A wrong guess costs a heart. Every board has one answer you can reach by logic alone.</p>
         </li>
       </ol>
       <div class="sheet__actions"><button class="btn btn--block" data-act="ok">Got it</button></div>`,

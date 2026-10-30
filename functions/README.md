@@ -32,8 +32,10 @@ is issued under today.
 
 D35 is such a change: spec 4 (one-animal Journey levels 1–20, levels from 21 replaying the board of level L − 20, and
 the one-animal Daily sent as `{ kind: 'daily', dateKey, rule: 'solo' }`). Deploy the functions built from this
-version (`npm run fb:deploy`) before the app update. Both Dailies of a date
-award the same `D<date>` id, so a day still counts once.
+version (`npm run fb:deploy`) before the app update. Award ids now follow the board: one-animal levels are `S1`–`S20`,
+and level L ≥ 21 is `L<L − 20>` (the id its board always had), so an account's earlier `L` awards stay valid and a
+board never pays twice. Both Dailies of a date award the same `D<date>` id and the same points, so a day still counts
+once and neither board pays more.
 
 `functions/.env` (optional, git-ignored): `FUNCTIONS_REGION` if not `us-central1`. `ENFORCE_APP_CHECK=true` only
 after the app sends App Check tokens (a native App Attest provider; not wired up yet), otherwise every call fails.

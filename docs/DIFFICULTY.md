@@ -74,7 +74,8 @@ Ladder (`V4_SOLO`, frozen in `src/data/journeyPack4.ts`, every slot matched): 5�
 medium, medium; 7×7 easy, medium; 6×6 hard; 7×7 medium, hard; 8×8 easy, medium; 7×7 hard; 8×8 medium, hard; 9×9
 medium; 8×8 hard; 9×9 medium, hard. Level 1 has a one-tile region so the guided first move is obvious. Level 21 is
 the two-animal lesson and level L ≥ 21 plays two-animal level L − 20's board. The one-animal Daily follows the week
-(Mon 6×6 easy … Sat 8×8 hard, never above 8×8).
+(Mon 6×6 easy … Sat 8×8 hard, never above 8×8). Both Dailies of a date pay Paw Points for the easier of their two
+weekday slots (`dailyPointsTier`), whichever was played; the board's chip still shows its own measured label.
 
 ## Changing the formula
 

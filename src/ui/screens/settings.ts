@@ -65,10 +65,15 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
       <div class="rows-title">Play</div>
       <div class="rows">
         <button class="row" data-act="rules"><span class="row__label">How to play<small>The rules, with pictures</small></span>${ICON.chevron}</button>
-        ${choice('controls', 'Controls', [
-          ['tap', 'Tap and double-tap'],
-          ['classic', 'Tap cycle'],
-        ])}
+        ${choice(
+          'controls',
+          'Controls',
+          [
+            ['tap', 'Tap and double-tap'],
+            ['classic', 'Tap cycle'],
+          ],
+          'Tap cycle needs no quick double tap: easier with VoiceOver or Switch Control',
+        )}
         <p class="controls-preview" data-controls-preview aria-live="polite">${controlsPreview(app.settings.controls)}</p>
         ${sw('autoMark', 'Dot impossible tiles', 'A small dot shows where no animal can go')}
         ${sw('showTimer', 'Show the clock')}

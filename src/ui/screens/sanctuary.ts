@@ -6,7 +6,7 @@
  */
 
 import { app } from '../../app/app';
-import { startGame } from '../../app/gameFlow';
+import { playMode } from '../../app/gameFlow';
 import { DECOR, DECOR_BY_ID, STARTER_DECOR, decorHome, decorOf, type DecorId } from '../../meta/catalogs/decor';
 import type { PetId } from '../../meta/catalogs/pets';
 import { chooseStarter, isShown, owns, sanctuaryChat, setShown, shownDecorIds } from '../../meta/sanctuary';
@@ -260,7 +260,7 @@ export const sanctuaryScreen: ScreenDef = {
       if (!a) return;
       if (a.act === 'back') app.router.go({ screen: 'home' });
       else if (a.act === 'shop') app.router.go({ screen: 'shop', sanctuary: 'harmony' });
-      else if (a.act === 'play') startGame({ kind: 'level', level: app.save.journey.nextLevel });
+      else if (a.act === 'play') playMode({ kind: 'level', level: app.save.journey.nextLevel });
       else if (a.act === 'build' && setActive(app.save, 'harmony')) {
         app.persist();
         sfx('coin');
@@ -404,6 +404,6 @@ function offerNext(scope: Scope): void {
     const a = actionOf(e);
     if (!a) return;
     sh.close();
-    if (a.act === 'play') startGame({ kind: 'level', level: next });
+    if (a.act === 'play') playMode({ kind: 'level', level: next });
   });
 }

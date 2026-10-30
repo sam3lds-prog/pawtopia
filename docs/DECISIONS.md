@@ -512,5 +512,19 @@ buttons on two-animal boards. Slow-down pace, board sizes and the Daily left to 
   a beard, a crest, patches and a blaze; tire-swing and tractor rides.
 - **Screens**: Home shows the sanctuary being built and who comes next; the win sheet says who came home and who is on
   the way; the album groups animals by sanctuary and shows the next arrival in color; the World map has six pins.
+- **Saves from before D35** (`storage.upgradeLadder`, once, with a backup at `pawtopia.backup.v2.pre-d35`; v1 saves
+  too): two-animal level L is now level L + 20 on the very same board, so a player who had cleared any level moves up
+  by 20. Clears, stars, best times, the next level, the board in progress and queued leaderboard solves move with it;
+  the two-animal lesson counts as done, so their Daily, Zen and Paw Cup stay two-animal. Levels 1–20 show as open
+  (not solved) on the path, and Home says once what happened. A player who never cleared a level starts the new
+  ladder.
+- **Rewards follow the board, not the number** (`specs.levelRewardKey`): one-animal levels pay under `S1`–`S20`; level
+  L ≥ 21 pays under `L<L − 20>`, the id that board always had. Coins, Paw Points, extra lives, hints and the server's
+  awards all use it, so a moved player never earns twice for a board (nor gets nothing for the new levels). Chapter
+  gifts stay with chapter numbers.
+- **Both Dailies of a date pay the same** (`specs.dailyPointsTier`): the easier of the two weekday slots, on the device
+  and on the server, so no one gains by playing the other board.
+- **No-timing controls**: Settings → Controls → Tap cycle (no quick double tap; for VoiceOver and Switch Control) is
+  named in Settings and in How to play.
 - Kept: hearts, hints and the Paw Cup's rules; the two-animal engine and every shipped two-animal board; nothing
   pay-to-win.

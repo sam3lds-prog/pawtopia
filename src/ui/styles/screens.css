@@ -246,6 +246,13 @@
     0 8px 18px -6px rgba(24, 92, 85, 0.5);
   font-size: 26px;
 }
+.node--open .node__btn {
+  background: var(--surface);
+  color: var(--brand-dark);
+  box-shadow:
+    inset 0 0 0 2px var(--brand),
+    0 3px 0 var(--brand-soft);
+}
 .node--locked .node__btn {
   background: var(--canvas-deep);
   color: var(--faint-ink);

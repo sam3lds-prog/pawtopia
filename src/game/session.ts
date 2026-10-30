@@ -332,6 +332,11 @@ export class Session {
     return this.history.length > 0;
   }
 
+  /** The most recent board change, if any (read-only). */
+  lastChange(): Readonly<Action> | undefined {
+    return this.history[this.history.length - 1];
+  }
+
   canRedo(): boolean {
     return this.redoStack.length > 0;
   }

@@ -89,7 +89,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   let tool: Tool = solo ? 'cat' : settings.lastSpecies;
   /** Erase is a mode: while it's on, taps take things back. */
   let erasing = false;
-  let lastTap: { r: number; c: number; t: number } | null = null;
+  let lastTap: { r: number; c: number; t: number; marked: boolean } | null = null;
   let hint: { info: HintInfo; tier: 1 | 2 } | null = null;
   let finished = false;
   let sheet: SheetHandle | null = null;
@@ -353,9 +353,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     }
     const now = performance.now();
     const v = s.cells[r][c];
-    // A second tap on the same tile, quickly: place the animal (the first tap's ✕ goes away with it).
+    // A second tap on the same tile, quickly: place the animal. The first tap's ✕ is taken back with a logged undo,
+    // so one Undo afterwards empties the tile (and the server's replay sees exactly the same moves).
     if (lastTap && lastTap.r === r && lastTap.c === c && now - lastTap.t < DOUBLE_TAP_MS && v !== CAT && v !== DOG) {
+      const ownMark = lastTap.marked;
       lastTap = null;
+      const last = s.lastChange();
+      if (ownMark && v === MARK && last && last.r === r && last.c === c && last.before === EMPTY && last.after === MARK) s.undo();
       placeAt(r, c);
       return null;
     }
@@ -365,7 +369,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       return null;
     }
     const res = s.toggleMark(r, c);
-    lastTap = s.givenMask[r][c] ? null : { r, c, t: now };
+    lastTap = s.givenMask[r][c] ? null : { r, c, t: now, marked: !!res.marked };
     handle(res, r, c);
     if (guide && guide.r === r && guide.c === c && res.marked) coach(`Now tap it again, quickly, to place ${aWord(guide.species)}.`);
     if (res.marked) return 'mark';
@@ -395,7 +399,12 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     if (k === 'enter') return keyApply(r, c, species() === DOG ? 'dog' : 'cat');
     if (k === '1' || k === 'a') return keyApply(r, c, 'cat');
     if (!solo && (k === '2' || k === 'b')) return keyApply(r, c, 'dog');
-    if (k === ' ' || k === 'x' || k === '.') return keyApply(r, c, 'mark');
+    if (k === ' ' || k === 'x' || k === '.') {
+      if (finished || s.paused) return true;
+      faces.activity();
+      handle(s.toggleMark(r, c), r, c);
+      return true;
+    }
     if (k === 'backspace' || k === 'delete' || k === '0' || k === 'e') return keyApply(r, c, 'erase');
     if (k === 'z') {
       doUndo();

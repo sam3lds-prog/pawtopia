@@ -299,7 +299,10 @@ export function difficultyReason(prof: DifficultyProfile): string {
     bits.push(prof.breakthroughs === 1 ? 'one moment that needs a new idea' : `${prof.breakthroughs} moments that need a new idea`);
   if (prof.longestChain >= 4) bits.push('long chains of reasoning');
   if (prof.neighborLock > 0) bits.push('neighbor logic');
-  if (prof.givens <= Math.max(1, Math.round(prof.size / 3))) bits.push(prof.givens === 1 ? 'one pet to start' : 'few pets to start');
+  if ((prof.subset ?? 0) > 0) bits.push('colors that share whole rows');
+  // One-animal boards always start empty, so the head start only says something on two-animal boards.
+  if (prof.rule !== 'solo' && prof.givens <= Math.max(1, Math.round(prof.size / 3)))
+    bits.push(prof.givens === 0 ? 'no animals to start' : prof.givens === 1 ? 'one animal to start' : 'few animals to start');
   const s = bits.slice(0, 3).join(', ');
   return s ? s.charAt(0).toUpperCase() + s.slice(1) + '.' : 'Needs a little more than single spots.';
 }

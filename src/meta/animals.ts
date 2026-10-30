@@ -43,6 +43,15 @@ export function animalInfo(id: AnimalId): AnimalInfo {
   return { id, name: c.name, kind: c.kind, noun: c.kind.toLowerCase(), animal: c.animal, trait: c.trait, bio: c.bio, sanctuary: c.sanctuary, resident: false };
 }
 
+/** "sheep", "piglets", "calves", "ponies", "foxes": the plural of an animal noun. */
+export function pluralNoun(noun: string): string {
+  if (/sheep$/i.test(noun)) return noun;
+  if (/calf$/i.test(noun)) return noun.replace(/calf$/i, 'calves');
+  if (/[^aeiou]y$/i.test(noun)) return noun.slice(0, -1) + 'ies';
+  if (/(s|x|z|ch|sh)$/i.test(noun)) return noun + 'es';
+  return noun + 's';
+}
+
 /** "a sheep", "an elephant calf". */
 export function withArticle(noun: string): string {
   return `${/^[aeiou]/i.test(noun) ? 'an' : 'a'} ${noun}`;

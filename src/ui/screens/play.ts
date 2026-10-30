@@ -44,8 +44,9 @@ function pathMarkup(ch: Chapter): string {
     .map((p, i) => {
       const L = ch.first + i;
       const clear = save.journey.clears[`L${L}`];
-      const state = clear || L < next ? 'done' : L === next ? 'current' : 'locked';
-      const stars = clear?.stars ?? (state === 'done' ? 1 : 0);
+      // 'open': behind the next level but never played (the one-animal levels for a save that moved up in D35).
+      const state = clear ? 'done' : L === next ? 'current' : L < next ? 'open' : 'locked';
+      const stars = clear?.stars ?? 0;
       // A board already in progress keeps the spec it was issued under (an old 9×9 save resumes as that 9×9).
       const saved = state === 'current' ? savedFor({ kind: 'level', level: L }) : null;
       const spec = saved && hasMeaningfulProgress(saved) ? (saved.specVersion ?? 1) : undefined;
@@ -65,7 +66,9 @@ function pathMarkup(ch: Chapter): string {
           ? `Level ${L}, locked`
           : state === 'current'
             ? `Level ${L}, ${size} by ${size}${tier ? `, ${tier}` : ''}, play next`
-            : `Level ${L}, solved, ${stars} of 3 stars`;
+            : state === 'open'
+              ? `Level ${L}, not played yet`
+              : `Level ${L}, solved, ${stars} of 3 stars`;
       return `
         <li class="node node--${state}" style="left:${p.x}%;top:${p.y}px">
           <button class="node__btn" data-level="${L}" ${state === 'locked' ? 'disabled' : ''} aria-label="${label}">
@@ -152,8 +155,8 @@ export const playScreen: ScreenDef = {
       let stars = 0;
       for (let L = ch.first; L <= ch.last; L++) {
         const c = save.journey.clears[`L${L}`];
-        if (c || L < next) solved++;
-        stars += c?.stars ?? (L < next ? 1 : 0);
+        if (c) solved++;
+        stars += c?.stars ?? 0;
       }
       const locked = ch.first > next;
       body.innerHTML = `

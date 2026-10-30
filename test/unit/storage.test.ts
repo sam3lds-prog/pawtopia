@@ -31,8 +31,9 @@ describe('v1 → v2 migration', () => {
     const kv = new MemoryKV({ [V1_KEY]: JSON.stringify(v1Fixture), [V1_RULES_KEY]: '1' });
     const { save, source } = loadSave(kv, NOW);
     expect(source).toBe('migrated-v1');
-    expect(save.journey.nextLevel).toBe(14);
-    expect(save.journey.bestTimes).toEqual({ L1: 31, L2: 44, L13: 120 });
+    // v1's two-animal levels moved up by 20 for D35 (level 14 is now 34, on the very same board).
+    expect(save.journey.nextLevel).toBe(34);
+    expect(save.journey.bestTimes).toEqual({ L21: 31, L22: 44, L33: 120 });
     expect(save.daily.bestTimes).toEqual({ 'D2026-10-23': 300, 'D2026-10-24': 250 });
     expect(Object.keys(save.daily.done).sort()).toEqual(['2026-10-23', '2026-10-24']);
     expect(save.daily.streak).toBe(2);
@@ -49,8 +50,10 @@ describe('v1 → v2 migration', () => {
   it('records every previously cleared level so replays cannot mint first-clear rewards again', () => {
     const kv = new MemoryKV({ [V1_KEY]: JSON.stringify(v1Fixture) });
     const { save } = loadSave(kv, NOW);
-    for (let L = 1; L < 14; L++) expect(save.journey.clears[`L${L}`]).toBeDefined();
-    expect(save.journey.clears.L14).toBeUndefined();
+    for (let L = 21; L < 34; L++) expect(save.journey.clears[`L${L}`]).toBeDefined();
+    expect(save.journey.clears.L34).toBeUndefined();
+    // The new one-animal levels are not marked solved.
+    for (let L = 1; L <= 20; L++) expect(save.journey.clears[`L${L}`]).toBeUndefined();
   });
 
   it('backs up v1, never deletes it, and is idempotent on the next launch', () => {
@@ -70,7 +73,7 @@ describe('v1 → v2 migration', () => {
     const kv = new MemoryKV({ [V1_KEY]: raw, [V1_BACKUP_KEY]: raw });
     const { save, source } = loadSave(kv, NOW);
     expect(source).toBe('migrated-v1');
-    expect(save.journey.nextLevel).toBe(14);
+    expect(save.journey.nextLevel).toBe(34);
   });
 
   it('survives a corrupted v1 save', () => {
@@ -95,7 +98,7 @@ describe('v1 → v2 migration', () => {
     const kv = new MemoryKV({ [V2_KEY]: '{{{', [V1_KEY]: JSON.stringify(v1Fixture) });
     const { save, source } = loadSave(kv, NOW);
     expect(source).toBe('migrated-v1');
-    expect(save.journey.nextLevel).toBe(14);
+    expect(save.journey.nextLevel).toBe(34);
     expect(kv.getItem('pawtopia.corrupt.v2')).toBe('{{{');
   });
 

@@ -15,6 +15,7 @@ import type { ModeRef } from '../game/modes';
 import { isValidModeRef } from '../game/modes';
 import { isSessionEvent, type SessionEvent, type SessionSnapshot } from '../game/session';
 import { dailySpec, levelSpec } from '../engine/levels';
+import { SOLO_LEVELS, levelRewardKey, pairSourceOf } from '../game/specs';
 
 // ------------------------------------------------------------------ keys
 
@@ -22,6 +23,8 @@ export const V1_KEY = 'cvd.progress.v1';
 export const V1_RULES_KEY = 'cvd.seenRules';
 export const V2_KEY = 'pawtopia.save.v2';
 export const V1_BACKUP_KEY = 'pawtopia.backup.cvd.progress.v1';
+/** A copy of a save as it was before D35 moved its levels up (written once, never read by the app). */
+export const PRE_D35_BACKUP_KEY = 'pawtopia.backup.v2.pre-d35';
 export const APP_KEY_PREFIXES = ['pawtopia.', 'cvd.'];
 
 // ------------------------------------------------------------------ v1 (legacy) shape
@@ -123,6 +126,8 @@ export interface SaveV2 {
     nextLevel: number;
     bestTimes: Record<string, number>; // `L${level}` → seconds (kept in v1 format for continuity)
     clears: Record<string, LevelClear>; // `L${level}`
+    /** Level numbering: 4 = D35's (one-animal levels 1–20 first); 3 = before it (moved up by `upgradeLadder`). */
+    ladder: 3 | 4;
   };
   daily: {
     done: Record<string, DailyClear>; // dateKey (local)
@@ -201,6 +206,8 @@ export interface SaveV2 {
     pairRulesSeen: boolean;
     /** The guided two-animal lesson (level 21) has been solved. */
     pairLessonDone: boolean;
+    /** The save's levels just moved up for D35 and the player hasn't been told yet. */
+    ladderNotice: boolean;
   };
   lastSession: SavedSession | null;
 }
@@ -306,7 +313,7 @@ export function defaultSave(now = new Date()): SaveV2 {
     progressVersion: 2,
     installDate: now.toISOString(),
     migratedFrom: null,
-    journey: { nextLevel: 1, bestTimes: {}, clears: {} },
+    journey: { nextLevel: 1, bestTimes: {}, clears: {}, ladder: 4 },
     daily: { done: {}, bestTimes: {}, streak: 0, bestStreak: 0, lastDate: null, cozyDays: {} },
     zen: { solved: 0, nextSeed: 1 },
     cup: { attempts: {}, open: {} },
@@ -330,6 +337,7 @@ export function defaultSave(now = new Date()): SaveV2 {
       soloRulesSeen: false,
       pairRulesSeen: false,
       pairLessonDone: false,
+      ladderNotice: false,
     },
     lastSession: null,
   };
@@ -488,6 +496,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
           ...(v.spec === 2 || v.spec === 3 || v.spec === 4 ? { spec: v.spec as 2 | 3 | 4 } : {}),
         };
       }),
+      ladder: j.ladder === 4 ? 4 : 3,
     },
     daily: {
       done: rec(dl.done, (v) => (isObj(v) ? { at: str(v.at, ''), seconds: int(v.seconds, 0, 0), mistakes: int(v.mistakes, 0, 0) } : undefined)),
@@ -575,6 +584,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       soloRulesSeen: bool(ob.soloRulesSeen, false),
       pairRulesSeen: bool(ob.pairRulesSeen, ob.seenRules === true && ob.tutorialDone === true),
       pairLessonDone: bool(ob.pairLessonDone, isObj(x.journey) && int(x.journey.nextLevel, 1) > 21),
+      ladderNotice: bool(ob.ladderNotice, false),
     },
     lastSession: normSavedSession(x.lastSession),
   };
@@ -586,6 +596,8 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
 export function migrateV1(v1raw: unknown, seenRules: boolean, now = new Date()): SaveV2 {
   const s = defaultSave(now);
   s.migratedFrom = 'v1';
+  // v1 numbered the two-animal levels from 1; `loadSave` moves them up for D35 (`upgradeLadder`).
+  s.journey.ladder = 3;
   s.onboarding.seenRules = seenRules;
   if (!isObj(v1raw)) return s;
   const v1 = v1raw as Partial<ProgressV1>;
@@ -640,6 +652,56 @@ export function migrateV1(v1raw: unknown, seenRules: boolean, now = new Date()):
   return s;
 }
 
+/**
+ * D35 put twenty one-animal levels in front of the two-animal Journey: two-animal level L is now level L + 20 and plays
+ * the very same board (`specs.pairSourceOf`). A save from before then moves up by 20 levels, so its player neither
+ * replays boards they solved nor loses anything: clears (with their stars and records), best times, the next level, the
+ * board in progress and queued leaderboard solves all move with it, and the two-animal lesson counts as done. Rewards
+ * and awards are keyed by board (`specs.levelRewardKey`), so nothing pays twice. A player who never cleared a level
+ * simply starts the new ladder. Pure; returns whether anything moved.
+ */
+export function upgradeLadder(save: SaveV2): boolean {
+  const j = save.journey;
+  if (j.ladder === 4) return false;
+  j.ladder = 4;
+  const cleared = Object.keys(j.clears).filter((k) => /^L\d+$/.test(k));
+  if (j.nextLevel <= 1 && cleared.length === 0) return false;
+  const up = (L: number) => L + SOLO_LEVELS;
+  // The same board keeps its records comparable (spec 4); a board from an older spec keeps its own spec.
+  const sameBoard = (L: number, spec: number | undefined) => (spec ?? 1) === pairSourceOf(up(L)).spec;
+
+  const clears: Record<string, LevelClear> = {};
+  for (const k of cleared) {
+    const L = Number(k.slice(1));
+    const c = j.clears[k];
+    const moved: LevelClear = { ...c };
+    if (sameBoard(L, c.spec)) moved.spec = 4;
+    clears[`L${up(L)}`] = moved;
+  }
+  j.clears = clears;
+  const times: Record<string, number> = {};
+  for (const [k, secs] of Object.entries(j.bestTimes)) if (/^L\d+$/.test(k)) times[`L${up(Number(k.slice(1)))}`] = secs;
+  j.bestTimes = times;
+  j.nextLevel = up(j.nextLevel);
+
+  const last = save.lastSession;
+  if (last && last.mode.kind === 'level') {
+    const L = last.mode.level;
+    if (sameBoard(L, last.specVersion)) save.lastSession = { ...last, mode: { kind: 'level', level: up(L) }, specVersion: 4 };
+    else save.lastSession = null; // a board from a retired spec can't be reached at its new number
+  }
+  for (const p of save.leaderboard.pending) {
+    if (p.mode.kind !== 'level' || !sameBoard(p.mode.level, p.spec)) continue; // retired specs are refused by design
+    p.mode = { kind: 'level', level: up(p.mode.level) };
+    p.spec = 4;
+    p.key = levelRewardKey(p.mode.level);
+  }
+  save.onboarding.pairRulesSeen = true;
+  save.onboarding.pairLessonDone = true;
+  save.onboarding.ladderNotice = true;
+  return true;
+}
+
 export interface LoadResult {
   save: SaveV2;
   source: 'v2' | 'migrated-v1' | 'fresh' | 'recovered';
@@ -653,7 +715,16 @@ export function loadSave(kv: KV = platformKV(), now = new Date()): LoadResult {
   const rawV2 = kv.getItem(V2_KEY);
   if (rawV2 !== null) {
     const parsed = safeParse<unknown>(rawV2);
-    if (isObj(parsed) && parsed.progressVersion === 2) return { save: normalizeSave(parsed, now), source: 'v2' };
+    if (isObj(parsed) && parsed.progressVersion === 2) {
+      const save = normalizeSave(parsed, now);
+      if (save.journey.ladder !== 4) {
+        // Keep the save as it was (once), then move its levels up for D35 and write it back.
+        if (kv.getItem(PRE_D35_BACKUP_KEY) === null) kv.setItem(PRE_D35_BACKUP_KEY, rawV2);
+        upgradeLadder(save);
+        kv.setItem(V2_KEY, JSON.stringify(save));
+      }
+      return { save, source: 'v2' };
+    }
     // Corrupt v2: fall through to v1 if present, otherwise start fresh (keep the bad copy for support).
     kv.setItem('pawtopia.corrupt.v2', rawV2);
   }
@@ -662,6 +733,7 @@ export function loadSave(kv: KV = platformKV(), now = new Date()): LoadResult {
     const seenRules = kv.getItem(V1_RULES_KEY) !== null;
     if (kv.getItem(V1_BACKUP_KEY) === null) kv.setItem(V1_BACKUP_KEY, rawV1);
     const migrated = migrateV1(safeParse<unknown>(rawV1), seenRules, now);
+    upgradeLadder(migrated);
     const json = JSON.stringify(migrated);
     kv.setItem(V2_KEY, json);
     // Round-trip check: what we read back must equal what we wrote.

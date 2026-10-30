@@ -62,9 +62,9 @@ describe('checking a solve', () => {
     if (!r.ok) return;
     const tier = profileOf(puzzleFor(L5 as ModeRef)).tier;
     expect(r.awards).toEqual([
-      { id: 'L5', points: POINTS.journeyBase + POINTS.difficulty[tier] },
-      { id: 'clean:L5', points: POINTS.clean },
-      { id: 'nohint:L5', points: POINTS.hintFree },
+      { id: 'S5', points: POINTS.journeyBase + POINTS.difficulty[tier] },
+      { id: 'clean:S5', points: POINTS.clean },
+      { id: 'nohint:S5', points: POINTS.hintFree },
     ]);
   });
 
@@ -76,7 +76,7 @@ describe('checking a solve', () => {
     if (!r.ok) return;
     expect(r.mistakes).toBe(session.mistakes);
     expect(r.hintsUsed).toBe(session.hintsUsed);
-    expect(r.awards.map((a) => a.id)).toEqual(['L12']);
+    expect(r.awards.map((a) => a.id)).toEqual(['S12']);
   });
 
   it('a Daily pays once, with its bonuses folded in, within a week of its date', () => {
@@ -138,8 +138,10 @@ describe('checking a solve', () => {
   });
 
   it('knows which awards a solve could still add', () => {
-    expect(possibleAwards(L5, 0, 0)).toEqual(['L5', 'clean:L5', 'nohint:L5']);
-    expect(possibleAwards(L5, 1, 2)).toEqual(['L5']);
+    expect(possibleAwards(L5, 0, 0)).toEqual(['S5', 'clean:S5', 'nohint:S5']);
+    expect(possibleAwards(L5, 1, 2)).toEqual(['S5']);
+    // From level 21, ids follow the two-animal board a level plays (D35): level 25 is board L5.
+    expect(possibleAwards({ kind: 'level', level: 25 }, 1, 2)).toEqual(['L5']);
     expect(possibleAwards({ kind: 'daily', dateKey: '2026-10-29' }, 0, 0)).toEqual(['D2026-10-29']);
   });
 });
@@ -210,10 +212,10 @@ describe('leaderboard server', () => {
       events: play({ kind: 'level', level: 12 }, { wrong: 1 }).events,
     };
     const m1 = await submitSolves(store, 'u1', [messy], NOW);
-    expect(m1.results[0].awarded).toEqual(['L12', 'nohint:L12']);
+    expect(m1.results[0].awarded).toEqual(['S12', 'nohint:S12']);
     const clean = { ...messy, events: play({ kind: 'level', level: 12 }).events };
     const m2 = await submitSolves(store, 'u1', [clean], NOW);
-    expect(m2.results[0]).toMatchObject({ status: 'ok', points: POINTS.clean, awarded: ['clean:L12'] });
+    expect(m2.results[0]).toMatchObject({ status: 'ok', points: POINTS.clean, awarded: ['clean:S12'] });
     // Next week: the weekly total starts again, the all-time total keeps going.
     const nextWeek = new Date(NOW.getTime() + 7 * 86_400_000);
     const d = { kind: 'daily' as const, dateKey: nextWeek.toISOString().slice(0, 10) };
@@ -329,14 +331,15 @@ describe('on the device', () => {
     lb.joined = true;
     expect(enqueueSolve(lb, { kind: 'zen', size: 6, seed: 1 }, 1, [], 0, 0)).toBe(false);
     expect(enqueueSolve(lb, lvl, 1, [], 0, 0)).toBe(true);
-    lb.awarded = { L5: true, 'clean:L5': true, 'nohint:L5': true };
+    lb.awarded = { S5: true, 'clean:S5': true, 'nohint:S5': true };
     expect(enqueueSolve(lb, lvl, 1, [], 0, 0)).toBe(false); // nothing left to earn
-    lb.awarded = { L5: true };
+    lb.awarded = { S5: true };
     expect(enqueueSolve(lb, lvl, 1, [], 1, 1)).toBe(false); // a messy replay can't add the bonuses
     expect(enqueueSolve(lb, lvl, 1, [], 0, 1)).toBe(true); // a clean one can
     for (let i = 0; i < LB_PENDING_MAX + 5; i++) enqueueSolve(lb, { kind: 'level', level: 100 + i }, 2, [], 0, 0);
     expect(lb.pending).toHaveLength(LB_PENDING_MAX);
-    expect(lb.pending[lb.pending.length - 1].key).toBe(`L${100 + LB_PENDING_MAX + 4}`);
+    // Level ids follow the board (D35): level L from 21 is two-animal board L − 20.
+    expect(lb.pending[lb.pending.length - 1].key).toBe(`L${100 + LB_PENDING_MAX + 4 - 20}`);
     // Survives a save round trip; junk is dropped.
     const s = defaultSave();
     s.leaderboard = lb;

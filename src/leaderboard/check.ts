@@ -4,8 +4,9 @@
  * date, and the spec it was issued under) and its move log; this rebuilds the official board, replays every move with
  * that mode's rules and computes the Paw Points itself, with the same table the app uses (`meta/points.ts`).
  *
- * Each award has a stable id (`L12`, `clean:L12`, `nohint:L12`, `D2026-10-29`), so a board pays at most once per
- * account however often it is sent. Both Dailies of a date share one id: a day's Daily pays once, whichever was played.
+ * Each award has a stable id (`S3`, `L12`, `clean:L12`, `nohint:L12`, `D2026-10-29`), so a board pays at most once per
+ * account however often it is sent. Level ids follow the board (D35: level 32 plays two-animal board 12, `L12`). Both
+ * Dailies of a date share one id and pay the same: a day's Daily pays once, whichever was played.
  */
 
 import { MAX_EVENTS, verifyAttempt } from '../competitions/verify';
@@ -15,7 +16,7 @@ import { profileOf } from '../game/grading';
 import { rulesFor, type ModeRef } from '../game/modes';
 import { currentSpec, puzzleFor } from '../game/puzzles';
 import { isSessionEvent, type SessionEvent } from '../game/session';
-import type { SpecVersion } from '../game/specs';
+import { dailyPointsTier, levelRewardKey, type SpecVersion } from '../game/specs';
 import { POINTS } from '../meta/points';
 
 /** A Daily is either the two-animal board or (for players before two animals, D35) the one-animal board of that date. */
@@ -46,8 +47,9 @@ export const MIN_MS_PER_PLACEMENT = 250;
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Award ids follow the board (D35): `S3` for one-animal level 3, `L5` for level 25 (two-animal board 5), `D<date>`. */
 export function boardKey(b: BoardRef): string {
-  return b.kind === 'level' ? `L${b.level}` : `D${b.dateKey}`;
+  return b.kind === 'level' ? levelRewardKey(b.level) : `D${b.dateKey}`;
 }
 
 /** Shape check for anything arriving from a client. */
@@ -109,7 +111,9 @@ export function checkSolve(sub: SolveSubmission, now: Date): CheckResult {
     if (clean) awards.push({ id: `clean:${key}`, points: POINTS.clean });
     if (hintFree) awards.push({ id: `nohint:${key}`, points: POINTS.hintFree });
   } else {
-    awards.push({ id: key, points: POINTS.dailyBase + POINTS.difficulty[tier] + (clean ? POINTS.clean : 0) + (hintFree ? POINTS.hintFree : 0) });
+    // Both Dailies of a date pay the same, so neither board is the better-paying one.
+    const t = dailyPointsTier(m.dateKey, tier) ?? tier;
+    awards.push({ id: key, points: POINTS.dailyBase + POINTS.difficulty[t] + (clean ? POINTS.clean : 0) + (hintFree ? POINTS.hintFree : 0) });
   }
   return { ok: true, key, awards, tier, mistakes: v.mistakes, hintsUsed: v.hintsUsed };
 }

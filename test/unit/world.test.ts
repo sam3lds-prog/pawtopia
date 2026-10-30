@@ -197,6 +197,18 @@ describe('growing a sanctuary', () => {
     expect(nextArrivalIn(fresh, 'harmony')?.id).toBe('juniper');
   });
 
+  it('a garden that a pre-D35 save already filled pays its completion gift once, at startup', () => {
+    const s = atLevel(60);
+    for (const p of PETS) s.inventory.pets[p.id] = { unlockedAt: '2026-10-01T00:00:00Z' };
+    for (const id of ['ember', 'maple'] as const) s.inventory.companions[id] = { unlockedAt: '2026-10-01T00:00:00Z' };
+    const before = balance(s);
+    expect(reconcileWorld(s, NOW)).toEqual(['juniper']);
+    expect(balance(s) - before).toBe(SANCTUARY_BY_ID.harmony.completeCoins);
+    reconcileWorld(s, NOW);
+    expect(balance(s) - before).toBe(SANCTUARY_BY_ID.harmony.completeCoins);
+    expect(s.inventory.ledger.filter((e) => e.id === 'world:complete:harmony')).toHaveLength(1);
+  });
+
   it('chats only about what happened', () => {
     const s = atLevel(0);
     expect(regionChat(s, 'farm', NOW)).toBeNull();

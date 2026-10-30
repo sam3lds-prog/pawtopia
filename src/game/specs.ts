@@ -226,6 +226,15 @@ export function isSoloLevel(level: number, spec: SpecVersion): boolean {
   return spec === 4 && level <= SOLO_LEVELS;
 }
 
+/**
+ * The id a Journey board's rewards and leaderboard awards are kept under (D35): one-animal levels are `S1`–`S20`, and a
+ * level from 21 uses the number of the two-animal level whose board it plays (`L1` for level 21). Ids follow the
+ * board, not the level number, so a board solved before D35 (as level L) never pays again as level L + 20.
+ */
+export function levelRewardKey(level: number): string {
+  return level <= SOLO_LEVELS ? `S${level}` : `L${level - SOLO_LEVELS}`;
+}
+
 /** The two-animal level (and the spec it was issued under) whose board a spec-4 level from 21 plays. */
 export function pairSourceOf(level: number): { level: number; spec: SpecVersion } {
   const p = level - SOLO_LEVELS;
@@ -249,6 +258,18 @@ export function dailyTargetSolo(dateKey: string): TargetSpec {
 }
 
 const RANK: Record<Difficulty, number> = { easy: 0, medium: 1, hard: 2, expert: 3 };
+
+/**
+ * The difficulty a date's Daily pays Paw Points for (D35). A date has two Dailies (one animal until the two-animal
+ * lesson, two after) and both pay the same: the easier of the two weekday slots, so nobody gains by playing the other
+ * board. Dailies from before the measured slots (spec 1) pay for what was played, as they always did.
+ */
+export function dailyPointsTier(dateKey: string, measured?: Difficulty): Difficulty | undefined {
+  if (dateKey < DAILY_V2_FROM) return measured;
+  const two = dailyTargetV2(dateKey).tier;
+  const one = dailyTargetSolo(dateKey).tier;
+  return RANK[two] <= RANK[one] ? two : one;
+}
 
 /**
  * Deterministically finds a board whose measured difficulty matches the target: candidate seeds are tried in a fixed

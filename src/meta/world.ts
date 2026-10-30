@@ -169,7 +169,7 @@ export function openRegions(save: Pick<SaveV2, 'journey' | 'world'>): RegionId[]
  * Startup safety net. Saves from before D35 never grew the Pet Garden (its residents arrived at Journey levels), so its
  * growth starts at the arrival count of the latest resident already home: everyone before them in the new order moves
  * in too, and the next one is a fair number of puzzles away. Then any arrival that was reached but not recorded is
- * welcomed. Idempotent.
+ * welcomed, and a sanctuary that is already finished pays its completion gift (once, by ledger id). Idempotent.
  */
 export function reconcileWorld(save: WorldSave, now = new Date()): AnimalId[] {
   if (save.world.growth.harmony === undefined) {
@@ -178,7 +178,11 @@ export function reconcileWorld(save: WorldSave, now = new Date()): AnimalId[] {
     if (reached > 0) save.world.growth.harmony = reached;
   }
   const out: AnimalId[] = [];
-  for (const s of SANCTUARIES) out.push(...welcomeArrivals(save, s.id, now));
+  for (const s of SANCTUARIES) {
+    out.push(...welcomeArrivals(save, s.id, now));
+    // A sanctuary that is already finished (an earlier save whose garden filled up above) still pays its gift, once.
+    if (isComplete(save, s.id)) grant(save, `world:complete:${s.id}`, s.completeCoins, 'gift', now, `${s.name} complete`);
+  }
   return out;
 }
 

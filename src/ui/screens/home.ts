@@ -258,6 +258,16 @@ export const homeScreen: ScreenDef = {
       return `${d.items?.life ? ICON.lifePlus : ''}${d.items?.hint ? ICON.bulb : ''}`;
     }
 
+    // D35 moved an earlier save's levels up by 20: say so once, in plain words.
+    const movedTo = app.save.onboarding.ladderNotice ? app.save.journey.nextLevel : 0;
+    const movedLine = movedTo
+      ? `Pawtopia now opens with twenty one-animal puzzles, so your Journey moved up to make room: you're on level ${movedTo}, with every clear, star and best time. Levels 1 to 20 are new and open whenever you'd like them.`
+      : '';
+    if (movedTo) {
+      app.save.onboarding.ladderNotice = false;
+      app.persist();
+    }
+
     // Players coming from v1: say what their earlier progress turned into, once.
     const gift = app.upgradeGift;
     if (gift) {
@@ -266,6 +276,7 @@ export const homeScreen: ScreenDef = {
         title: 'Welcome to Pawtopia',
         center: true,
         body: `<p class="sheet__lead">Cats vs Dogs has grown into Pawtopia. Every level you solved is still solved, and it earned you a head start:</p>
+          ${movedLine ? `<p>${esc(movedLine)}</p>` : ''}
           <div class="win-rewards">
             ${gift.coins ? `<div class="reward-coins"><span class="reward-coins__amt">${ICON.coin}<b class="num">+${gift.coins}</b></span><span class="muted">Paw Coins for ${plural(Object.keys(app.save.journey.clears).length, 'solved level')}</span></div>` : ''}
             ${gift.decor.length ? `<p>Chapter gifts: ${esc(gift.decor.map((d) => DECOR_BY_ID[d].name).join(', '))}.</p>` : ''}
@@ -277,6 +288,16 @@ export const homeScreen: ScreenDef = {
         if (!a) return;
         gs.close();
         if (a.act === 'see') app.router.go({ screen: 'sanctuary' });
+      });
+    } else if (movedLine) {
+      const ls = openSheet(scope, {
+        title: 'Twenty new levels',
+        center: true,
+        body: `<p class="sheet__lead">${esc(movedLine)}</p>
+          <div class="sheet__actions"><button class="btn btn--block" data-act="ok">Got it</button></div>`,
+      });
+      ls.scope.on(ls.el, 'click', (e) => {
+        if (actionOf(e)?.act === 'ok') ls.close();
       });
     }
 

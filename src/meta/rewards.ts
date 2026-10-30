@@ -16,6 +16,7 @@ import type { WinRecord } from './progression';
 import type { Difficulty } from '../engine/types';
 import { COMPANIONS, type CompanionId } from './catalogs/companions';
 import { CLEAR_LIVES, HINT_EVERY, POINTS, grantItem, hasItemEntry, type ItemSource } from './items';
+import { dailyPointsTier, levelRewardKey } from '../game/specs';
 
 export interface RewardLine {
   id: string;
@@ -78,11 +79,13 @@ export function applyLevelRewards(
   const sum = empty();
   if (!clear) return sum;
   const ps: ItemSource = source === 'migration' ? 'migration' : 'journey';
-  addPoints(sum, save, `pts:L${level}`, POINTS.journeyBase + (tier ? POINTS.difficulty[tier] : 0), ps, now, `Level ${level}`);
-  if (clear.clean) addPoints(sum, save, `pts:clean:L${level}`, POINTS.clean, ps, now, 'Clean solve');
-  if (clear.hintFree) addPoints(sum, save, `pts:nohint:L${level}`, POINTS.hintFree, ps, now, 'No hints');
-  add(sum, save, `clear:L${level}`, ECONOMY.journeyFirstClear, 'First clear', source, now);
-  if (clear.clean) add(sum, save, `clean:L${level}`, ECONOMY.journeyCleanBonus, 'Clean solve', source, now);
+  // Ids follow the board (D35), so a board cleared before the one-animal levels arrived never pays twice.
+  const k = levelRewardKey(level);
+  addPoints(sum, save, `pts:${k}`, POINTS.journeyBase + (tier ? POINTS.difficulty[tier] : 0), ps, now, `Level ${level}`);
+  if (clear.clean) addPoints(sum, save, `pts:clean:${k}`, POINTS.clean, ps, now, 'Clean solve');
+  if (clear.hintFree) addPoints(sum, save, `pts:nohint:${k}`, POINTS.hintFree, ps, now, 'No hints');
+  add(sum, save, `clear:${k}`, ECONOMY.journeyFirstClear, 'First clear', source, now);
+  if (clear.clean) add(sum, save, `clean:${k}`, ECONOMY.journeyCleanBonus, 'Clean solve', source, now);
   if (level % LEVELS_PER_CHAPTER === 0) {
     const ch = chapterAt(level / LEVELS_PER_CHAPTER - 1);
     const before = sum.coins;
@@ -107,8 +110,9 @@ export function rewardsForWin(save: SaveV2, mode: ModeRef, rec: WinRecord, now =
     const sum = applyLevelRewards(save, mode.level, save.journey.clears[`L${mode.level}`], now, 'journey', tier);
     if (rec.firstClear) {
       // The `treat:` id prefix predates the Extra life name (D26) and stays, so a level never grants twice.
-      addItem(sum, save, `treat:L${mode.level}`, 'life', CLEAR_LIVES, 'journey', now, `Level ${mode.level}`);
-      if (mode.level % HINT_EVERY === 0) addItem(sum, save, `hint:L${mode.level}`, 'hint', 1, 'journey', now, `Level ${mode.level}`);
+      const k = levelRewardKey(mode.level);
+      addItem(sum, save, `treat:${k}`, 'life', CLEAR_LIVES, 'journey', now, `Level ${mode.level}`);
+      if (mode.level % HINT_EVERY === 0) addItem(sum, save, `hint:${k}`, 'hint', 1, 'journey', now, `Level ${mode.level}`);
     }
     return sum;
   }
@@ -116,7 +120,9 @@ export function rewardsForWin(save: SaveV2, mode: ModeRef, rec: WinRecord, now =
   if (mode.kind === 'daily' && rec.newDaily) {
     add(sum, save, `daily:${mode.dateKey}`, ECONOMY.dailyFirstClear, 'Daily Cozy Puzzle', 'daily', now);
     if (rec.clean) add(sum, save, `dailyclean:${mode.dateKey}`, ECONOMY.dailyCleanBonus, 'Clean solve', 'daily', now);
-    const pts = POINTS.dailyBase + (tier ? POINTS.difficulty[tier] : 0) + (rec.clean ? POINTS.clean : 0) + (rec.hintFree ? POINTS.hintFree : 0);
+    // Both Dailies of a date pay the same (D35), whichever board was played.
+    const t = dailyPointsTier(mode.dateKey, tier);
+    const pts = POINTS.dailyBase + (t ? POINTS.difficulty[t] : 0) + (rec.clean ? POINTS.clean : 0) + (rec.hintFree ? POINTS.hintFree : 0);
     addPoints(sum, save, `pts:D${mode.dateKey}`, pts, 'daily', now, 'Daily Cozy Puzzle');
   }
   return sum;
@@ -139,7 +145,7 @@ export function reconcileRewards(
   for (const L of levels) {
     const clear = save.journey.clears[`L${L}`];
     // Measuring a board costs a few ms, so only levels whose points haven't been recorded yet are measured.
-    const tier = clear && !hasItemEntry(save, `pts:L${L}`) ? tierOf(L, clear) : undefined;
+    const tier = clear && !hasItemEntry(save, `pts:${levelRewardKey(L)}`) ? tierOf(L, clear) : undefined;
     const s = applyLevelRewards(save, L, clear, now, 'migration', tier);
     total.coins += s.coins;
     total.points += s.points;

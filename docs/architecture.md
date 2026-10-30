@@ -43,7 +43,8 @@ pagehide) → `session.claimOutcome()` returns win/loss exactly once.
 (missions, badges) → persist → face celebration (≤1.5 s) → win sheet → only after the player taps through, an
 interstitial *may* be considered by `shouldShowInterstitial` (never in release today: no ad network).
 
-**Startup.** `storage.loadSave` (v2, or migrate v1 with backup + round-trip check) → `rewards.reconcileRewards`
+**Startup.** `storage.loadSave` (v2, or migrate v1 with backup + round-trip check; a save from before D35 moves up 20
+levels once, `upgradeLadder`, with a backup) → `rewards.reconcileRewards`
 (idempotent catch-up for v1 progress and back-dated Paw Points) → `items.grantStarterItems` (once) →
 `world.reconcileWorld` (regional friends whose stage was reached) → `catchUpAchievements` → gem purchase reconcile and
 leaderboard sync in the background → route to Welcome (fresh install) or Home.
@@ -151,6 +152,7 @@ backend or a store stays off until integrated, tested and approved.
 | `test/unit/economy.test.ts` | ledger idempotency, rewards, v1 reconcile, decor purchase, scene |
 | `test/unit/competition.test.ts` | score fixtures, tie-breaks, league settlement, replay verifier tamper cases |
 | `test/unit/meta.test.ts` | missions, badges, v1 stats, local cup attempt limits |
+| `test/unit/ladder.test.ts` | D35 save move (+20 levels on the same boards, once, with a backup), rewards keyed by board, both Dailies pay the same, copy |
 | `test/unit/world.test.ts` | projection, sanctuaries opening, growth/stages/arrivals/gift once, switching, reconcile, the board's cast, decor, scenes |
 | `test/unit/leaderboard.test.ts` | solve replay (mistakes, hints, extra lives), rejections, awards once, weekly rollover, rate limits, names, reports, deletion, queue |
 | `test/firebase/rules.test.ts` | Firestore rules against the emulator (`npm run fb:test`; not part of `npm test`) |
