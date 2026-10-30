@@ -61,6 +61,13 @@ export class ToyKit {
     return g;
   }
 
+  private shadowTex: THREE.Texture | null = null;
+  /** The soft ground shadow, one texture for every toy. */
+  shadow(): THREE.Texture {
+    this.shadowTex ??= this.track(shadowTexture());
+    return this.shadowTex;
+  }
+
   track<T extends THREE.Texture>(t: T): T {
     this.textures.push(t);
     return t;
@@ -82,6 +89,7 @@ export class ToyKit {
     this.lathes.clear();
     this.textures = [];
     this.geos = [];
+    this.shadowTex = null;
   }
 }
 
@@ -124,6 +132,13 @@ export class Toy {
   private kind: BodyKind;
   /** Meshes a tap can hit. */
   readonly hits: THREE.Object3D[] = [];
+  /** Geometries only this toy uses (released with it). */
+  private geos: THREE.BufferGeometry[] = [];
+
+  private own<T extends THREE.BufferGeometry>(g: T): T {
+    this.geos.push(g);
+    return g;
+  }
 
   constructor(spec: ToySpec, kit: ToyKit, mood?: string) {
     this.spec = spec;
@@ -171,7 +186,7 @@ export class Toy {
   private limb(pivot: THREE.Group, at: THREE.Vector3, len: number, r: number, color: string, paw: string, pawScale = 1): void {
     pivot.position.copy(at);
     this.body.add(pivot);
-    const cap = this.kit.trackGeo(new THREE.CapsuleGeometry(r, Math.max(0.001, len - r * 2), 6, 14));
+    const cap = this.own(new THREE.CapsuleGeometry(r, Math.max(0.001, len - r * 2), 6, 14));
     this.part(cap, this.kit.fur(color), v3(0, -len / 2, 0), v3(1, 1, 1), pivot);
     this.ball(paw, v3(0, -len + r * 0.25, r * 0.45), v3(r * 1.2 * pawScale, r * 0.85 * pawScale, r * 1.35 * pawScale), pivot);
   }
@@ -217,7 +232,7 @@ export class Toy {
         this.ball(belly, v3(0, tc - 0.04, torso.z * 0.55), v3(torso.x * 0.62 * bk, torso.y * 0.74 * bk, torso.z * 0.55));
         if (s.extras?.includes('chestfluff')) this.ball(s.light, v3(0, tc + torso.y * 0.45, torso.z * 0.5), v3(0.15, 0.12, 0.12));
         if (this.kind === 'tall') {
-          const neck = this.kit.trackGeo(new THREE.CapsuleGeometry(0.075, 0.5, 6, 14));
+          const neck = this.own(new THREE.CapsuleGeometry(0.075, 0.5, 6, 14));
           this.part(neck, this.kit.fur(s.fur), v3(0, 0.68, 0.06), v3(1, 1, 1), this.body, new THREE.Euler(0.08, 0, 0));
         }
         // Front legs.
@@ -264,7 +279,7 @@ export class Toy {
     skull.scale.set(hx, hy, hz);
     this.head.add(skull);
     this.part(this.kit.sphere, this.kit.fur(s.fur), v3(0, 0, 0), v3(1, 1, 1), skull);
-    const shellGeo = this.kit.trackGeo(
+    const shellGeo = this.own(
       new THREE.SphereGeometry(1.004, 32, 24, Math.PI / 2 - HEAD_SHELL.phiLen / 2, HEAD_SHELL.phiLen, HEAD_SHELL.thetaStart, HEAD_SHELL.thetaLen),
     );
     // Sphere geometry's phi runs from −x round to +x through +z, so the shell faces the viewer.
@@ -282,7 +297,7 @@ export class Toy {
         g.position.set(side * hx * 0.38, hy * 0.82, -hz * 0.1);
         g.rotation.z = -side * 0.18;
         this.head.add(g);
-        const stalk = this.kit.trackGeo(new THREE.CylinderGeometry(0.022, 0.028, 0.11, 10));
+        const stalk = this.own(new THREE.CylinderGeometry(0.022, 0.028, 0.11, 10));
         this.part(stalk, this.kit.fur(s.fur), v3(0, 0.05, 0), v3(1, 1, 1), g);
         this.ball(s.dark, v3(0, 0.115, 0), v3(0.035, 0.03, 0.035), g);
       }
@@ -292,7 +307,7 @@ export class Toy {
     const s = this.spec;
     const k = s.snout.size;
     const mouthGeo = () =>
-      this.kit.trackGeo(new THREE.SphereGeometry(1.006, 20, 16, Math.PI / 2 - MUZZLE_SHELL.phiLen / 2, MUZZLE_SHELL.phiLen, MUZZLE_SHELL.thetaStart, MUZZLE_SHELL.thetaLen));
+      this.own(new THREE.SphereGeometry(1.006, 20, 16, Math.PI / 2 - MUZZLE_SHELL.phiLen / 2, MUZZLE_SHELL.phiLen, MUZZLE_SHELL.thetaStart, MUZZLE_SHELL.thetaLen));
     const muzzle = (c: THREE.Vector3, r: THREE.Vector3, color: string, nose: THREE.Vector3 | null, noseR: THREE.Vector3) => {
       const g = new THREE.Group();
       g.position.copy(c);
@@ -491,9 +506,8 @@ export class Toy {
   }
 
   private buildShadow(): THREE.Mesh {
-    const tex = this.kit.track(shadowTexture());
-    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.55 });
-    const geo = this.kit.trackGeo(new THREE.PlaneGeometry(1, 1));
+    const mat = new THREE.MeshBasicMaterial({ map: this.kit.shadow(), transparent: true, depthWrite: false, opacity: 0.55 });
+    const geo = this.own(new THREE.PlaneGeometry(1, 1));
     const m = new THREE.Mesh(geo, mat);
     m.renderOrder = -1;
     m.position.set(0, 0.0, -0.32);
@@ -607,6 +621,9 @@ export class Toy {
   dispose(): void {
     this.eyeMat.dispose();
     this.mouthMat?.dispose();
+    (this.shadow.material as THREE.Material).dispose();
+    for (const g of this.geos) g.dispose();
+    this.geos = [];
     for (const [a, b] of this.faces.values()) {
       a?.dispose();
       b?.dispose();

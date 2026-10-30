@@ -95,6 +95,8 @@ export class SceneStage {
   private seedBase = Math.floor(Math.random() * 1e6);
   /** Dev only: a frozen clock for stepping through a clip frame by frame. */
   private frozen: number | null = null;
+  /** The WebGL context is gone (the OS took it back); the drawn animals show until it returns. */
+  private lost = false;
   readonly canvas: HTMLCanvasElement;
 
   constructor(private readonly o: StageOptions) {
@@ -116,8 +118,17 @@ export class SceneStage {
     this.resize = new ResizeObserver(() => this.fit());
     this.canvas.addEventListener('webglcontextlost', (e) => {
       e.preventDefault();
+      this.lost = true;
       this.figure?.classList.remove('has-3d');
       this.stop();
+    });
+    // three.js rebuilds its GPU state when the context comes back; then the toys can show again.
+    this.canvas.addEventListener('webglcontextrestored', () => {
+      this.lost = false;
+      if (!this.figure || !this.svg || this.disposed) return;
+      this.renderNow();
+      this.figure.classList.add('has-3d');
+      this.kick();
     });
     if (typeof IntersectionObserver !== 'undefined')
       this.visible = new IntersectionObserver((es) => {
@@ -162,7 +173,7 @@ export class SceneStage {
     }
     this.fit();
     this.renderNow();
-    figure.classList.add('has-3d');
+    if (!this.lost) figure.classList.add('has-3d');
     this.kick();
   }
 
@@ -194,12 +205,15 @@ export class SceneStage {
       keep.add(key);
       let e = this.entries.get(key);
       const home = { gx: Number(el.dataset.gx), gy: Number(el.dataset.gy), gh: Number(el.dataset.gh) };
+      let late: string | null = null;
       if (!e) {
         const toy = new Toy(spec, this.kit, el.dataset.mood);
         const actor = new Actor(toy, this.seedBase + hash(key));
         this.scene.add(toy.root);
         e = { actor, fig: el, seen: { classes: new Set(), trick: null }, home, ride: null };
         this.entries.set(key, e);
+        // The 3D code arrived while this animal was already doing a trick (drawn): take it over.
+        late = el.dataset.trick ?? null;
       }
       e.fig = el;
       e.home = home;
@@ -207,16 +221,28 @@ export class SceneStage {
       this.endRide(e, this.now());
       e.actor.away = el.classList.contains('is-away');
       this.place(e, home.gx, home.gy, home.gh);
+      if (late) {
+        for (const n of svg.querySelectorAll('.sp-trick')) n.remove();
+        const moving = el.classList.contains(`is-trick-${late}`);
+        const ms = e.actor.perform(late, this.now(), !moving);
+        if (ms) this.effects.perform(late, e.actor, this.now(), ms, !moving);
+      }
+    }
+    // A decoration ride that started before the 3D code arrived: the toy takes over the ride.
+    for (const act of svg.querySelectorAll('.sp-act')) {
+      const key = this.riderKey(act);
+      const e = key ? this.entries.get(key) : null;
+      if (e && !e.ride) this.startRide(e, act, this.now());
     }
     let gone = false;
     for (const [key, e] of this.entries)
       if (!keep.has(key)) {
+        this.effects.clearFor(e.actor);
         e.actor.toy.dispose();
         this.entries.delete(key);
         gone = true;
       }
-    // Props may hang on a toy that left (a party hat): start clean.
-    if (gone) this.effects.clear();
+    void gone;
   }
 
   /** Stands a toy on a scene point so that it projects exactly onto the drawn figure's spot, nearer ones in front. */
@@ -354,7 +380,7 @@ export class SceneStage {
     for (const c of classes) {
       if (e.seen.classes.has(c)) continue;
       const m = TRACKED.exec(c);
-      if (m && e.actor.ambient(m[1], now, reduced)) this.effects.ambient(m[1], e.actor, now, ambientClip(m[1])?.ms ?? 1000);
+      if (m && e.actor.ambient(m[1], now, reduced)) this.effects.ambient(m[1], e.actor, now, ambientClip(m[1])?.ms ?? 1000, reduced);
     }
     // Away on a decoration: shown riding it instead (D32).
     e.actor.away = classes.has('is-away') && !e.ride;
@@ -371,7 +397,7 @@ export class SceneStage {
   // ---------------------------------------------------------------- taps
 
   private onClick = (ev: MouseEvent): void => {
-    if (!this.figure || (ev as MouseEvent & { __toy?: boolean }).__toy) return;
+    if (!this.figure || this.lost || (ev as MouseEvent & { __toy?: boolean }).__toy) return;
     const r = this.canvas.getBoundingClientRect();
     if (!r.width) return;
     const ndc = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
@@ -406,7 +432,7 @@ export class SceneStage {
 
   private kick(): void {
     if (this.disposed) return;
-    const run = this.live && this.onScreen && !document.hidden && !!this.figure;
+    const run = this.live && this.onScreen && !document.hidden && !!this.figure && !this.lost;
     if (run && !this.raf) this.raf = requestAnimationFrame(this.tick);
     else if (!run) this.stop();
   }
@@ -422,8 +448,9 @@ export class SceneStage {
     const now = raf;
     const reduced = this.o.reducedMotion();
     const busy = [...this.entries.values()].some((e) => e.actor.busy(now) || !!e.ride) || this.effects.active;
-    // Smooth while something is happening; a calmer frame rate for breathing; a few frames a second when still.
-    const minGap = busy ? 0 : reduced ? 250 : 30;
+    // Smooth while something is happening; a calmer frame rate for breathing; a few frames a second when nothing
+    // moves (reduced motion: faces change, nothing travels).
+    const minGap = reduced ? 120 : busy ? 0 : 30;
     if (now - this.lastFrame >= minGap) {
       this.lastFrame = now;
       this.frame(now, reduced);
@@ -441,7 +468,7 @@ export class SceneStage {
   }
 
   private renderNow(): void {
-    if (this.disposed) return;
+    if (this.disposed || this.lost) return;
     this.frame(this.now(), this.o.reducedMotion());
   }
 

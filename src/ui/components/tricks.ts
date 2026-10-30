@@ -275,8 +275,8 @@ export function showTrickSheet(scope: Scope, id: TrickId, opts: { who?: string; 
     first = true;
     preview();
   };
-  void s3d.ready.then(() => sh.scope.timeout(firstPreview, 250));
-  sh.scope.timeout(firstPreview, 1500);
+  // First show it once the toy is there (or straight away, drawn, when there won't be one).
+  void s3d.ready.then((ok) => sh.scope.alive && sh.scope.timeout(firstPreview, ok ? 250 : 350));
 
   let busy = false;
   sh.scope.on(sh.el, 'click', async (e) => {

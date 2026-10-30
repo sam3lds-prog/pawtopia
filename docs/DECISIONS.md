@@ -453,7 +453,9 @@ acted out with face and body.
   its own clip, turns to face where a travelling decoration takes it, and sits *inside* the balloon's basket: an
   invisible cut-out in front of the toy lets the drawn basket show over its legs.
 - **Previews**: a trick or emote card shows a 3D toy performing it too, released when the card closes.
-- **Cost and fallbacks**: three.js loads only when a sanctuary opens (≈ 165 kB gzipped, its own chunk). Eight toys
+- **Cost and fallbacks**: three.js loads only when a sanctuary opens (≈ 165 kB gzipped, its own chunk; the
+  single-file tester preview carries it from the start), and no WebGL context is made for a scene that never shows
+  toys (a locked region). If the OS takes the context back, the drawn animals return until it is restored. Eight toys
   draw in about 200 calls and 140k triangles; posing them takes about 0.1 ms a frame. Without
   WebGL, if the context is lost, or with Settings → 3D animals off, the drawn animals stay. Frames: smooth while
   something plays, ~30 fps for breathing, a few per second under reduced motion (where nothing moves by itself), none

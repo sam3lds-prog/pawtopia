@@ -36,20 +36,34 @@ export function wants3D(): boolean {
 
 let loading: Promise<typeof import('../../three/stage')> | null = null;
 
+/** Dev only: the most recent live stage, for stepping clips frame by frame (`__stage3d.freezeAt`). */
+const liveStages: SceneStage[] = [];
+if (import.meta.env.DEV && typeof window !== 'undefined')
+  Object.defineProperty(window, '__stage3d', { configurable: true, get: () => liveStages[liveStages.length - 1] ?? null });
+
+/**
+ * The 3D layer for one scene. Nothing is loaded and no WebGL context is made until it is attached to a scene (a locked
+ * region never is).
+ */
 export function createScene3D(): Scene3D {
   let stage: SceneStage | null = null;
   let target: [HTMLElement, SVGSVGElement] | null = null;
   let live = !document.hidden;
   let disposed = false;
+  let started = false;
   let settle: (ok: boolean) => void = () => {};
   const ready = new Promise<boolean>((r) => (settle = r));
-  if (wants3D()) {
+  if (!wants3D()) settle(false);
+
+  const start = () => {
+    if (started || disposed || !wants3D()) return;
+    started = true;
     loading ??= import('../../three/stage');
     loading
       .then((m) => {
         if (disposed) return settle(false);
         stage = new m.SceneStage({ reducedMotion: () => app.reducedMotion });
-        if (import.meta.env.DEV) (window as unknown as { __stage3d?: SceneStage }).__stage3d = stage;
+        liveStages.push(stage);
         stage.setLive(live);
         if (target) {
           stage.attach(...target);
@@ -57,15 +71,17 @@ export function createScene3D(): Scene3D {
         }
       })
       .catch(() => settle(false));
-  } else settle(false);
+  };
+
   return {
     ready,
     attach(figure, svg) {
       target = figure && svg ? [figure, svg] : null;
-      if (stage && target) {
+      if (!target) return;
+      if (stage) {
         stage.attach(...target);
         settle(true);
-      }
+      } else start();
     },
     setLive(on) {
       live = on;
@@ -74,6 +90,7 @@ export function createScene3D(): Scene3D {
     dispose() {
       disposed = true;
       settle(false);
+      if (stage) liveStages.splice(liveStages.indexOf(stage), 1);
       stage?.dispose();
       stage = null;
     },

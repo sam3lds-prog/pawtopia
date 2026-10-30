@@ -3,6 +3,8 @@
 //                              npm run artifact -- --qa  →  artifact/pawtopia-qa.html (adds Tester shortcuts in Settings)
 //
 // It is a release build: no dev hooks, no test store, no test ads. Progress is kept in that browser only.
+// Being one file, it carries the 3D toys' code (three.js) from the start; the app itself loads it only when a sanctuary
+// opens.
 import { build, loadEnv } from 'vite';
 
 const qa = process.argv.includes('--qa');

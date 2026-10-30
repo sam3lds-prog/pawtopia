@@ -111,3 +111,37 @@ describe('3D props', () => {
     expect(hasEffect('ambient:love')).toBe(true);
   });
 });
+
+describe('3D actors', () => {
+  it('a trick that interrupts a stroll unwinds the turn the short way (no whip spin)', async () => {
+    const { Actor } = await import('../../src/three/actor');
+    const kit = new ToyKit();
+    const toy = new Toy(toySpec('biscuit')!, kit, 'happy');
+    const a = new Actor(toy, 3);
+    a.ambient('stroll', 0);
+    a.update(2400, false); // turned round, walking home: yaw near 3π/2
+    a.perform('wave', 2400);
+    const mover = toy.root.children.find((c) => c.type === 'Group')!;
+    let last = mover.rotation.y;
+    for (let t = 2416; t <= 2700; t += 16) {
+      a.update(t, false);
+      const d = Math.abs(mover.rotation.y - last);
+      expect(Math.min(d, Math.PI * 2 - d), `at ${t}`).toBeLessThan(0.35);
+      last = mover.rotation.y;
+    }
+    toy.dispose();
+    kit.dispose();
+  });
+
+  it('a second trick replaces the first instead of stacking on it', async () => {
+    const { Actor } = await import('../../src/three/actor');
+    const kit = new ToyKit();
+    const a = new Actor(new Toy(toySpec('mochi')!, kit), 5);
+    a.perform('party', 0);
+    a.perform('party', 500);
+    a.update(800, false);
+    expect(a.performing(800)).toBe('party');
+    expect(a.progress('party', 800)).toBeGreaterThan(0);
+    kit.dispose();
+  });
+});

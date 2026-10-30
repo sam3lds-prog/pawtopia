@@ -26,6 +26,8 @@ export interface FxCtx {
   ms: number;
   /** Scene units per toy unit. */
   u: number;
+  /** Reduced motion: shown in place, nothing travels. */
+  still: boolean;
 }
 
 export type EffectFactory = (c: FxCtx) => Effect | null;
@@ -42,8 +44,14 @@ export function hasEffect(id: string): boolean {
   return registry.has(id);
 }
 
+interface Live {
+  e: Effect;
+  actor: Actor;
+  kind: 'ambient' | 'perform';
+}
+
 export class Effects {
-  private live: Effect[] = [];
+  private live: Live[] = [];
   private geo = new Map<string, THREE.BufferGeometry>();
   private tex = new Map<string, THREE.Texture>();
 
@@ -52,20 +60,30 @@ export class Effects {
     readonly kit: ToyKit,
   ) {}
 
-  /** An ambient action's little extra (a heart for a pat). */
-  ambient(action: string, actor: Actor, now: number, ms: number): void {
-    this.run(`ambient:${action}`, actor, now, ms);
+  /** An ambient action's little extra (a heart for a pat); in place under reduced motion. */
+  ambient(action: string, actor: Actor, now: number, ms: number, still = false): void {
+    this.run(`ambient:${action}`, 'ambient', actor, now, ms, still);
   }
 
-  /** A trick or emote: the emote bubble, and its props unless `still`. */
+  /** A trick or emote: the emote bubble, and its props unless `still`. It replaces the actor's previous one. */
   perform(id: string, actor: Actor, now: number, ms: number, still: boolean): void {
-    if (isTrickId(id)) this.live.push(emoteBubble({ fx: this, actor, start: now, ms, u: unit(actor) }, TRICK_BY_ID[id].emote, still));
-    if (!still) this.run(`perform:${id}`, actor, now, ms);
+    this.clearFor(actor, 'perform');
+    if (isTrickId(id)) this.live.push({ e: emoteBubble({ fx: this, actor, start: now, ms, u: unit(actor), still }, TRICK_BY_ID[id].emote, still), actor, kind: 'perform' });
+    if (!still) this.run(`perform:${id}`, 'perform', actor, now, ms, still);
   }
 
-  private run(key: string, actor: Actor, now: number, ms: number): void {
-    const e = registry.get(key)?.({ fx: this, actor, start: now, ms, u: unit(actor) });
-    if (e) this.live.push(e);
+  private run(key: string, kind: Live['kind'], actor: Actor, now: number, ms: number, still: boolean): void {
+    const e = registry.get(key)?.({ fx: this, actor, start: now, ms, u: unit(actor), still });
+    if (e) this.live.push({ e, actor, kind });
+  }
+
+  /** Ends an actor's effects (all, or one kind): it left, or something new replaces them. */
+  clearFor(actor: Actor, kind?: Live['kind']): void {
+    this.live = this.live.filter((l) => {
+      if (l.actor !== actor || (kind && l.kind !== kind)) return true;
+      l.e.dispose();
+      return false;
+    });
   }
 
   get active(): boolean {
@@ -73,16 +91,16 @@ export class Effects {
   }
 
   update(now: number): void {
-    this.live = this.live.filter((e) => {
-      const alive = e.update(now);
-      if (!alive) e.dispose();
+    this.live = this.live.filter((l) => {
+      const alive = l.e.update(now);
+      if (!alive) l.e.dispose();
       return alive;
     });
   }
 
-  /** Ends every effect of one actor (it left the scene). */
+  /** Ends every effect. */
   clear(): void {
-    for (const e of this.live) e.dispose();
+    for (const l of this.live) l.e.dispose();
     this.live = [];
   }
 
@@ -309,6 +327,12 @@ defineEffect('ambient:love', (c) => {
     [mesh],
     (t) => {
       c.actor.toy.headTop(tmp);
+      if (c.still) {
+        // Reduced motion: the heart shows in place, still (like the drawn one).
+        mesh.position.set(tmp.x + c.u * 0.12, tmp.y + c.u * 0.18, tmp.z + c.u * 0.2);
+        mesh.scale.setScalar(c.u * 0.085);
+        return;
+      }
       mesh.position.set(tmp.x + c.u * 0.12, tmp.y + c.u * (0.12 + t * 0.35), tmp.z + c.u * 0.2);
       mesh.scale.setScalar(c.u * 0.085 * (0.5 + 0.5 * easeOutBack(clamp01(t / 0.2))));
       mesh.rotation.y = Math.sin(t * Math.PI * 2) * 0.6;

@@ -4,7 +4,7 @@
  * Under reduced motion nothing moves by itself; clips still show their faces, held still.
  */
 
-import { activityClip, ambientClip, performClip, type Clip, type ClipCtx } from './clips';
+import { TURN_CHANNELS, activityClip, ambientClip, performClip, type Clip, type ClipCtx } from './clips';
 import type { Expr } from './face';
 import { addPose, restPose, type Pose } from './pose';
 import type { Toy } from './toy';
@@ -21,7 +21,10 @@ interface Layer {
   still: boolean;
 }
 
-const FADE_MS = 160;
+const FADE_MS = 260;
+const TAU = Math.PI * 2;
+/** An angle as the nearest equivalent turn (−π, π], so a fading turn unwinds the short way. */
+const wrap = (a: number) => a - TAU * Math.round(a / TAU);
 const OPEN_EYED: ReadonlySet<Expr> = new Set(['idle', 'lookL', 'lookR', 'focused', 'surprised']);
 
 export class Actor {
@@ -107,7 +110,12 @@ export class Actor {
     for (const l of this.layers) {
       const t = (now - l.start) / l.clip.ms;
       const f = l.clip.frame(t, l.ctx);
-      const w = l.fadeFrom === undefined ? 1 : 1 - (now - l.fadeFrom) / FADE_MS;
+      const fading = l.fadeFrom !== undefined;
+      const w = fading ? 1 - (now - l.fadeFrom!) / FADE_MS : 1;
+      if (fading) {
+        // Interrupted (a trick over a stroll): turns unwind the short way instead of spinning back.
+        for (const k of TURN_CHANNELS) if (f.pose[k] !== undefined) f.pose[k] = wrap(f.pose[k]!);
+      }
       if (!l.still) addPose(pose, f.pose, w);
       const fw = (l.kind === 'perform' ? 2 : 1) * w;
       if (f.face && fw > faceWeight) {
