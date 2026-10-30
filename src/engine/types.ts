@@ -30,6 +30,22 @@ export interface Puzzle {
   difficulty: Difficulty;
   /** Seed that produced this puzzle (for reproducibility / sharing). */
   seed: number;
+  /**
+   * Which rule the board is played with. Absent: the two-animal rule (one cat and one dog per unit, D1). 'solo': the
+   * one-animal rule (one animal per unit, never touching, src/engine/solo.ts; the animal is stored as CAT).
+   */
+  rule?: 'solo';
+}
+
+export type Rule = 'pair' | 'solo';
+
+export function ruleOf(p: Pick<Puzzle, 'rule'>): Rule {
+  return p.rule === 'solo' ? 'solo' : 'pair';
+}
+
+/** Animals each row, column and region holds under a rule. */
+export function perUnit(rule: Rule): 1 | 2 {
+  return rule === 'solo' ? 1 : 2;
 }
 
 /**

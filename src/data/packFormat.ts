@@ -1,6 +1,7 @@
 /** Compact, typed format for frozen level packs, plus the verification every shipped board must pass. */
 
-import { deduce } from '../engine/deduce';
+import { deduce, type Technique } from '../engine/deduce';
+import { countSoloSolutions, deduceSolo, isValidSoloSolution } from '../engine/solo';
 import { countSolutions, isValidSolution } from '../engine/solver';
 import { CAT, DOG, EMPTY, type Difficulty, type Kind, type Puzzle, type Species } from '../engine/types';
 
@@ -15,9 +16,11 @@ export interface PackLevel {
   solution: string[];
   givens: Array<[number, number, 1 | 2]>;
   /** Hardest deduction technique the engine needed. */
-  technique: 'single' | 'pointing' | 'neighbor-lock' | null;
+  technique: Technique | null;
   /** Logical steps the engine took. */
   steps: number;
+  /** 'solo' for a one-animal board (D35); absent for the two-animal rule. */
+  rule?: 'solo';
 }
 
 export interface PackFile {
@@ -31,7 +34,7 @@ export interface PackFile {
  * (src/game/grading.ts) so the label shown to players is the one the board was verified with.
  */
 export interface PackLevel2 extends PackLevel {
-  spec: 1 | 2 | 3;
+  spec: 1 | 2 | 3 | 4;
   /** What the spec asked for (spec 2 and 3). */
   target?: Difficulty;
   /** Measured label and score under `gradingVersion`. */
@@ -47,8 +50,10 @@ export interface PackFile2 {
 }
 
 export function encodeBoard(level: number, p: Puzzle): PackLevel {
-  const d = deduce(p.size, p.regions, p.givens);
+  const solo = p.rule === 'solo';
+  const d = solo ? deduceSolo(p.size, p.regions, p.givens) : deduce(p.size, p.regions, p.givens);
   return {
+    ...(solo ? { rule: 'solo' as const } : {}),
     level,
     size: p.size,
     difficulty: p.difficulty,
@@ -69,6 +74,7 @@ export function decodeLevel(l: PackLevel): Puzzle {
     givens: l.givens.map(([r, c, k]) => ({ r, c, kind: k as Species })),
     difficulty: l.difficulty,
     seed: l.seed,
+    ...(l.rule === 'solo' ? { rule: 'solo' as const } : {}),
   };
 }
 
@@ -110,8 +116,16 @@ export function verifyBoard(p: Puzzle): string[] {
     }
     if (seen.size !== cells.length) out.push(`region ${id} is not connected`);
   }
-  if (!isValidSolution(n, p.regions, p.solution)) out.push('solution breaks the rules');
   for (const g of p.givens) if (p.solution[g.r]?.[g.c] !== g.kind) out.push(`given at ${g.r},${g.c} disagrees with the solution`);
+  if (p.rule === 'solo') {
+    // One-animal boards start empty: the regions alone make the solution unique.
+    if (!isValidSoloSolution(n, p.regions, p.solution)) out.push('solution breaks the rules');
+    const sols = countSoloSolutions(n, p.regions, p.givens, 2);
+    if (sols.count !== 1) out.push(`expected exactly one solution, found ${sols.count}`);
+    if (!deduceSolo(n, p.regions, p.givens).solved) out.push('not solvable by logic alone');
+    return out;
+  }
+  if (!isValidSolution(n, p.regions, p.solution)) out.push('solution breaks the rules');
   if (!p.givens.length) out.push('needs at least one given');
   const sols = countSolutions(n, p.regions, p.givens, 2);
   if (sols.count !== 1) out.push(`expected exactly one solution, found ${sols.count}`);

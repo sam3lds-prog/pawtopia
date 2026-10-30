@@ -14,7 +14,8 @@
 
 import { CAT, DOG, EMPTY, type Given, type Kind, type Species, makeGrid, otherSpecies } from './types';
 
-export type Technique = 'single' | 'pointing' | 'neighbor-lock';
+/** `subset` is only used by the one-animal engine (src/engine/solo.ts). */
+export type Technique = 'single' | 'pointing' | 'neighbor-lock' | 'subset';
 
 export interface Board {
   size: number;
@@ -194,7 +195,7 @@ export interface DeductionReport {
 /** Runs the engine to completion. Reports whether the puzzle is solvable by logic alone and the hardest technique needed. */
 export function deduce(size: number, regions: number[][], givens: Given[]): DeductionReport {
   const b = createBoard(size, regions, givens);
-  const rank: Record<Technique, number> = { single: 1, pointing: 2, 'neighbor-lock': 3 };
+  const rank: Record<Technique, number> = { single: 1, pointing: 2, 'neighbor-lock': 3, subset: 4 };
   let hardest: Technique | null = null;
   let moves = 0;
   for (;;) {

@@ -1,7 +1,8 @@
 /** One play session: the player's marks, hearts, timer, undo/redo stacks, and win/lose checks. */
 
-import { CAT, DOG, EMPTY, type Kind, type Puzzle, type Species, makeGrid } from '../engine/types';
+import { CAT, DOG, EMPTY, type Kind, type Puzzle, type Rule, type Species, makeGrid, perUnit, ruleOf } from '../engine/types';
 import { createBoard, nextMove, type Board, type Move } from '../engine/deduce';
+import { createSoloBoard, nextSoloMove } from '../engine/solo';
 
 export const MARK = 3; // player's "nothing here" ✕
 export type CellState = typeof EMPTY | typeof CAT | typeof DOG | typeof MARK;
@@ -29,7 +30,7 @@ export interface MoveResult {
   cleared?: boolean;
   marked?: boolean;
   unmarked?: boolean;
-  /** Rows / columns / regions this placement completed (both pets now present). */
+  /** Rows / columns / regions this placement completed (both pets now present; never on one-animal boards). */
   completed?: UnitRef[];
   /** Nothing changed (given cell, game over, or a no-op tap). */
   ignored?: boolean;
@@ -88,6 +89,8 @@ const LEGACY_MAX_HEARTS = 3;
 
 export class Session {
   readonly puzzle: Puzzle;
+  /** The rule this board is played with (D35): one animal per unit, or one cat and one dog. */
+  readonly rule: Rule;
   readonly cells: CellState[][];
   readonly givenMask: boolean[][];
   readonly heartsEnabled: boolean;
@@ -117,6 +120,7 @@ export class Session {
 
   constructor(puzzle: Puzzle, opts: SessionOptions = {}) {
     this.puzzle = puzzle;
+    this.rule = ruleOf(puzzle);
     this.heartsEnabled = opts.hearts ?? true;
     this.maxHearts = Math.max(1, Math.min(9, Math.round(opts.maxHearts ?? LEGACY_MAX_HEARTS)));
     this.hearts = this.maxHearts;
@@ -133,6 +137,11 @@ export class Session {
 
   get size(): number {
     return this.puzzle.size;
+  }
+
+  /** Animals on the finished board: one per row on a one-animal board, two otherwise. */
+  get total(): number {
+    return perUnit(this.rule) * this.size;
   }
 
   // ------------------------------------------------------------------ clock
@@ -221,6 +230,26 @@ export class Session {
     this.set(r, c, EMPTY);
     this.log({ t: this.elapsedMs(), type: v === MARK ? 'unmark' : 'clear', r, c });
     return v === MARK ? { unmarked: true } : { cleared: true };
+  }
+
+  /**
+   * The default controls (D35): a tap toggles ✕ on a tile that holds no animal, and leaves animals alone (Erase takes
+   * one back). A double tap places an animal with `place`.
+   */
+  toggleMark(r: number, c: number): MoveResult {
+    if (this.outcome !== 'playing' || this.givenMask[r][c]) return { ignored: true };
+    const v = this.cells[r][c];
+    if (v === EMPTY) {
+      this.set(r, c, MARK);
+      this.log({ t: this.elapsedMs(), type: 'mark', r, c });
+      return { marked: true };
+    }
+    if (v === MARK) {
+      this.set(r, c, EMPTY);
+      this.log({ t: this.elapsedMs(), type: 'unmark', r, c });
+      return { unmarked: true };
+    }
+    return { ignored: true };
   }
 
   /** Sets ✕ on an empty cell (used by drag-marking). No-op on anything else. */
@@ -378,7 +407,7 @@ export class Session {
   }
 
   private checkWin(): void {
-    if (this.placedCount() === 2 * this.size) this.outcome = 'won';
+    if (this.placedCount() === this.total) this.outcome = 'won';
   }
 
   placedCount(): number {
@@ -388,8 +417,12 @@ export class Session {
     return placed;
   }
 
-  /** Units (row / column / region) through (r,c) that now hold both a cat and a dog. */
+  /**
+   * Units (row / column / region) through (r,c) that now hold both a cat and a dog. On a one-animal board every
+   * placement fills its row, column and region at once, so there is nothing extra to celebrate: always empty.
+   */
   completedUnitsAt(r: number, c: number): UnitRef[] {
+    if (this.rule === 'solo') return [];
     const n = this.size;
     const reg = this.puzzle.regions[r][c];
     const out: UnitRef[] = [];
@@ -422,12 +455,23 @@ export class Session {
     return this.cells.map((row) => row.map((v) => (v === MARK ? EMPTY : v)));
   }
 
+  /** The deduction engine's view of the board now, for this board's rule. */
+  private engineBoard(): Board {
+    return this.rule === 'solo'
+      ? createSoloBoard(this.size, this.puzzle.regions, [], this.placedKinds())
+      : createBoard(this.size, this.puzzle.regions, [], this.placedKinds());
+  }
+
+  private engineNext(b: Board): Move | null {
+    return this.rule === 'solo' ? nextSoloMove(b) : nextMove(b);
+  }
+
   /**
    * Cells where no animal can go given what's on the board. Used for auto-marks.
    * Derived from the rules and the player's own (always-correct) placements, so it never leaks the answer.
    */
   deadCells(): boolean[][] {
-    const b = createBoard(this.size, this.puzzle.regions, [], this.placedKinds());
+    const b = this.engineBoard();
     const n = this.size;
     const dead = makeGrid(n, false);
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) dead[r][c] = this.cells[r][c] === EMPTY && !b.cand[CAT][r][c] && !b.cand[DOG][r][c];
@@ -440,10 +484,10 @@ export class Session {
    */
   peekHint(): HintInfo | null {
     if (this.outcome !== 'playing') return null;
-    const b = createBoard(this.size, this.puzzle.regions, [], this.placedKinds());
+    const b = this.engineBoard();
     let m: Move | null;
     let guard = 0;
-    while ((m = nextMove(b)) && guard++ < 500) {
+    while ((m = this.engineNext(b)) && guard++ < 500) {
       if (m.kind === 'place') return { r: m.r, c: m.c, species: m.species, reason: m.reason, unit: forcingUnit(b, m) };
       b.cand[m.species][m.r][m.c] = false;
     }
@@ -505,7 +549,12 @@ export class Session {
       outcome: this.outcome,
       heartsEnabled: this.heartsEnabled,
       maxHearts: this.maxHearts,
-      hintState: { freeNudgeUsed: this.freeNudgeUsed, paid: [...this.paidTargets], tier: this.hintTierReached, ...(this.freeTarget ? { free: this.freeTarget } : {}) },
+      hintState: {
+        freeNudgeUsed: this.freeNudgeUsed,
+        paid: [...this.paidTargets],
+        tier: this.hintTierReached,
+        ...(this.freeTarget ? { free: this.freeTarget } : {}),
+      },
       revives: this.revives,
     };
   }
