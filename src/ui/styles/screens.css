@@ -602,6 +602,10 @@
   .status-board {
     display: inline-block;
   }
+  /* "3 of 7 placed" keeps the status line on one row beside the size chip. */
+  .status-word {
+    display: none;
+  }
 }
 
 /* ---------- Win sheet ---------- */

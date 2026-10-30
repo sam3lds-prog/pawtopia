@@ -192,7 +192,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   function paint(): void {
     board.render({ cells: s.cells, givenMask: s.givenMask, dead: settings.autoMark ? s.deadCells() : null });
-    progressEl.textContent = `${s.placedCount()} of ${total} ${total === 1 ? 'animal' : 'animals'} placed`;
+    progressEl.innerHTML = `${s.placedCount()} of ${total} <span class="status-word">${total === 1 ? 'animal' : 'animals'}</span> placed`;
     if (heartsEl) {
       heartsEl.dataset.max = String(s.maxHearts);
       heartsEl.innerHTML = Array.from({ length: s.maxHearts }, (_, i) => (i < s.hearts ? ICON.life : ICON.lifeOff)).join('');
