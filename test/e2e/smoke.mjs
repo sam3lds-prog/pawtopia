@@ -46,7 +46,23 @@ async function reload() {
 const coins = () => page.evaluate(() => window.__pt.app.coins());
 const title = () => page.textContent('.game-title h1').catch(() => null);
 
-async function solveActive({ stopAfter = Infinity } = {}) {
+/** Double-taps a tile (D35: a double tap places the board's animal; the animal buttons pick which on two-animal boards). */
+async function dblTap(r, c) {
+  await page.dblclick(`.cell[data-r="${r}"][data-c="${c}"]`, { delay: 10 });
+}
+
+/** Picks the animal for a species (two-animal boards only; one-animal boards have no animal buttons). */
+async function pick(species) {
+  const sel = `[data-tool="${species === 1 ? 'cat' : 'dog'}"]`;
+  if (await page.$(sel)) await page.click(sel);
+}
+
+async function place(r, c, species) {
+  await pick(species);
+  await dblTap(r, c);
+}
+
+async function solveActive({ stopAfter = Infinity, pace = 0 } = {}) {
   const sol = await page.evaluate(() => window.__pt.app.active.session.puzzle.solution);
   let placed = 0;
   for (let r = 0; r < sol.length; r++)
@@ -54,11 +70,30 @@ async function solveActive({ stopAfter = Infinity } = {}) {
       const cells = await page.evaluate(() => window.__pt.app.active?.session.cells);
       if (!cells || !sol[r][c] || cells[r][c] === sol[r][c]) continue;
       if (placed >= stopAfter) return;
-      await page.click(`[data-tool="${sol[r][c] === 1 ? 'cat' : 'dog'}"]`);
-      await page.click(`.cell[data-r="${r}"][data-c="${c}"]`);
+      if (pace) await page.waitForTimeout(pace);
+      await place(r, c, sol[r][c]);
       placed++;
     }
   await page.waitForSelector('.win-sheet', { timeout: 5000 });
+}
+
+/** A tile that can't hold an animal on the active board, still empty. */
+const emptyTile = () =>
+  page.evaluate(() => {
+    const s = window.__pt.app.active.session;
+    for (let r = 0; r < s.size; r++) for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] === 0 && s.puzzle.solution[r][c] === 0) return [r, c];
+    return null;
+  });
+
+/** Puts the player past the two-animal lesson (D35), as if they had played that far. */
+async function reachPairs(level = 25) {
+  await page.evaluate((L) => {
+    const s = window.__pt.app.save;
+    for (let i = 1; i < L; i++) s.journey.clears['L' + i] ??= { firstClearAt: new Date().toISOString(), bestSeconds: 60, bestMistakes: 0, clean: true, hintFree: true, stars: 3 };
+    if (s.journey.nextLevel < L) s.journey.nextLevel = L;
+    Object.assign(s.onboarding, { soloRulesSeen: true, pairRulesSeen: true, pairLessonDone: true, seenRules: true });
+    window.__pt.app.persist();
+  }, level);
 }
 
 try {
@@ -71,33 +106,50 @@ try {
   await page.waitForSelector('.welcome');
   check('first run shows the welcome screen', true);
 
-  // Guided tutorial
+  // Guided tutorial: a one-animal board with the sheep (D35)
   await page.click('[data-act="start"]');
   await page.waitForSelector('.cell.is-guide');
   check('tutorial highlights exactly one tile', (await page.$$('.cell.is-guide')).length === 1);
   check('tutorial board is forgiving (no hearts shown)', !(await page.$('[data-hearts]')));
+  check('the first board is a one-animal board', await page.evaluate(() => window.__pt.app.active.session.rule === 'solo'));
+  check('one-animal boards have only Erase and Hint', !(await page.$('[data-tool]')) && (await page.$$('.controls--solo .act')).length === 2 && !(await page.$('.controls [data-act="undo"]')));
+  check('the coach explains tap and double-tap', /double-tap/i.test((await page.textContent('[data-coach]')) ?? ''));
 
-  // Facial-only: placing a pet never transforms the pet element, and its face reacts.
+  // Tap marks ✕ and a second, slow tap clears it again; animals only come with a double tap.
+  const free0 = await emptyTile();
+  await page.click(`.cell[data-r="${free0[0]}"][data-c="${free0[1]}"]`);
+  check('a tap marks ✕', (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], free0)) === 3);
+  await page.waitForTimeout(500);
+  await page.click(`.cell[data-r="${free0[0]}"][data-c="${free0[1]}"]`);
+  check('a second tap later clears the ✕', (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], free0)) === 0);
+  await page.waitForTimeout(500);
+
+  // Facial-only: placing an animal never transforms its element, and its face reacts.
   const g = await page.$('.cell.is-guide');
   const box0 = await g.boundingBox();
-  await g.click();
+  await g.dblclick({ delay: 10 });
   await page.waitForTimeout(60);
+  check('the board shows the animal being brought home (Cotton the sheep)', !!(await page.$('.board .pet[data-pet="cotton"]')));
   const moods = await page.$$eval('.board .pet', (els) => els.map((e) => e.dataset.mood));
   check('a correct placement makes a face react', moods.some((m) => m === 'happy' || m === 'proud'), moods.join(','));
   const transforms = await page.$$eval('.board .cell__pet', (els) => els.map((e) => getComputedStyle(e).transform));
   check('pet tiles are never transformed', transforms.every((t) => t === 'none'), transforms.join(','));
   const box1 = await (await page.$(`.cell[data-r="${await g.getAttribute('data-r')}"][data-c="${await g.getAttribute('data-c')}"]`)).boundingBox();
-  check('the tile never moves or resizes', box0.x === box1.x && box0.y === box1.y && box0.width === box1.width);
+  check('the tile never moves or resizes', box0.x === box1.x && box0.y === box1.y && box0.width === box1.width, JSON.stringify([box0, box1]));
 
   await solveActive();
-  check('first win offers to meet the residents', (await page.textContent('[data-act="meet"]'))?.includes('Meet your residents'));
+  check('the first win brings Cotton home and offers to meet her', (await page.textContent('[data-act="meet"]'))?.includes('Meet Cotton') && /Cotton the sheep came home/.test((await page.textContent('.win-sheet')) ?? ''));
+  check('the win sheet shows who comes next', /Truffle the piglet/.test((await page.textContent('.win-sheet')) ?? ''));
   const afterFirst = await coins();
   check('first clear pays coins', afterFirst >= 45, String(afterFirst));
   await page.click('[data-act="meet"]');
-  await page.click('[data-act="ok"]');
-  await page.click('[data-choose="lamp"]');
-  await page.click('[data-act="play"]');
+  await page.waitForSelector('.region');
+  await page.waitForSelector('.sheet [data-choose="wheelbarrow"]');
+  check('meeting her opens the Farm, with Farm starter gifts', !!(await page.$('[data-choose="trough"]')));
+  await page.click('[data-choose="wheelbarrow"]');
+  await page.click('.sheet [data-act="play"]');
   check('starter flow continues to level 2', (await title()) === 'Level 2');
+  check('level 2 shows the next animal on its way (Truffle)', await page.evaluate(() => window.__pt.app.active.cast.a === 'truffle'));
 
   // Next level advances (v1 regression)
   await solveActive();
@@ -130,36 +182,33 @@ try {
   const givens = await page.evaluate(() => window.__pt.app.active.session.puzzle.givens.length);
   check('the resumed board keeps its placements', placedCount === givens + 1, `${placedCount} vs ${givens + 1}`);
 
-  // Five hearts on casual boards; a wrong pet is a fading ghost with a strike, never a ✕ or a reveal
+  // Five hearts on casual boards; a wrong animal is a fading ghost with a strike, and the tile is marked ✕
   check('Journey boards show five hearts', (await page.$$('[data-hearts] .ico')).length === 5);
-  const wrongCell = await page.evaluate(() => {
-    const s = window.__pt.app.active.session;
-    for (let r = 0; r < s.size; r++)
-      for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] === 0 && s.puzzle.solution[r][c] === 2) return [r, c];
-    return null;
-  });
-  await page.click('[data-tool="cat"]');
-  await page.click(`.cell[data-r="${wrongCell[0]}"][data-c="${wrongCell[1]}"]`);
+  const wrongCell = await emptyTile();
+  await dblTap(wrongCell[0], wrongCell[1]);
   const afterWrong = await page.evaluate(([r, c]) => {
     const s = window.__pt.app.active.session;
     return { hearts: s.hearts, cell: s.cells[r][c] };
   }, wrongCell);
   const strike = await page.$(`.cell[data-r="${wrongCell[0]}"][data-c="${wrongCell[1]}"] .cell__strike`);
-  check('a wrong Cat on a Dog tile costs one heart and leaves the tile empty', afterWrong.hearts === 4 && afterWrong.cell === 0, JSON.stringify(afterWrong));
+  check('a wrong double-tap costs one heart and leaves a ✕', afterWrong.hearts === 4 && afterWrong.cell === 3, JSON.stringify(afterWrong));
   check('the mistake shows a fading ghost with a strike', !!strike);
   await page.waitForTimeout(800);
   check('the ghost and strike are gone afterwards', !(await page.$('.cell__strike')) && !(await page.$('.cell__ghost')));
-
-  // The pet tool picked last is selected on the next board; the Play tab opens on the current level
   check('regions are separated by soft seams, not dark lines', await page.evaluate(() => getComputedStyle(document.querySelector('.board__lines .div')).stroke !== 'rgb(52, 67, 63)'));
-  await page.click('[data-tool="dog"]');
-  await solveActive({ stopAfter: 1 }).catch(() => {});
-  await page.click('[data-tool="dog"]');
-  await page.evaluate(() => window.__pt.app.saveActive());
-  await reload();
-  await page.evaluate(() => window.__pt.start({ kind: 'level', level: 5 }));
+
+  // Erase is a mode; undo, redo and How to play live in the pause sheet
+  await page.click('[data-act="erase"]');
+  check('Erase stays on until it is tapped again', (await page.getAttribute('[data-act="erase"]', 'aria-pressed')) === 'true');
+  await page.click(`.cell[data-r="${wrongCell[0]}"][data-c="${wrongCell[1]}"]`);
+  check('with Erase on, a tap takes the ✕ back', (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], wrongCell)) === 0);
+  await page.click('[data-act="erase"]');
+  await page.click('[data-act="pause"]');
+  check('the pause sheet has undo, redo and How to play', !!(await page.$('.sheet [data-act="undo"]')) && !!(await page.$('.sheet [data-act="rules"]')));
+  await page.click('.sheet [data-act="rules"]');
+  check('How to play explains the one-animal rule with the board animal', /One piglet/.test((await page.textContent('.rules')) ?? ''));
+  await page.click('[data-act="ok"]');
   await page.waitForTimeout(200);
-  check('the next board opens with the last pet tool', (await page.getAttribute('[data-tool="dog"]', 'aria-checked')) === 'true');
 
   // Hints: the board's first look is free, the exact cell costs one hint, placing that cell costs nothing more
   const hintCount = () => page.evaluate(() => window.__pt.app.save.inventory.items.filter((e) => e.item === 'hint').reduce((a, e) => a + e.delta, 0));
@@ -173,12 +222,9 @@ try {
   check('placing that same cell costs nothing more', (await hintCount()) === t0 - 1, `${t0} → ${await hintCount()}`);
 
   // Extra lives: one heart back from the hearts button, kept with the board
-  const wc = await page.evaluate(() => {
-    const s = window.__pt.app.active.session;
-    for (let r = 0; r < s.size; r++) for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] !== 2 && s.puzzle.solution[r][c] === 2) return [r, c];
-  });
-  await page.click('[data-tool="cat"]');
-  await page.click(`.cell[data-r="${wc[0]}"][data-c="${wc[1]}"]`);
+  const wc = await emptyTile();
+  await dblTap(wc[0], wc[1]);
+  const heartsBefore = await page.evaluate(() => window.__pt.app.active.session.hearts);
   const treatsBefore = await page.evaluate(() => window.__pt.app.save.inventory.items.filter((e) => e.item === 'life').reduce((a, e) => a + e.delta, 0));
   await page.click('[data-act="hearts"]');
   await page.click('[data-act="life"]');
@@ -187,7 +233,7 @@ try {
     hearts: window.__pt.app.active.session.hearts,
     treats: window.__pt.app.save.inventory.items.filter((e) => e.item === 'life').reduce((a, e) => a + e.delta, 0),
   }));
-  check('an extra life gives one heart back and is used once', afterTreat.hearts === 5 && afterTreat.treats === treatsBefore - 1, JSON.stringify({ treatsBefore, ...afterTreat }));
+  check('an extra life gives one heart back and is used once', afterTreat.hearts === heartsBefore + 1 && afterTreat.treats === treatsBefore - 1, JSON.stringify({ heartsBefore, treatsBefore, ...afterTreat }));
   await solveActive();
   check('the win sheet shows Paw Points', /Paw Points/.test((await page.textContent('.win-sheet')) ?? ''));
   await page.click('[data-act="next"]');
@@ -197,7 +243,7 @@ try {
   await page.evaluate(() => {
     window.__pt.app.save.inventory.ledger.push({ id: 'e2e:seed', delta: 500, at: new Date().toISOString(), source: 'gift' });
     window.__pt.app.persist();
-    window.__pt.go({ screen: 'shop' });
+    window.__pt.go({ screen: 'shop', sanctuary: 'harmony' });
   });
   const c0 = await coins();
   await page.click('[data-decor="rug"]');
@@ -210,7 +256,7 @@ try {
   await reload();
   check('purchased decor survives reload', await page.evaluate(() => !!window.__pt.app.save.inventory.decor.rug));
 
-  // Video tokens come only from a (test) reward video; food is bought with coins and fed to a resident
+  // Video tokens come only from a (test) reward video; each sanctuary has its own treats, fed from an animal's card
   await page.evaluate(() => window.__pt.go({ screen: 'shop' }));
   await page.waitForSelector('[data-act="watch-token"]');
   const vt = () => page.evaluate(() => window.__pt.app.save.inventory.items.filter((e) => e.item === 'vtoken').reduce((a, e) => a + e.delta, 0));
@@ -219,17 +265,19 @@ try {
   await page.waitForTimeout(1900);
   check('a watched test video grants one video token', (await vt()) === vt0 + 1, `${vt0} → ${await vt()}`);
   await page.click('[data-tab="food"]');
-  await page.click('[data-food="fishbites"]');
+  await page.click('[data-place="farm"]');
+  check('the Farm sells its own treats', !!(await page.$('[data-food="hay"]')) && !(await page.$('[data-food="kibble"]')));
+  await page.click('[data-food="hay"]');
   await page.click('[data-act="buy"]');
   await page.click('[data-act="close"]');
-  await page.evaluate(() => window.__pt.go({ screen: 'sanctuary' }));
-  await page.click('.resident-row [data-pet="mochi"]');
-  await page.click('[data-feed="fishbites"]');
-  check('feeding a favorite food adds two hearts of affection', (await page.evaluate(() => window.__pt.app.save.sanctuary.affection.mochi)) === 2);
+  await page.evaluate(() => window.__pt.go({ screen: 'region', id: 'farm' }));
+  await page.click('.resident-row [data-friend-card="cotton"]');
+  await page.click('[data-feed="hay"]');
+  check('feeding a favorite food adds two hearts of affection', (await page.evaluate(() => window.__pt.app.save.sanctuary.affection.cotton)) === 2);
   await page.keyboard.press('Escape');
 
-  // Sanctuary life: a tap on a resident in the garden gets a small reaction; ambient actions come and go on their own
-  await page.evaluate(() => window.__pt.go({ screen: 'sanctuary' }));
+  // Sanctuary life: a tap on an animal gets a small reaction; ambient actions come and go on their own
+  await page.evaluate(() => window.__pt.go({ screen: 'region', id: 'farm' }));
   await page.waitForSelector('.sanctuary__scene.is-live .sanctuary__pet');
   const greeted = await page
     .waitForFunction(() => document.querySelector('.sanctuary__scene .sanctuary__pet:is(.is-greet, .is-hop, .is-wag)'), null, { timeout: 3000 })
@@ -237,9 +285,9 @@ try {
       () => true,
       () => false,
     );
-  check('residents say hello when you arrive', greeted);
+  check('the animals say hello when you arrive', greeted);
   await page.waitForSelector('.sanctuary__scene.has-3d > canvas.scene3d', { timeout: 15000 }).catch(() => {});
-  check('the residents appear as 3D toys over the drawn garden', await page.evaluate(() => !!document.querySelector('.sanctuary__scene.has-3d > canvas.scene3d') && getComputedStyle(document.querySelector('.sanctuary__scene .sanctuary__pet')).opacity === '0'));
+  check('the Farm animals appear as 3D toys over the drawn scene', await page.evaluate(() => !!document.querySelector('.sanctuary__scene.has-3d > canvas.scene3d') && getComputedStyle(document.querySelector('.sanctuary__scene .sanctuary__pet')).opacity === '0'));
   await page.waitForTimeout(3000);
   await page.evaluate(() => {
     window.__seen = new Set();
@@ -248,29 +296,30 @@ try {
     }).observe(document.querySelector('.sanctuary__scene svg'), { subtree: true, attributes: true, attributeFilter: ['class'] });
   });
   await page.click('.sanctuary__scene .sanctuary__pet');
-  check('tapping a resident in the garden makes it react', await page.evaluate(() => window.__seen.has('is-greet') || window.__seen.has('is-love')));
+  check('tapping an animal in the scene makes it react', await page.evaluate(() => window.__seen.has('is-greet') || window.__seen.has('is-love')));
   await page.waitForTimeout(10_000);
   const seen = await page.evaluate(() => [...window.__seen]);
   check('the garden comes alive by itself within 10 seconds', seen.some((c) => c !== 'is-love' && c !== 'is-greet'), seen.join(','));
   check('no more than three figures move at once', await page.evaluate(() => document.querySelectorAll('.sanctuary__scene [class*="is-"]:not(.is-live)').length <= 3));
 
-  // Decoration activities: tapping the hot-air balloon sends someone up in it, then brings them back
+  // Decoration activities: tapping the little red tractor sends someone for a ride, then brings them back
   await page.evaluate(() => {
-    window.__pt.app.save.inventory.decor.balloon = { ownedAt: new Date().toISOString() };
+    window.__pt.app.save.inventory.decor.tractor = { ownedAt: new Date().toISOString() };
     window.__pt.app.persist();
-    window.__pt.go({ screen: 'sanctuary' });
+    window.__pt.go({ screen: 'region', id: 'farm' });
   });
-  await page.waitForSelector('.sanctuary__scene [data-decor="balloon"].has-act');
-  await page.evaluate(() => document.querySelector('.sanctuary__scene [data-decor="balloon"]').dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  await page.waitForSelector('.sanctuary__scene [data-decor="tractor"].has-act');
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => document.querySelector('.sanctuary__scene [data-decor="tractor"]').dispatchEvent(new MouseEvent('click', { bubbles: true })));
   await page.waitForTimeout(300);
   const ride = await page.evaluate(() => ({
-    rider: !!document.querySelector('.sp-balloon .sp-act .sp-rider-fig'),
+    rider: !!document.querySelector('.sp-tractor .sp-act .sp-rider-fig'),
     away: document.querySelectorAll('.sanctuary__scene .sanctuary__pet.is-away').length,
     caption: document.querySelector('[data-chat] span')?.textContent ?? '',
   }));
-  check('tapping the balloon sends an animal for a ride', ride.rider && ride.away === 1 && /balloon/.test(ride.caption), JSON.stringify(ride));
-  check('in 3D, the toy itself rides the balloon', await page.evaluate(() => (window.__stage3d?.riders() ?? []).some((r) => r.decor === 'balloon')));
-  await page.waitForTimeout(6600);
+  check('tapping the tractor sends an animal for a ride', ride.rider && ride.away === 1 && /tractor/.test(ride.caption), JSON.stringify(ride));
+  check('in 3D, the toy itself rides the tractor', await page.evaluate(() => (window.__stage3d?.riders() ?? []).some((r) => r.decor === 'tractor')));
+  await page.waitForTimeout(6800);
   check('the ride ends and the animal comes back', await page.evaluate(() => !document.querySelector('.sp-act') && !document.querySelector('.is-away')));
 
   // Tricks: tap an animal, ask for a free trick; a locked one opens its card instead
@@ -321,18 +370,45 @@ try {
   await page.waitForSelector('.trick-card');
   check('the Shop lists every trick and emote', (await page.$$('.trick-card')).length === 18);
 
-  // Paw Cup: an open attempt survives other play, resumes, and scores from its full move log
+  // Paw Cup waits for the two-animal lesson; then an open attempt survives other play, resumes, and scores from its log
   await page.evaluate(() => window.__pt.go({ screen: 'league' }));
   await page.click('.segmented [data-tab="week"]');
   await page.click('[data-act="ok"]').catch(() => {});
+  check('Paw Cup boards stay closed before two animals', !(await page.$('[data-board="0"]')));
+
+  // Level 21: the two-animal lesson, a guided board with an animal button for each
+  await page.evaluate(() => {
+    const s = window.__pt.app.save;
+    for (let i = 1; i < 21; i++) s.journey.clears['L' + i] ??= { firstClearAt: new Date().toISOString(), bestSeconds: 60, bestMistakes: 0, clean: true, hintFree: true, stars: 3 };
+    s.journey.nextLevel = 21;
+    s.onboarding.pairLessonDone = false;
+    window.__pt.app.persist();
+    window.__pt.start({ kind: 'level', level: 21 });
+  });
+  await page.waitForSelector('.game.is-guided .cell.is-guide');
+  const lesson = await page.evaluate(() => ({
+    rule: window.__pt.app.active.session.rule ?? 'pair',
+    tools: document.querySelectorAll('.controls--pair [data-tool]').length,
+    coach: document.querySelector('[data-coach]')?.textContent ?? '',
+    cast: window.__pt.app.active.cast,
+  }));
+  check('level 21 teaches two animals on a guided board', lesson.rule === 'pair' && lesson.tools === 2 && /two animals/i.test(lesson.coach), JSON.stringify(lesson));
+  check('the lesson pairs the animal coming home with a different kind already home', !!lesson.cast.b && lesson.cast.a !== lesson.cast.b, JSON.stringify(lesson.cast));
+  await reachPairs(25);
+  await page.evaluate(() => window.__pt.go({ screen: 'home' }));
+  await page.evaluate(() => window.__pt.go({ screen: 'league' }));
+  await page.click('.segmented [data-tab="week"]');
   await page.click('[data-board="0"]');
   await page.click('[data-act="go"]');
   await page.waitForTimeout(200);
+  check('two-animal boards add two animal buttons', (await page.$$('.controls--pair [data-tool]')).length === 2);
   await solveActive({ stopAfter: 2 }).catch(() => {});
-  await page.click('[data-act="rules"]');
-  check('Paw Cup hides the board while the rules are open', !!(await page.$('.board-veil')));
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(100);
+  await page.click('[data-act="pause"]');
+  check('Paw Cup hides the board while paused', !!(await page.$('.board-veil')));
+  await page.click('.sheet [data-act="rules"]');
+  check('…and while the rules are open', !!(await page.$('.board-veil')));
+  await page.click('[data-act="ok"]');
+  await page.waitForTimeout(150);
   check('the board comes back after the rules', !(await page.$('.board-veil')));
   await page.click('[data-act="leave"]');
   await page.evaluate(() => window.__pt.start({ kind: 'level', level: 4 }));
@@ -346,6 +422,18 @@ try {
   const pts = Number((await page.textContent('.score-card__total .num')) ?? 0);
   check('a resumed Cup attempt scores from its whole log', pts > 550, String(pts));
   await page.click('[data-act="next"]');
+
+  // Two-animal boards remember the animal picked last
+  await page.evaluate(() => window.__pt.start({ kind: 'level', level: 23 }));
+  await page.waitForTimeout(300);
+  await page.click('[data-tool="dog"]');
+  await page.evaluate(() => window.__pt.app.saveActive());
+  await reload();
+  await page.evaluate(() => window.__pt.start({ kind: 'level', level: 24 }));
+  await page.waitForTimeout(300);
+  check('the next two-animal board opens with the last animal picked', (await page.getAttribute('[data-tool="dog"]', 'aria-checked')) === 'true');
+  const castNames = await page.$$eval('.controls [data-tool] .tool__label', (els) => els.map((e) => e.textContent));
+  check('the animal buttons are named for the board’s animals', castNames.length === 2 && castNames.every((n) => n && n !== 'Cat' && n !== 'Dog'), castNames.join(','));
 
   // Re-entering a mode resumes its saved board instead of wiping it
   const dk = await page.evaluate(() => {
@@ -362,30 +450,26 @@ try {
   const dGivens = await page.evaluate(() => window.__pt.app.active.session.puzzle.givens.length);
   check('tapping the Daily again continues the saved daily', dPlaced === dGivens + 1, `${dPlaced} vs ${dGivens + 1}`);
 
-  // World map: a pin for every sanctuary; the first opens after level 6; every solve grows the sanctuary being built
-  await page.evaluate(() => {
-    const s = window.__pt.app.save;
-    if (s.journey.nextLevel < 7) s.journey.nextLevel = 7;
-    window.__pt.app.persist();
-  });
+  // World map: a pin for every sanctuary; the Farm is built first; every solve grows the sanctuary being built
   await page.evaluate(() => window.__pt.go({ screen: 'home' }));
   await page.click('.nav [data-tab="world"]');
   await page.waitForSelector('.world-map');
-  check('the World tab shows a pin for every sanctuary', (await page.$$('.world-pin')).length === 5);
-  check('the Outback is open and being built', !!(await page.$('.world-pin.is-building[data-go="outback"]')));
+  check('the World tab shows a pin for every sanctuary', (await page.$$('.world-pin')).length === 6);
+  check('the Farm is being built', !!(await page.$('.world-pin.is-building[data-go="farm"]')));
+  check('the Outback is open by level 25', !(await page.$('.world-pin.is-locked[data-go="outback"]')));
   check('later sanctuaries stay locked until their level', !!(await page.$('.world-pin.is-locked[data-go="amazon"]')));
-  await page.click('.world-card[data-go="outback"]');
+  await page.click('.world-card[data-go="farm"]');
   await page.waitForSelector('.region .sanctuary__scene svg');
-  const g0 = await page.evaluate(() => window.__pt.app.save.world.growth.outback ?? 0);
+  const g0 = await page.evaluate(() => window.__pt.app.save.world.growth.farm ?? 0);
   await page.click('.region-progress [data-act="play"]');
   await page.waitForSelector('.board');
   await page.waitForTimeout(500);
   if (await page.$('.overlay')) await page.evaluate(() => document.querySelector('.overlay [data-act]')?.click());
   await page.waitForTimeout(300);
   await solveActive();
-  const g1 = await page.evaluate(() => window.__pt.app.save.world.growth.outback ?? 0);
+  const g1 = await page.evaluate(() => window.__pt.app.save.world.growth.farm ?? 0);
   check('solving a puzzle grows the sanctuary being built by one', g1 === g0 + 1, `${g0} → ${g1}`);
-  check('the win sheet says how the sanctuary grew', /Outback/.test((await page.textContent('.win-sheet')) ?? ''));
+  check('the win sheet says who is coming home next', /is on the way/.test((await page.textContent('.win-sheet')) ?? ''));
   await page.evaluate(() => window.__pt.go({ screen: 'shop', sanctuary: 'amazon' }));
   check('a locked sanctuary’s decorations cannot be bought yet', !!(await page.$('.shop-card.is-locked[data-decor="waterfall"]')));
 
@@ -406,19 +490,8 @@ try {
   await page.waitForSelector('.board');
   await page.waitForTimeout(400);
   if (await page.$('.overlay')) await page.evaluate(() => document.querySelector('.overlay [data-act]')?.click());
-  {
-    // At a person's pace: the server doesn't count boards solved faster than a person can place pets.
-    const sol = await page.evaluate(() => window.__pt.app.active.session.puzzle.solution);
-    for (let r = 0; r < sol.length; r++)
-      for (let c = 0; c < sol.length; c++) {
-        const cells = await page.evaluate(() => window.__pt.app.active?.session.cells);
-        if (!cells || !sol[r][c] || cells[r][c] === sol[r][c]) continue;
-        await page.waitForTimeout(320);
-        await page.click(`[data-tool="${sol[r][c] === 1 ? 'cat' : 'dog'}"]`);
-        await page.click(`.cell[data-r="${r}"][data-c="${c}"]`);
-      }
-    await page.waitForSelector('.win-sheet', { timeout: 5000 });
-  }
+  // At a person's pace: the server doesn't count boards solved faster than a person can place animals.
+  await solveActive({ pace: 320 });
   const lbTotal = await page
     .waitForFunction(() => {
       const l = window.__pt.app.save.leaderboard;
@@ -440,7 +513,7 @@ try {
   await page.click('[data-act="settings"]');
   await page.click('[data-switch="toys3d"]');
   await page.keyboard.press('Escape');
-  await page.evaluate(() => window.__pt.go({ screen: 'sanctuary' }));
+  await page.evaluate(() => window.__pt.go({ screen: 'region', id: 'farm' }));
   await page.waitForTimeout(1200);
   check('with 3D animals off, the drawn animals show and no 3D layer is made', await page.evaluate(() => !window.__pt.app.settings.toys3d && !document.querySelector('canvas.scene3d') && getComputedStyle(document.querySelector('.sanctuary__scene .sanctuary__pet')).opacity === '1'));
   await page.evaluate(() => window.__pt.go({ screen: 'home' }));

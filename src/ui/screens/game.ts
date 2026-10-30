@@ -104,7 +104,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   const lives = () => itemBalance(app.save, 'life');
 
   const el = h(`
-    <div class="game" data-mode="${mode.kind}">
+    <div class="game${guided ? ' is-guided' : ''}" data-mode="${mode.kind}">
       <header class="game-top">
         <button class="icon-btn" data-act="leave" aria-label="Leave board">${ICON.back}</button>
         <div class="game-title">

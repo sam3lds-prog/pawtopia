@@ -373,7 +373,8 @@
   opacity: 0.35;
 }
 .coach {
-  min-height: 42px;
+  /* Room for three lines, so a longer tip never pushes the board under the player's finger. */
+  min-height: calc(3 * 1.35em);
   text-align: center;
   color: var(--ink);
   font-weight: 600;
@@ -886,6 +887,10 @@
 /* ---------- Tutorial coach ---------- */
 .coach.is-guide {
   color: var(--brand-dark);
+}
+/* Lesson boards explain more; their coach keeps four lines' room so the board stays put between steps. */
+.game.is-guided .coach {
+  min-height: calc(4 * 1.35em);
 }
 .cell.is-guide::before {
   opacity: 1;
