@@ -692,6 +692,7 @@
   height: 100%;
 }
 .trick-sheet__stage {
+  position: relative;
   width: 240px;
   max-width: 100%;
   margin: var(--s2) auto 0;
@@ -702,7 +703,7 @@
   overflow: visible;
 }
 .trick-sheet__stage svg {
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 120 / 104;
 }
 .trick-sheet__again {
   display: flex;

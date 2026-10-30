@@ -4,7 +4,7 @@
  * Under reduced motion nothing moves by itself; clips still show their faces, held still.
  */
 
-import { ambientClip, performClip, type Clip, type ClipCtx } from './clips';
+import { activityClip, ambientClip, performClip, type Clip, type ClipCtx } from './clips';
 import type { Expr } from './face';
 import { addPose, restPose, type Pose } from './pose';
 import type { Toy } from './toy';
@@ -36,6 +36,8 @@ export class Actor {
   away = false;
   /** Which way travelling clips go (toward the middle of the scene). */
   dir: 1 | -1 = 1;
+  /** Extra turn while riding (to face where the decoration takes it). */
+  extraYaw = 0;
 
   constructor(toy: Toy, seed: number) {
     this.toy = toy;
@@ -64,6 +66,21 @@ export class Actor {
     for (const l of this.layers) l.fadeFrom ??= now;
     this.layers.push({ clip, kind: 'perform', id, start: now, ctx: this.ctx(), still });
     return clip.ms;
+  }
+
+  /** Acts out a decoration activity (D32) while the stage carries the toy along the decoration's path. */
+  ride(decor: string, now: number, still = false): number {
+    const clip = activityClip(decor);
+    if (!clip) return 0;
+    for (const l of this.layers) l.fadeFrom ??= now;
+    this.layers.push({ clip, kind: 'perform', id: `act:${decor}`, start: now, ctx: this.ctx(), still });
+    return clip.ms;
+  }
+
+  /** Ends a ride early (the activity was stopped). */
+  endRide(now: number): void {
+    for (const l of this.layers) if (l.id.startsWith('act:')) l.fadeFrom ??= now;
+    this.extraYaw = 0;
   }
 
   performing(now: number): string | null {
@@ -99,6 +116,7 @@ export class Actor {
       }
     }
     if (idle) this.idle(pose, now);
+    pose.yaw += this.extraYaw;
     this.toy.setPose(pose);
 
     // Blinks every few seconds while the eyes are open.

@@ -9,6 +9,8 @@ import type { SceneStage } from '../../three/stage';
 export interface Scene3D {
   /** Binds to the (re-)rendered scene figure and its SVG. */
   attach(figure: HTMLElement | null, svg: SVGSVGElement | null): void;
+  /** Settles true once the toys are showing, false if they won't (no WebGL, setting off, load failed). */
+  readonly ready: Promise<boolean>;
   setLive(on: boolean): void;
   dispose(): void;
 }
@@ -39,24 +41,31 @@ export function createScene3D(): Scene3D {
   let target: [HTMLElement, SVGSVGElement] | null = null;
   let live = !document.hidden;
   let disposed = false;
+  let settle: (ok: boolean) => void = () => {};
+  const ready = new Promise<boolean>((r) => (settle = r));
   if (wants3D()) {
     loading ??= import('../../three/stage');
     loading
       .then((m) => {
-        if (disposed) return;
+        if (disposed) return settle(false);
         stage = new m.SceneStage({ reducedMotion: () => app.reducedMotion });
         if (import.meta.env.DEV) (window as unknown as { __stage3d?: SceneStage }).__stage3d = stage;
         stage.setLive(live);
-        if (target) stage.attach(...target);
+        if (target) {
+          stage.attach(...target);
+          settle(true);
+        }
       })
-      .catch(() => {
-        /* The drawn animals stay. */
-      });
-  }
+      .catch(() => settle(false));
+  } else settle(false);
   return {
+    ready,
     attach(figure, svg) {
       target = figure && svg ? [figure, svg] : null;
-      if (stage && target) stage.attach(...target);
+      if (stage && target) {
+        stage.attach(...target);
+        settle(true);
+      }
     },
     setLive(on) {
       live = on;
@@ -64,6 +73,7 @@ export function createScene3D(): Scene3D {
     },
     dispose() {
       disposed = true;
+      settle(false);
       stage?.dispose();
       stage = null;
     },

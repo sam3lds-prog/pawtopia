@@ -269,6 +269,7 @@ try {
     caption: document.querySelector('[data-chat] span')?.textContent ?? '',
   }));
   check('tapping the balloon sends an animal for a ride', ride.rider && ride.away === 1 && /balloon/.test(ride.caption), JSON.stringify(ride));
+  check('in 3D, the toy itself rides the balloon', await page.evaluate(() => (window.__stage3d?.riders() ?? []).some((r) => r.decor === 'balloon')));
   await page.waitForTimeout(6600);
   check('the ride ends and the animal comes back', await page.evaluate(() => !document.querySelector('.sp-act') && !document.querySelector('.is-away')));
 
@@ -294,6 +295,8 @@ try {
   await page.click('[data-tray-tab="trick"]');
   await page.click('.trick-chip[data-trick="backflip"]');
   await page.waitForSelector('.trick-sheet');
+  await page.waitForSelector('.trick-sheet__stage.has-3d', { timeout: 10000 }).catch(() => {});
+  check('the card previews the trick with a 3D toy', await page.evaluate(() => !!document.querySelector('.trick-sheet__stage.has-3d > canvas.scene3d')));
   check('a premium trick opens its card, bought with gems only', /gem/i.test(await page.textContent('.trick-sheet')) && !(await page.$('.trick-sheet [data-act="watch"]')));
   await page.keyboard.press('Escape');
   await page.waitForTimeout(250);
@@ -306,6 +309,7 @@ try {
   check('a video-token trick can’t be bought without tokens', !!(await page.$('.trick-sheet button[disabled]')) && !(await page.$('.trick-sheet [data-act="buy"]')));
   await page.keyboard.press('Escape');
   await page.waitForTimeout(250);
+  check('closing a card releases its 3D preview', await page.evaluate(() => document.querySelectorAll('canvas.scene3d').length === 1));
   check('looking at tricks charges nothing', (await page.evaluate(() => window.__pt.app.save.inventory.items.length)) === spent);
   // Without a pointer: the Tricks button opens the same tray, focus goes into it and comes back when it closes
   await page.click('[data-act="tray-close"]');

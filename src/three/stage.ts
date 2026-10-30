@@ -10,7 +10,7 @@
 
 import * as THREE from 'three';
 import { Actor } from './actor';
-import { ambientClip } from './clips';
+import { activityClip, ambientClip } from './clips';
 import { Effects } from './effects';
 import { addLights } from './lights';
 import { toySpec } from './species';
@@ -20,18 +20,34 @@ export interface StageOptions {
   reducedMotion: () => boolean;
 }
 
-/** Scene units of the drawn frame (360 × 300) and the camera distance. */
-const VW = 360;
-const VH = 300;
+/** The camera distance, in scene units (the drawn frame is 360 × 300 in a sanctuary, smaller in a trick card). */
 const D = 900;
 /** How much the toys lean toward you, so you see a little of their tops. */
 const TILT = 0.16;
+
+interface Ride {
+  decor: string;
+  /** The drawn rider, invisible: its box is where the toy goes. */
+  el: SVGGraphicsElement;
+  h0: number;
+  gh: number;
+  lastX: number | null;
+  /** Parts of the decoration that sit in front of the rider (the balloon's basket). */
+  cuts: Array<{ el: Element; mesh: THREE.Mesh }>;
+}
 
 interface Entry {
   actor: Actor;
   fig: SVGGElement;
   seen: { classes: Set<string>; trick: string | null };
+  home: { gx: number; gy: number; gh: number };
+  ride: Ride | null;
 }
+
+/** Decoration parts drawn in front of a rider. */
+const CUTS: Record<string, string[]> = { balloon: ['.sp-basket'] };
+/** Activities where the rider travels, and turns to face where it goes. */
+const TRAVELS: ReadonlySet<string> = new Set(['kite', 'icelanterns', 'waterfall']);
 
 const TRACKED = /^is-(blink|look|yawn|wag|stretch|hop|love|greet|stroll|flutter)$/;
 
@@ -53,6 +69,10 @@ export class SceneStage {
   private lastFrame = 0;
   private disposed = false;
   private ray = new THREE.Raycaster();
+  private vw = 360;
+  private vh = 300;
+  private cutMat = new THREE.MeshBasicMaterial({ colorWrite: false });
+  private cutGeo = new THREE.PlaneGeometry(1, 1);
   private seedBase = Math.floor(Math.random() * 1e6);
   /** Dev only: a frozen clock for stepping through a clip frame by frame. */
   private frozen: number | null = null;
@@ -65,7 +85,7 @@ export class SceneStage {
     this.canvas = this.renderer.domElement;
     this.canvas.className = 'scene3d';
     this.canvas.setAttribute('aria-hidden', 'true');
-    this.camera = new THREE.PerspectiveCamera((2 * Math.atan(VH / 2 / D) * 180) / Math.PI, VW / VH, 10, 4000);
+    this.camera = new THREE.PerspectiveCamera((2 * Math.atan(300 / 2 / D) * 180) / Math.PI, 360 / 300, 10, 4000);
     this.camera.position.set(0, 0, D);
     addLights(this.scene);
     this.effects = new Effects(this.scene, this.kit);
@@ -99,8 +119,16 @@ export class SceneStage {
       this.visible?.observe(figure);
     }
     this.svg = svg;
+    const vb = svg.viewBox?.baseVal;
+    if (vb?.width && vb.height && (vb.width !== this.vw || vb.height !== this.vh)) {
+      this.vw = vb.width;
+      this.vh = vb.height;
+      this.camera.fov = (2 * Math.atan(this.vh / 2 / D) * 180) / Math.PI;
+      this.camera.aspect = this.vw / this.vh;
+      this.camera.updateProjectionMatrix();
+    }
     this.observer.disconnect();
-    this.observer.observe(svg, { attributes: true, subtree: true, attributeFilter: ['class', 'data-trick'] });
+    this.observer.observe(svg, { attributes: true, childList: true, subtree: true, attributeFilter: ['class', 'data-trick'] });
     this.syncFigures();
     this.fit();
     this.renderNow();
@@ -111,6 +139,11 @@ export class SceneStage {
   setLive(on: boolean): void {
     this.live = on;
     this.kick();
+  }
+
+  /** Who is riding a decoration now, and which (tests). */
+  riders(): Array<{ key: string; decor: string }> {
+    return [...this.entries].filter(([, e]) => e.ride).map(([key, e]) => ({ key, decor: e.ride!.decor }));
   }
 
   /** Every actor, by the figure's key (`mochi`, `friend:gumnut`). For effects and tests. */
@@ -130,17 +163,20 @@ export class SceneStage {
       if (!spec) continue;
       keep.add(key);
       let e = this.entries.get(key);
+      const home = { gx: Number(el.dataset.gx), gy: Number(el.dataset.gy), gh: Number(el.dataset.gh) };
       if (!e) {
         const toy = new Toy(spec, this.kit, el.dataset.mood);
         const actor = new Actor(toy, this.seedBase + hash(key));
         this.scene.add(toy.root);
-        e = { actor, fig: el, seen: { classes: new Set(), trick: null } };
+        e = { actor, fig: el, seen: { classes: new Set(), trick: null }, home, ride: null };
         this.entries.set(key, e);
       }
       e.fig = el;
+      e.home = home;
       e.seen = { classes: new Set(el.classList), trick: el.dataset.trick ?? null };
+      this.endRide(e, this.now());
       e.actor.away = el.classList.contains('is-away');
-      this.place(e, Number(el.dataset.gx), Number(el.dataset.gy), Number(el.dataset.gh));
+      this.place(e, home.gx, home.gy, home.gh);
     }
     let gone = false;
     for (const [key, e] of this.entries)
@@ -154,14 +190,78 @@ export class SceneStage {
   }
 
   /** Stands a toy on a scene point so that it projects exactly onto the drawn figure's spot, nearer ones in front. */
-  private place(e: Entry, gx: number, gy: number, gh: number): void {
-    const z = (gy - VH / 2) * 0.35;
+  private place(e: Entry, gx: number, gy: number, gh: number, lift = 0): void {
+    const z = (gy - this.vh / 2) * 0.35 + lift;
     const k = (D - z) / D;
     const root = e.actor.toy.root;
-    root.position.set((gx - VW / 2) * k, (VH / 2 - gy) * k, z);
+    root.position.set((gx - this.vw / 2) * k, (this.vh / 2 - gy) * k, z);
     root.scale.setScalar(gh * k);
     root.rotation.x = TILT;
-    e.actor.dir = gx > VW / 2 ? -1 : 1;
+    e.actor.dir = gx > this.vw / 2 ? -1 : 1;
+  }
+
+  /** A scene rectangle (the svg's own units) for an element's current box, wherever CSS has moved it. */
+  private sceneBox(el: Element): { x: number; y: number; w: number; h: number } | null {
+    const fr = this.svg!.getBoundingClientRect();
+    if (!fr.width) return null;
+    const r = el.getBoundingClientRect();
+    const kx = this.vw / fr.width;
+    const ky = this.vh / fr.height;
+    return { x: (r.left - fr.left) * kx, y: (r.top - fr.top) * ky, w: r.width * kx, h: r.height * ky };
+  }
+
+  // ---------------------------------------------------------------- decoration rides (D32): the toy goes along
+
+  private startRide(e: Entry, act: Element, now: number): void {
+    const el = act.querySelector<SVGGraphicsElement>('.sp-rider-fig');
+    const decor = (act as HTMLElement).dataset.activity ?? '';
+    if (!el || !activityClip(decor)) return;
+    const box = this.sceneBox(el);
+    const still = act.classList.contains('is-act-still');
+    const host = act.closest('[data-decor]') ?? this.svg!.querySelector(`[data-decor="${decor}"]`);
+    const cuts = (CUTS[decor] ?? []).flatMap((sel) => [...(host?.querySelectorAll(sel) ?? [])]).map((c) => {
+      const mesh = new THREE.Mesh(this.cutGeo, this.cutMat);
+      mesh.renderOrder = -10;
+      this.scene.add(mesh);
+      return { el: c, mesh };
+    });
+    e.ride = { decor, el, h0: box?.h || 1, gh: Number(el.closest('[data-rh]')?.getAttribute('data-rh') ?? (el as unknown as HTMLElement).dataset?.rh ?? e.home.gh), lastX: null, cuts };
+    e.actor.ride(decor, now, still);
+    e.actor.away = false;
+  }
+
+  private endRide(e: Entry, now: number): void {
+    if (!e.ride) return;
+    for (const c of e.ride.cuts) c.mesh.removeFromParent();
+    e.ride = null;
+    e.actor.endRide(now);
+    this.place(e, e.home.gx, e.home.gy, e.home.gh);
+  }
+
+  /** Carries a riding toy to where the drawn rider is now. */
+  private follow(e: Entry): void {
+    const r = e.ride!;
+    const b = this.sceneBox(r.el);
+    if (!b || !b.h) return;
+    const gx = b.x + b.w / 2;
+    const gy = b.y + b.h;
+    // In front of the decoration it uses.
+    this.place(e, gx, gy, r.gh * (b.h / r.h0), 40);
+    // Faces the way the decoration takes it, smoothly.
+    if (r.lastX !== null && TRAVELS.has(r.decor)) {
+      const vx = gx - r.lastX;
+      const want = Math.abs(vx) > 0.15 ? Math.sign(vx) * 1.1 : 0;
+      e.actor.extraYaw += (want - e.actor.extraYaw) * 0.12;
+    }
+    r.lastX = gx;
+    const z = e.actor.toy.root.position.z + 60;
+    const k = (D - z) / D;
+    for (const c of r.cuts) {
+      const cb = this.sceneBox(c.el);
+      if (!cb) continue;
+      c.mesh.position.set((cb.x + cb.w / 2 - this.vw / 2) * k, (this.vh / 2 - (cb.y + cb.h / 2)) * k, z);
+      c.mesh.scale.set(cb.w * k, cb.h * k, 1);
+    }
   }
 
   // ---------------------------------------------------------------- state from the drawn figures
@@ -174,12 +274,19 @@ export class SceneStage {
   freezeAt(ms: number | null): void {
     this.frozen = ms;
     this.renderNow();
+    this.kick();
   }
 
   private onMutations(records: MutationRecord[]): void {
     const now = this.now();
     const touched = new Set<Element>();
-    for (const r of records) if (r.type === 'attributes') touched.add(r.target as Element);
+    for (const r of records) {
+      if (r.type === 'attributes') touched.add(r.target as Element);
+      else {
+        for (const n of r.removedNodes) if (n instanceof Element && n.matches('.sp-act')) this.rideEnded(n, now);
+        for (const n of r.addedNodes) if (n instanceof Element && n.matches('.sp-act')) this.rideStarted(n, now);
+      }
+    }
     for (const el of touched) {
       const key = (el as SVGGElement).dataset?.pet ?? ((el as SVGGElement).dataset?.friend ? `friend:${(el as SVGGElement).dataset.friend}` : null);
       const e = key ? this.entries.get(key) : null;
@@ -187,6 +294,27 @@ export class SceneStage {
       this.react(e, now);
     }
     this.kick();
+  }
+
+  private riderKey(act: Element): string | null {
+    const id = act.querySelector<SVGGElement>('.sp-rider-fig')?.dataset.rider;
+    if (!id) return null;
+    return this.entries.has(id) ? id : this.entries.has(`friend:${id}`) ? `friend:${id}` : null;
+  }
+
+  private rideStarted(act: Element, now: number): void {
+    const key = this.riderKey(act);
+    const e = key ? this.entries.get(key) : null;
+    if (e) this.startRide(e, act, now);
+  }
+
+  private rideEnded(act: Element, now: number): void {
+    const key = this.riderKey(act);
+    const e = key ? this.entries.get(key) : null;
+    if (e?.ride) {
+      this.endRide(e, now);
+      e.actor.away = e.fig.classList.contains('is-away');
+    }
   }
 
   private react(e: Entry, now: number): void {
@@ -198,7 +326,8 @@ export class SceneStage {
       const m = TRACKED.exec(c);
       if (m && e.actor.ambient(m[1], now, reduced)) this.effects.ambient(m[1], e.actor, now, ambientClip(m[1])?.ms ?? 1000);
     }
-    e.actor.away = classes.has('is-away');
+    // Away on a decoration: shown riding it instead (D32).
+    e.actor.away = classes.has('is-away') && !e.ride;
     const trick = el.dataset.trick ?? null;
     if (trick && trick !== e.seen.trick) {
       // Under reduced motion the trick class isn't set: the face and the emote show, still.
@@ -259,10 +388,10 @@ export class SceneStage {
 
   private tick = (raf: number): void => {
     this.raf = 0;
-    if (this.disposed) return;
-    const now = this.frozen ?? raf;
+    if (this.disposed || this.frozen !== null) return;
+    const now = raf;
     const reduced = this.o.reducedMotion();
-    const busy = [...this.entries.values()].some((e) => e.actor.busy(now)) || this.effects.active;
+    const busy = [...this.entries.values()].some((e) => e.actor.busy(now) || !!e.ride) || this.effects.active;
     // Smooth while something is happening; a calmer frame rate for breathing; a few frames a second when still.
     const minGap = busy ? 0 : reduced ? 250 : 30;
     if (now - this.lastFrame >= minGap) {
@@ -273,7 +402,10 @@ export class SceneStage {
   };
 
   private frame(now: number, reduced: boolean): void {
-    for (const e of this.entries.values()) e.actor.update(now, !reduced);
+    for (const e of this.entries.values()) {
+      if (e.ride) this.follow(e);
+      e.actor.update(now, !reduced);
+    }
     this.effects.update(now);
     this.renderer.render(this.scene, this.camera);
   }
@@ -292,9 +424,14 @@ export class SceneStage {
     this.visible?.disconnect();
     this.figure?.removeEventListener('click', this.onClick, true);
     this.figure?.classList.remove('has-3d');
-    for (const e of this.entries.values()) e.actor.toy.dispose();
+    for (const e of this.entries.values()) {
+      for (const c of e.ride?.cuts ?? []) c.mesh.removeFromParent();
+      e.actor.toy.dispose();
+    }
     this.entries.clear();
     this.effects.dispose();
+    this.cutGeo.dispose();
+    this.cutMat.dispose();
     this.kit.dispose();
     this.canvas.remove();
     this.renderer.dispose();

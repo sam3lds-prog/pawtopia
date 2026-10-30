@@ -16,7 +16,7 @@ import type { BodyKind, ToySpec } from './species';
 /** Shared materials and geometry for every toy in one stage. */
 export class ToyKit {
   private mats = new Map<string, THREE.Material>();
-  readonly sphere = new THREE.SphereGeometry(1, 28, 20);
+  readonly sphere = new THREE.SphereGeometry(1, 26, 18);
   readonly lowSphere = new THREE.SphereGeometry(1, 16, 12);
   private lathes = new Map<string, THREE.LatheGeometry>();
   private textures: THREE.Texture[] = [];
@@ -162,7 +162,9 @@ export class Toy {
   }
 
   private ball(color: string, pos: THREE.Vector3, r: THREE.Vector3, parent: THREE.Object3D = this.body, low = false): THREE.Mesh {
-    return this.part(low ? this.kit.lowSphere : this.kit.sphere, this.kit.fur(color), pos, r, parent);
+    // Small parts don't need many triangles.
+    const small = Math.max(r.x, r.y, r.z) < 0.075;
+    return this.part(low || small ? this.kit.lowSphere : this.kit.sphere, this.kit.fur(color), pos, r, parent);
   }
 
   /** A limb from a pivot straight down to a paw, as a capsule plus a rounded paw. */
@@ -263,7 +265,7 @@ export class Toy {
     this.head.add(skull);
     this.part(this.kit.sphere, this.kit.fur(s.fur), v3(0, 0, 0), v3(1, 1, 1), skull);
     const shellGeo = this.kit.trackGeo(
-      new THREE.SphereGeometry(1.004, 40, 30, Math.PI / 2 - HEAD_SHELL.phiLen / 2, HEAD_SHELL.phiLen, HEAD_SHELL.thetaStart, HEAD_SHELL.thetaLen),
+      new THREE.SphereGeometry(1.004, 32, 24, Math.PI / 2 - HEAD_SHELL.phiLen / 2, HEAD_SHELL.phiLen, HEAD_SHELL.thetaStart, HEAD_SHELL.thetaLen),
     );
     // Sphere geometry's phi runs from −x round to +x through +z, so the shell faces the viewer.
     const shell = new THREE.Mesh(shellGeo, this.eyeMat);
@@ -290,7 +292,7 @@ export class Toy {
     const s = this.spec;
     const k = s.snout.size;
     const mouthGeo = () =>
-      this.kit.trackGeo(new THREE.SphereGeometry(1.006, 28, 22, Math.PI / 2 - MUZZLE_SHELL.phiLen / 2, MUZZLE_SHELL.phiLen, MUZZLE_SHELL.thetaStart, MUZZLE_SHELL.thetaLen));
+      this.kit.trackGeo(new THREE.SphereGeometry(1.006, 20, 16, Math.PI / 2 - MUZZLE_SHELL.phiLen / 2, MUZZLE_SHELL.phiLen, MUZZLE_SHELL.thetaStart, MUZZLE_SHELL.thetaLen));
     const muzzle = (c: THREE.Vector3, r: THREE.Vector3, color: string, nose: THREE.Vector3 | null, noseR: THREE.Vector3) => {
       const g = new THREE.Group();
       g.position.copy(c);

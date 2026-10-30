@@ -335,6 +335,112 @@ export const EMOTE_CLIPS: Record<string, Clip> = {
   },
 };
 
+// ------------------------------------------------------------------ decoration activities (D32), as the rider acts them
+
+/** How the rider acts on each decoration; the path it travels is the decoration's own (the drawn rider's). */
+export const ACTIVITY_CLIPS: Record<string, Clip> = {
+  balloon: {
+    ms: 6200,
+    frame: (t) => {
+      const wave = hold(t, 0.22, 0.5, 0.06);
+      const look = hold(t, 0.55, 0.88, 0.08);
+      return {
+        pose: { py: wiggle(t, 0, 1, 5, 0.02), armR: 0.4 * wave, armROut: 2.3 * wave + wiggle(t, 0.26, 0.46, 3, 0.4), armLOut: 0.4 * hold(t, 0.05, 0.95), headYaw: Math.sin(seg(t, 0.55, 0.88) * TAU) * 0.6 * look, headPitch: -0.15 * look, tail: wiggle(t, 0, 1, 6, 0.4) },
+        face: look > 0.3 ? 'surprised' : 'happy',
+      };
+    },
+  },
+  kite: {
+    ms: 5600,
+    frame: (t) => {
+      const w = hold(t, 0.04, 0.96, 0.08);
+      return { pose: sum(steps(t, 0.1, 0.9, 10), { armL: 0.6 * w, armLOut: 2.1 * w, armROut: 0.6 * w, headPitch: -0.38 * w, headYaw: -0.3 * w, tailUp: 0.5 * w }), face: 'laugh' };
+    },
+  },
+  goldfountain: {
+    ms: 4800,
+    frame: (t) => {
+      const w = hold(t, 0.04, 0.96, 0.08);
+      return { pose: sum(jump(t, 0.12, 0.36, 0.25), jump(t, 0.42, 0.66, 0.25), jump(t, 0.7, 0.84, 0.2), { armLOut: (1.4 + wiggle(t, 0.1, 0.95, 8, 0.6)) * w, armROut: (1.4 - wiggle(t, 0.1, 0.95, 8, 0.6)) * w }), face: 'laugh' };
+    },
+  },
+  eavelights: {
+    ms: 5200,
+    frame: (t) => {
+      const w = hold(t, 0.03, 0.97, 0.08);
+      const beat = Math.sin(seg(t, 0.05, 0.95) * 8 * Math.PI);
+      return { pose: { py: Math.abs(beat) * 0.05 * w, tilt: beat * 0.15 * w, yaw: beat * 0.4 * w, armLOut: (1.7 + beat * 0.7) * w, armROut: (1.7 - beat * 0.7) * w, headTilt: -beat * 0.2 * w, tail: beat * 0.6 * w }, face: 'laugh' };
+    },
+  },
+  hammock: {
+    ms: 6000,
+    frame: (t) => {
+      const w = hold(t, 0.02, 0.98, 0.12);
+      return { pose: { roll: 1.3 * w, py: -0.12 * w, headPitch: -0.1 * w, squash: Math.sin(t * 6 * Math.PI) * 0.02 * w, tail: wiggle(t, 0, 1, 3, 0.3), ears: -0.3 * w }, face: w > 0.3 ? 'sleepy' : undefined };
+    },
+  },
+  opalrock: {
+    ms: 4600,
+    frame: (t) => {
+      const sniff = hold(t, 0.02, 0.36, 0.1);
+      const joy = hold(t, 0.58, 0.97, 0.08);
+      return {
+        pose: sum(jump(t, 0.38, 0.54, 0.22), { lean: 0.35 * sniff, headPitch: 0.35 * sniff + wiggle(t, 0.05, 0.33, 4, 0.08), armLOut: 2.2 * joy, armROut: 2.2 * joy, yaw: easeInOut(seg(t, 0.62, 0.95)) * TAU }),
+        face: t < 0.36 ? 'focused' : t < 0.56 ? 'surprised' : 'stars',
+      };
+    },
+  },
+  flamingos: {
+    ms: 5400,
+    frame: (t) => {
+      const w = hold(t, 0.04, 0.96, 0.1);
+      const beat = Math.sin(seg(t, 0.05, 0.95) * 6 * Math.PI);
+      return { pose: { legL: 0.9 * w, tilt: (beat * 0.12 - 0.06) * w, armLOut: (1.5 + beat * 0.5) * w, armROut: (1.5 - beat * 0.5) * w, headTilt: beat * 0.15 * w, py: Math.abs(beat) * 0.03 * w }, face: 'happy' };
+    },
+  },
+  pavilion: {
+    ms: 5600,
+    frame: (t) => {
+      const sip = bump(t, 0.18, 0.28, 0.38) + bump(t, 0.56, 0.66, 0.76);
+      return { pose: { armR: 1.5 * sip, armROut: -0.3 * sip, headPitch: -0.12 * sip, tail: wiggle(t, 0, 1, 4, 0.3), headTilt: wiggle(t, 0.4, 0.55, 1, 0.15) }, face: sip > 0.5 ? 'blink' : 'happy' };
+    },
+  },
+  icelanterns: {
+    ms: 6000,
+    frame: (t) => {
+      const w = hold(t, 0.03, 0.97, 0.08);
+      return { pose: sum(steps(t, 0.05, 0.95, 12), { armR: 1.0 * w, armROut: 0.3 * w, headPitch: -0.1 * w }), face: 'happy' };
+    },
+  },
+  aurora: {
+    ms: 6000,
+    frame: (t) => {
+      const w = hold(t, 0.04, 0.96, 0.15);
+      return { pose: { headPitch: -0.55 * w, lean: -0.1 * w, armL: 0.8 * w, armR: 0.8 * w, armLOut: -0.3 * w, armROut: -0.3 * w, tilt: wiggle(t, 0.1, 0.9, 2, 0.06), tail: wiggle(t, 0, 1, 3, 0.3) }, face: t > 0.3 && t < 0.8 ? 'love' : 'happy' };
+    },
+  },
+  fireflyjars: {
+    ms: 5600,
+    frame: (t) => {
+      const open = hold(t, 0.05, 0.3, 0.08);
+      const up = hold(t, 0.3, 0.95, 0.1);
+      return { pose: { armL: 1.0 * open, armR: 1.0 * open, armLOut: 2.2 * up, armROut: 2.2 * up, headPitch: -0.35 * up, headYaw: Math.sin(seg(t, 0.3, 0.95) * 2 * TAU) * 0.5 * up, py: bump(t, 0.3, 0.38, 0.46) * 0.12 }, face: t < 0.3 ? 'focused' : 'surprised' };
+    },
+  },
+  waterfall: {
+    ms: 4800,
+    frame: (t) => {
+      const w = hold(t, 0.04, 0.9, 0.08);
+      return { pose: sum({ lean: -0.45 * w, armLOut: 2.4 * w, armROut: 2.4 * w, legL: 0.8 * w, legR: 0.8 * w, ears: 0.4 * w }, jump(t, 0.76, 0.86, 0.12)), face: t < 0.2 ? 'surprised' : 'laugh' };
+    },
+  },
+};
+
+/** A decoration activity's clip for the rider. */
+export function activityClip(decor: string): Clip | null {
+  return ACTIVITY_CLIPS[decor] ?? null;
+}
+
 /** A trick's or an emote's clip (they share the catalog's ids; D33/D34). */
 export function performClip(id: string): Clip | null {
   return TRICK_CLIPS[id] ?? EMOTE_CLIPS[id] ?? null;

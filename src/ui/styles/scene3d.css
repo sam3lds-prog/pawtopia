@@ -24,3 +24,7 @@
 :root[data-motion='reduce'] .sanctuary__scene.has-3d .sanctuary__pet {
   transition: none;
 }
+/* A rider on a decoration (D32) is the toy itself; the drawn copy only marks the path. */
+.sanctuary__scene.has-3d .sp-rider-fig {
+  opacity: 0;
+}

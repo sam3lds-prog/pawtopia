@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AMBIENT, EMOTE_CLIPS, TRICK_CLIPS, TURN_CHANNELS, ambientClip, performClip } from '../../src/three/clips';
+import { ACTIVITY_CLIPS, AMBIENT, EMOTE_CLIPS, TRICK_CLIPS, TURN_CHANNELS, activityClip, ambientClip, performClip } from '../../src/three/clips';
+import { ACTIVITIES } from '../../src/ui/art/activities';
 import { CHANNELS, restPose, addPose } from '../../src/three/pose';
 import { ALL_TOY_IDS, FRIEND_TOYS, PET_TOYS, toySpec } from '../../src/three/species';
 import { EXPRESSIONS, exprForMood } from '../../src/three/face';
@@ -48,7 +49,7 @@ describe('3D toys (D34)', () => {
 });
 
 describe('3D clips', () => {
-  const all = { ...Object.fromEntries(Object.entries(AMBIENT).map(([k, v]) => [`ambient:${k}`, v])), ...Object.fromEntries(Object.entries(TRICK_CLIPS).map(([k, v]) => [`trick:${k}`, v])), ...Object.fromEntries(Object.entries(EMOTE_CLIPS).map(([k, v]) => [`emote:${k}`, v])) };
+  const all = { ...Object.fromEntries(Object.entries(ACTIVITY_CLIPS).map(([k, v]) => [`activity:${k}`, v])), ...Object.fromEntries(Object.entries(AMBIENT).map(([k, v]) => [`ambient:${k}`, v])), ...Object.fromEntries(Object.entries(TRICK_CLIPS).map(([k, v]) => [`trick:${k}`, v])), ...Object.fromEntries(Object.entries(EMOTE_CLIPS).map(([k, v]) => [`emote:${k}`, v])) };
 
   it('start and end at rest (so one can follow another), and never break', () => {
     for (const [name, clip] of Object.entries(all))
@@ -76,6 +77,13 @@ describe('3D clips', () => {
       const clip = performClip(t.id);
       expect(clip, t.id).not.toBeNull();
       expect(clip!.ms, t.id).toBe(t.ms);
+    }
+  });
+
+  it('every decoration activity has a 3D rider, as long as the activity', () => {
+    for (const a of Object.values(ACTIVITIES)) {
+      expect(activityClip(a.decor), a.decor).not.toBeNull();
+      expect(activityClip(a.decor)!.ms, a.decor).toBe(a.ms);
     }
   });
 

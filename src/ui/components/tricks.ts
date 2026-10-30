@@ -25,6 +25,7 @@ import { esc, plural } from '../dom';
 import { ICON } from '../icons';
 import type { Scope } from '../router';
 import { openSheet, toast } from './sheet';
+import { createScene3D } from './scene3d';
 import { animalName } from './activities';
 import { avatarPortrait } from '../screens/leaderboardTab';
 
@@ -250,7 +251,7 @@ export function showTrickSheet(scope: Scope, id: TrickId, opts: { who?: string; 
     return `
       ${t.tier !== 'free' ? `<span class="chip ${t.tier === 'premium' ? 'chip--gem' : 'chip--video'}">${t.tier === 'premium' ? `${ICON.gem}Premium ${t.kind}` : `${ICON.videoToken}Video-token ${t.kind}`}</span>` : ''}
       <figure class="trick-sheet__stage sanctuary__scene is-live" aria-label="${esc(`${whoName} showing ${t.name}`)}">
-        <svg viewBox="0 0 120 90" role="img"><rect width="120" height="90" rx="14" fill="#e6f2df"/><path d="M0 70 Q60 60 120 70 V76 A14 14 0 0 1 106 90 H14 A14 14 0 0 1 0 76 Z" fill="#cfe3c4"/>${stageFigure(who)}</svg>
+        <svg viewBox="0 0 120 104" role="img"><rect width="120" height="104" rx="14" fill="#e6f2df"/><path d="M0 84 Q60 74 120 84 V90 A14 14 0 0 1 106 104 H14 A14 14 0 0 1 0 90 Z" fill="#cfe3c4"/>${stageFigure(who)}</svg>
       </figure>
       <button class="btn btn--quiet btn--small trick-sheet__again" data-act="preview">${ICON.restart}Show me again</button>
       <p class="sheet__lead">${esc(t.blurb)}</p>
@@ -264,7 +265,18 @@ export function showTrickSheet(scope: Scope, id: TrickId, opts: { who?: string; 
     const fig = s?.querySelector<SVGGElement>('.sanctuary__pet');
     if (s && fig) performTrick(s, fig, id, app.reducedMotion);
   };
-  sh.scope.timeout(preview, 350);
+  // The preview animal is a 3D toy too (D34), when the sanctuary's are.
+  const s3d = createScene3D();
+  sh.scope.onDispose(() => s3d.dispose());
+  s3d.attach(sh.el.querySelector<HTMLElement>('.trick-sheet__stage'), sh.el.querySelector<SVGSVGElement>('.trick-sheet__stage svg'));
+  let first = false;
+  const firstPreview = () => {
+    if (first || !sh.scope.alive) return;
+    first = true;
+    preview();
+  };
+  void s3d.ready.then(() => sh.scope.timeout(firstPreview, 250));
+  sh.scope.timeout(firstPreview, 1500);
 
   let busy = false;
   sh.scope.on(sh.el, 'click', async (e) => {
@@ -322,7 +334,7 @@ export function showTrickSheet(scope: Scope, id: TrickId, opts: { who?: string; 
 
 /** A preview figure on the little stage in the trick card (a scene figure, so the trick plays on it). */
 function stageFigure(id: string): string {
-  if (isPetId(id)) return residentFigure(id, 60, 74, 38, 'happy');
-  if (isCompanionId(id)) return companionFigure(id, 60, 74, 36, 'happy');
-  return residentFigure('mochi', 60, 74, 38, 'happy');
+  if (isPetId(id)) return residentFigure(id, 60, 90, 34, 'happy');
+  if (isCompanionId(id)) return companionFigure(id, 60, 90, 32, 'happy');
+  return residentFigure('mochi', 60, 90, 34, 'happy');
 }

@@ -448,7 +448,13 @@ acted out with face and body.
   emotes; Starstruck (45 gems: star eyes, a twirl inside a ring of stars) and Party time (60 gems: a party hat,
   confetti, a dance) can only be bought. Same ledger, same rules, cosmetic only. New faces: heart eyes, star eyes,
   giggling, blushing, yawning, surprised.
-- **Cost and fallbacks**: three.js loads only when a sanctuary opens (≈ 156 kB gzipped, its own chunk). Without
+- **Decoration rides in 3D** (D32): the toy itself rides the balloon, flies the kite, naps in the hammock, slides down
+  the waterfall. It follows the drawn rider's path (which stays, invisible, as the choreography), acts it out with
+  its own clip, turns to face where a travelling decoration takes it, and sits *inside* the balloon's basket: an
+  invisible cut-out in front of the toy lets the drawn basket show over its legs.
+- **Previews**: a trick or emote card shows a 3D toy performing it too, released when the card closes.
+- **Cost and fallbacks**: three.js loads only when a sanctuary opens (≈ 165 kB gzipped, its own chunk). Eight toys
+  draw in about 200 calls and 140k triangles; posing them takes about 0.1 ms a frame. Without
   WebGL, if the context is lost, or with Settings → 3D animals off, the drawn animals stay. Frames: smooth while
   something plays, ~30 fps for breathing, a few per second under reduced motion (where nothing moves by itself), none
   when hidden or scrolled away. The canvas and context are released when the screen closes.

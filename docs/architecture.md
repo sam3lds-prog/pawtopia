@@ -100,6 +100,17 @@ buying, `ui/art/tricks.ts` for emotes and props, `ui/components/tricks.ts` for t
 and `performTrick`) play on the tapped figure itself. Their motion lives in `styles/sanctuary-play.css` (≤ 6.5 s, no
 loops, reduced motion = still), checked by `test/unit/play.test.ts` and `test/unit/tricks.test.ts`. D32, D33.
 
+## 3D toys (D34)
+
+`src/three/` is loaded on demand (`ui/components/scene3d.ts` → `import('../../three/stage')`). `species.ts` describes
+the 20 animals as data; `toy.ts` builds each from rounded parts with a rig; `face.ts` paints eyes and mouths per
+expression onto canvas textures; `pose.ts`/`clips.ts` are pure, tested pose channels and clips (everyday moves,
+tricks, emotes, decoration rides); `actor.ts` layers clips over idle motion; `effects.ts` adds props and the emote
+bubble; `stage.ts` overlays a WebGL canvas on a sanctuary figure (or a card's preview stage), stands each toy on its
+drawn figure's `data-gx/gy/gh`, and mirrors the drawn figures' state (`is-<action>`, `data-trick`, `is-away`, the
+`.sp-act` rider) with a MutationObserver, so nothing upstream knows the toys exist. `toys.html` (dev only) is a
+gallery of every toy: `?clip=backflip&t=0.5`, `?face=love`. In dev, `window.__stage3d.freezeAt(ms)` steps a clip.
+
 ## World map
 
 `ui/art/worldMap.data.ts` is generated once by `scripts/build-world-map.ts` (Natural Earth via world-atlas, Natural

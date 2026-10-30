@@ -58,9 +58,12 @@ Defects confirmed in source and fixed in Sprint 0:
 - [x] **Sprint K** (D31) — steeper Journey: 7×7 from level 6, 8×8 from 15, 9×9 from 40 (spec 3, pack 3 for 6–150)
 - [x] **Sprint L** (D32) — animals use the special and premium decorations (balloon rides, kite flying, hammock naps…)
 - [x] **Sprint M** (D33) — tricks with emotes: two free, four for video tokens, four premium for gems
+- [x] **Sprint N** (D34) — the 20 sanctuary animals as 3D soft toys (three.js, lazy-loaded) with idle life and strolls
+- [x] **Sprint O** (D34) — tricks performed in 3D with props; eight emotes (2 free, 4 video-token, 2 premium)
+- [x] **Sprint P** (D34) — 3D rides on all twelve special and premium decorations; 3D previews in trick cards
 - [ ] Game Center and online Paw Cup leagues — not started
 
-Test count: 307 unit tests + 65 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~163 kB JS gzipped for the app (incl. all three level packs); the Firebase SDK loads only when the leaderboard is used.
+Test count: 316 unit tests + 70 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.

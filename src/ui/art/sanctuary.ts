@@ -111,7 +111,7 @@ const DECOR_ART: Record<HarmonyDecorId, DecorArt> = {
         <path d="M137 22 C134 30 134 42 140 52" stroke="#fff" stroke-width="1.6" fill="none" opacity="0.55" stroke-linecap="round"/>
         <path d="M130 36 H172" stroke="#f9c0b5" stroke-width="1"/>
         <g class="sp-seat"></g>
-        <rect x="143" y="75" width="16" height="8" rx="2" fill="#c99a68" stroke="${OUT}" stroke-width="0.9"/>
+        <rect class="sp-basket" x="143" y="75" width="16" height="8" rx="2" fill="#c99a68" stroke="${OUT}" stroke-width="0.9"/>
         <path d="M143 79 H159" stroke="#a87b4f" stroke-width="0.8"/>
       </g>`,
   },
