@@ -412,7 +412,7 @@ interface FriendSpot {
 }
 
 const FRIEND_SPOTS: Partial<Record<CompanionId, FriendSpot>> = {
-  juniper: { x: 74, y: 278, H: 34, mood: 'happy' },
+  juniper: { x: 334, y: 204, H: 32, mood: 'happy' },
   ember: { x: 46, y: 224, H: 40, mood: 'happy' },
   maple: { x: 196, y: 160, H: 32, mood: 'sleepy', on: { decor: 'tree', x: 58, y: 117, H: 32 } },
 };

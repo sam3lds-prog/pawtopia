@@ -57,9 +57,10 @@ function sign(x: number, y: number, accent: string): string {
 export const REGION_DECOR_ART: Record<RegionDecorId, DecorArt> = {
   // Farm
   scarecrow: {
-    base: 196,
-    box: [12, 132, 50, 68],
-    draw: () => `
+    // Standing in the field just behind the pasture gate, a little smaller for being further back.
+    base: 176,
+    box: [100, 122, 44, 58],
+    draw: () => `<g transform="translate(122 176) scale(0.8) translate(-37 -196)">
       <ellipse cx="37" cy="196" rx="12" ry="2.6" fill="${SHADOW}"/>
       <path d="M37 196 V146" stroke="#8a6a4f" stroke-width="2.6" stroke-linecap="round"/>
       <path d="M18 160 H56" stroke="#8a6a4f" stroke-width="2.2" stroke-linecap="round"/>
@@ -70,7 +71,7 @@ export const REGION_DECOR_ART: Record<RegionDecorId, DecorArt> = {
       <circle cx="37" cy="150" r="7.4" fill="#f3e2bf" stroke="${OUT}" stroke-width="0.9"/>
       <circle cx="34.4" cy="149.4" r="1" fill="#2f2a27"/><circle cx="39.6" cy="149.4" r="1" fill="#2f2a27"/><path d="M34.6 152.6 q2.4 1.8 4.8 0" stroke="#2f2a27" stroke-width="0.9" fill="none" stroke-linecap="round"/>
       <path d="M26.5 145 C29 137 45 137 47.5 145 Z" fill="#c8945a" stroke="${OUT}" stroke-width="0.9"/><path d="M24 145.4 H50" stroke="#a87642" stroke-width="2" stroke-linecap="round"/>
-      <circle cx="43" cy="141" r="1.8" fill="#e5546c"/>`,
+      <circle cx="43" cy="141" r="1.8" fill="#e5546c"/></g>`,
   },
   wheelbarrow: {
     base: 270,
@@ -105,7 +106,7 @@ export const REGION_DECOR_ART: Record<RegionDecorId, DecorArt> = {
       <g fill="#7fb35d"><circle cx="18" cy="86" r="18"/><circle cx="40" cy="70" r="22"/><circle cx="64" cy="82" r="18"/><circle cx="76" cy="96" r="10"/><circle cx="10" cy="104" r="10"/></g>
       <g fill="#97c473"><circle cx="34" cy="62" r="10"/><circle cx="58" cy="74" r="8"/><circle cx="20" cy="80" r="7"/></g>
       <g fill="#e5546c"><circle cx="24" cy="94" r="2"/><circle cx="56" cy="88" r="2"/><circle cx="44" cy="78" r="1.8"/></g>
-      <g class="sp-swing"><path d="M68 94 V178" stroke="#8a6a4f" stroke-width="1.2"/><ellipse class="sp-seat" cx="68" cy="186" rx="10" ry="9" fill="none" stroke="#3f3a36" stroke-width="5"/><ellipse cx="68" cy="186" rx="10" ry="9" fill="none" stroke="#5d5752" stroke-width="1.2"/><path class="sp-tire-front" d="M58 187 A10 9 0 0 0 78 187" fill="none" stroke="#3f3a36" stroke-width="5"/></g>`,
+      <g class="sp-swing"><path d="M68 94 V168" stroke="#8a6a4f" stroke-width="1.2"/><ellipse class="sp-seat" cx="68" cy="176" rx="10" ry="9" fill="none" stroke="#3f3a36" stroke-width="5"/><ellipse cx="68" cy="176" rx="10" ry="9" fill="none" stroke="#5d5752" stroke-width="1.2"/><path class="sp-tire-front" d="M58 177 A10 9 0 0 0 78 177" fill="none" stroke="#3f3a36" stroke-width="5"/></g>`,
   },
   tractor: {
     base: 286,
@@ -361,7 +362,7 @@ interface Spot {
 type RegionalCompanion = Exclude<CompanionId, 'ember' | 'maple' | 'juniper'>;
 
 const SPOTS: Record<RegionalCompanion, Spot> = {
-  cotton: { x: 70, y: 214, H: 34, mood: 'happy' },
+  cotton: { x: 60, y: 240, H: 34, mood: 'happy' },
   truffle: { x: 182, y: 262, H: 30, mood: 'happy' },
   buttercup: { x: 262, y: 230, H: 38, mood: 'idle' },
   pepper: { x: 214, y: 166, H: 24, mood: 'happy', base: 189 },

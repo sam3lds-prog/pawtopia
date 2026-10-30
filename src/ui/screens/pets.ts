@@ -55,7 +55,8 @@ export const petsScreen: ScreenDef = {
               const isNext = !ownsIt && id === nextId;
               const when = !open ? `Opens after level ${sd.opensAfterLevel}` : isNext ? 'Coming home next' : 'Arrives later';
               const attr = isPetId(id) ? `data-pet="${id}"` : `data-friend="${id}"`;
-              const art = isPetId(id) ? portrait(id, ownsIt ? 'happy' : 'idle', !ownsIt) : friendPortrait(id as CompanionId, !ownsIt);
+              const shown = ownsIt || (isNext && open);
+              const art = isPetId(id) ? portrait(id, ownsIt ? 'happy' : 'idle', !shown) : friendPortrait(id as CompanionId, !shown);
               return `<li><button class="pet-card card card--tap ${ownsIt ? '' : 'is-locked'}" ${attr} aria-label="${esc(ownsIt ? `${a.name} the ${a.noun}, ${a.trait}${fav ? ', favorite' : ''}` : `${isNext ? a.name : `A ${a.noun}`}. ${when}`)}">
                 ${fav ? `<span class="pet-card__fav" aria-hidden="true">${ICON.heart}</span>` : ''}
                 ${art}
@@ -80,7 +81,7 @@ export const petsScreen: ScreenDef = {
                 const a = animalInfo(coming.next.id);
                 const span = Math.max(1, coming.need - coming.from);
                 return `<div class="next-arrival card">
-                  ${isPetId(coming.next.id) ? portrait(coming.next.id, 'idle', true) : friendPortrait(coming.next.id as CompanionId, true)}
+                  ${isPetId(coming.next.id) ? portrait(coming.next.id, 'idle') : friendPortrait(coming.next.id as CompanionId)}
                   <div class="next-arrival__body">
                     <b>${esc(a.name)} the ${esc(a.noun)} is on the way</b>
                     <span class="muted">${plural(coming.left, 'more puzzle')} while you build the ${esc(SANCTUARIES.find((s) => s.id === building)!.short)}.</span>

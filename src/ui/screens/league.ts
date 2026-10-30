@@ -9,7 +9,7 @@
  */
 
 import { app } from '../../app/app';
-import { dailyFor } from '../../game/modes';
+import { FIRST_PAIR_LEVEL, dailyFor, playsSolo } from '../../game/modes';
 import { playMode, resumeGame, savedFor, startGame } from '../../app/gameFlow';
 import { featureFlags } from '../../config/featureFlags';
 import { CUP_ATTEMPTS_PER_BOARD, cupWeek, PAR_SECONDS, type CupBoardSpec } from '../../competitions/cup';
@@ -68,11 +68,15 @@ export const leagueScreen: ScreenDef = {
       const left = attemptsLeft(app.save, b.weekKey, b.index);
       const resumable = !!savedFor({ kind: 'cup', weekKey: b.weekKey, index: b.index });
       const dots = Array.from({ length: CUP_ATTEMPTS_PER_BOARD }, (_, i) => `<i class="${i < used ? 'is-used' : ''}"></i>`).join('');
+      // Paw Cup boards hold two animals: they open once the two-animal lesson is done (D35).
+      const cupLocked = playsSolo(app.save.journey.nextLevel);
       const action = resumable
         ? `<button class="btn btn--small" data-resume="${b.index}">Resume</button>`
-        : left > 0
-          ? `<button class="btn btn--small ${best ? 'btn--secondary' : ''}" data-board="${b.index}">${used ? 'Try again' : 'Play'}</button>`
-          : `<span class="muted cup-board__done">Done</span>`;
+        : cupLocked
+          ? `<span class="muted cup-board__done">${ICON.lock}After level ${FIRST_PAIR_LEVEL}</span>`
+          : left > 0
+            ? `<button class="btn btn--small ${best ? 'btn--secondary' : ''}" data-board="${b.index}">${used ? 'Try again' : 'Play'}</button>`
+            : `<span class="muted cup-board__done">Done</span>`;
       return `<li class="cup-board card">
         <span class="cup-board__num">${b.index + 1}</span>
         <span class="cup-board__info">
@@ -90,6 +94,7 @@ export const leagueScreen: ScreenDef = {
       const prev = weekSummary(app.save, previousWeekKey());
       const delta = prev.total ? sum.total - prev.total : null;
       return `
+        ${playsSolo(app.save.journey.nextLevel) ? `<p class="notice">${ICON.lock}<span>Paw Cup boards have two animals. They open after the two-animal lesson on Journey level ${FIRST_PAIR_LEVEL}.</span></p>` : ''}
         <ol class="cup-boards" aria-label="This week's boards">${week.map(boardRow).join('')}</ol>
         <button class="btn btn--quiet" data-act="how">${ICON.help}How scoring works</button>
         <section class="card you-card" aria-labelledby="you-h">

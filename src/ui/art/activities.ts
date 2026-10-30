@@ -46,7 +46,7 @@ export const ACTIVITIES: Record<string, ActivityDef> = {
     line: (who) => `${who} is swinging on the tire swing!`,
     ms: 5600,
     x: 68,
-    y: 192,
+    y: 182,
     H: 16,
     mood: 'happy',
     seat: '.sp-swing',
