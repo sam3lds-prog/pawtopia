@@ -467,7 +467,9 @@ function mountHub(root: HTMLElement, scope: Scope): void {
         break;
       case 'journey':
       case 'play-next':
-        playMode({ kind: 'level', level });
+        // The one saved board slot would be overwritten: never throw away a board with progress without asking.
+        if (resumeLevel && curLevel !== level) confirmDropSaved(scope, curLevel, level, () => playMode({ kind: 'level', level }));
+        else playMode({ kind: 'level', level });
         break;
       case 'resume-other':
         if (otherSaved && !resumeGame()) {
@@ -495,6 +497,26 @@ function mountHub(root: HTMLElement, scope: Scope): void {
         app.router.go({ screen: 'profile' });
         break;
     }
+  });
+}
+
+/** "Play level N instead" while a Journey board is saved: say what it costs, and let the player keep it. */
+function confirmDropSaved(scope: Scope, savedLevel: number, level: number, go: () => void): void {
+  const placed = app.save.lastSession?.snap.history?.length ?? 0;
+  const sh = openSheet(scope, {
+    title: `Start level ${level}?`,
+    center: true,
+    body: `<p class="sheet__lead">Your level ${savedLevel} board${placed ? ` (${plural(placed, 'move')} so far)` : ''} will be cleared. Only one board is kept at a time.</p>
+      <div class="sheet__actions">
+        <button class="btn btn--quiet" data-act="keep" data-autofocus>Keep level ${savedLevel}</button>
+        <button class="btn btn--block" data-act="go">Start level ${level}</button>
+      </div>`,
+  });
+  sh.scope.on(sh.el, 'click', (e) => {
+    const a = actionOf(e);
+    if (!a) return;
+    sh.close();
+    if (a.act === 'go') go();
   });
 }
 

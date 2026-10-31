@@ -79,7 +79,7 @@ Defects confirmed in source and fixed in Sprint 0:
   World, its pins, the tab and the goal card until a sanctuary is visited
 - [ ] Game Center and online Paw Cup leagues — not started
 
-Test count: 398 unit tests + 135 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
+Test count: 400 unit tests + 135 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.
