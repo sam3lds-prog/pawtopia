@@ -28,7 +28,7 @@ import type { ScoreBreakdown } from '../../competitions/scoring';
 import { afterSolve, type MetaNews } from '../../app/events';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
 import { SANCTUARY_BY_ID, isRegionId, type SanctuaryId } from '../../meta/catalogs/sanctuaries';
-import { activeSanctuary, arrivalProgress, countsForGrowth, creditSolve, isMilestone, nextStage, openRegions, stageOf, type GrowthNews } from '../../meta/world';
+import { activeSanctuary, alreadyGrown, arrivalProgress, countsForGrowth, creditSolve, isMilestone, nextStage, openRegions, stageOf, type GrowthNews } from '../../meta/world';
 import { regionThumb } from '../art/regions';
 import { animalInfo, withArticle, type AnimalId } from '../../meta/animals';
 import { castFor, castWord, type Cast } from '../../meta/cast';
@@ -1070,11 +1070,15 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       tier: profile.tier,
     };
     const openedBefore = openRegions(app.save);
+    // How far the board's animal was before this solve, so the win can show the step it took (D38).
+    const friendBefore = mode.kind === 'cup' ? null : arrivalProgress(app.save, cast.sanctuary);
     const rec = recordWin(app.save, mode, result);
     const rewards = rewardsForWin(app.save, mode, rec, new Date(), profile.tier);
-    // Every solved puzzle (not Paw Cup) grows the sanctuary this board was started for, whatever is being built now; the
-    // guided first board brings the first animal home. Credited once per board (its id is the receipt).
-    const growth = countsForGrowth(mode, tutorial) ? creditSolve(app.save, { boardSanctuary: cast.sanctuary, openedBefore, receipt: boardId }) : null;
+    // Every new puzzle solved (not Paw Cup) grows the sanctuary this board was started for, whatever is being built now;
+    // the guided first board brings the first animal home. Credited once per board (its id is the receipt) and once per
+    // puzzle (its mode key): a replay of a cleared level grows nothing more (D38).
+    const replay = countsForGrowth(mode, tutorial) && alreadyGrown(app.save, modeKey(mode));
+    const growth = countsForGrowth(mode, tutorial) ? creditSolve(app.save, { boardSanctuary: cast.sanctuary, openedBefore, receipt: boardId, puzzle: modeKey(mode) }) : null;
     // On the leaderboard: queue the board (with its move log) for the server to check, then send in the background.
     const queued = !tutorial && queueSolve(app.save, mode, spec, s.events, result.mistakes, result.hintsUsed);
     const cupScore = mode.kind === 'cup' ? finishAttempt(app.save, mode, s.events, s.elapsedMs()) : null;
@@ -1093,8 +1097,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     // The board locks and glows for a beat (faces smile in a wave), then the results rise in stages. Nothing waits on
     // the animation: the sheet's buttons work the moment it opens, and a tap reveals everything at once.
     if (queued) void syncLeaderboard();
-    scope.timeout(() => showWin(rec, result.seconds, rewards, news, cupScore, growth), app.reducedMotion ? 150 : 500);
+    scope.timeout(() => showWin(rec, result.seconds, rewards, news, cupScore, growth, { replay, friendBefore }), app.reducedMotion ? 150 : 500);
   }
+
+  /** What this solve did (or didn't) for the world, carried into the win sheet (D38). */
+  type WorldStep = { replay: boolean; friendBefore: ReturnType<typeof arrivalProgress> };
 
   function rewardsMarkup(r: RewardSummary): string {
     if (!r.coins && !r.decor.length && !r.lives && !r.hints) return '';
@@ -1169,7 +1176,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
    * What this solve did for the world, below the stats: anything the hero didn't already show (a second region, more
    * arrivals, a stage reached on the same solve as an arrival), then how far the next animal is.
    */
-  function growthMarkup(g: GrowthNews | null, hero: Hero): string {
+  function growthMarkup(g: GrowthNews | null, hero: Hero, step: WorldStep): string {
     if (!g) return '';
     const parts: string[] = [];
     for (const r of g.opened) {
@@ -1200,17 +1207,31 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         parts.push(
           `<div class="win-growth is-up" style="--accent:${def.accent}">${ICON.sprout}<span><b>${esc(def.short)}: ${esc(g.stageUp.name)}!</b> ${esc(g.stageUp.change)}.</span></div>`,
         );
-      parts.push(nextFriendMarkup(g.sanctuary, true));
+      parts.push(nextFriendMarkup(g.sanctuary, true, step.friendBefore));
     }
     return parts.length ? `<div class="win-world">${parts.join('')}</div>` : '';
   }
 
-  /** The animal on its way to a sanctuary and how many puzzles until it arrives; `grew` says this solve counted for it. */
-  function nextFriendMarkup(where: SanctuaryId | null, grew = false): string {
+  /**
+   * A replay of a puzzle that already grew the world (D38): say so plainly, and show where the sanctuary's next animal
+   * stands, with no "+1". The stars and the best time are what a replay is for (replayMarkup says which).
+   */
+  function replayWorldMarkup(): string {
+    if (mode.kind === 'cup') return '';
+    const def = SANCTUARY_BY_ID[cast.sanctuary];
+    return `<div class="win-world"><p class="win-note muted" data-replay-note>${ICON.info}A replay: it already grew the ${esc(def.short)} once. New levels, the Daily and Zen boards grow it.</p>${nextFriendMarkup(cast.sanctuary)}</div>`;
+  }
+
+  /**
+   * The animal on its way to a sanctuary and how many puzzles until it arrives; `grew` says this solve counted for it.
+   * With `before` (the same animal's progress before the solve), the line says the step — "3 → 2 puzzles away" — and the
+   * bar starts where it was and fills to where it is now (one short move, skipped under reduced motion or a tap; D38).
+   */
+  function nextFriendMarkup(where: SanctuaryId | null, grew = false, before: ReturnType<typeof arrivalProgress> = null): string {
     if (!where || mode.kind === 'cup') return '';
     const p = arrivalProgress(app.save, where);
     const def = SANCTUARY_BY_ID[where];
-    const plus = grew ? `<b>${esc(def.short)} +1</b> · ` : '';
+    const plus = grew ? `<b class="win-plus">${esc(def.short)} +1</b> · ` : '';
     if (!p) {
       const st = nextStage(app.save, where);
       if (!st) return '';
@@ -1220,7 +1241,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     const a = animalInfo(p.next.id);
     const span = Math.max(1, p.need - p.from);
     const pct = Math.round(((p.have - p.from) / span) * 100);
-    return `<div class="win-next-friend" style="--accent:${def.accent}"><span class="win-next-friend__art is-shy">${animalPortrait(p.next.id, 'idle')}</span><span class="win-growth__body"><span>${plus}<b>${esc(a.name)} the ${esc(a.noun)}</b> is on the way: ${p.left === 1 ? 'one more puzzle' : `${p.left} more puzzles`}</span><span class="progress world-progress" role="progressbar" aria-label="${esc(a.name)} coming home" aria-valuemin="${p.from}" aria-valuemax="${p.need}" aria-valuenow="${p.have}"><span style="width:${pct}%"></span></span></span></div>`;
+    const sameFriend = grew && before && before.next.id === p.next.id;
+    const pct0 = sameFriend ? Math.round(((before.have - before.from) / Math.max(1, before.need - before.from)) * 100) : pct;
+    const away = p.left === 1 ? 'one more puzzle' : `${p.left} more puzzles`;
+    const line = sameFriend && before.left !== p.left ? `<b>${esc(a.name)} the ${esc(a.noun)}</b>: <span class="num">${before.left} → ${p.left}</span> ${p.left === 1 ? 'puzzle' : 'puzzles'} away` : `<b>${esc(a.name)} the ${esc(a.noun)}</b> is on the way: ${away}`;
+    return `<div class="win-next-friend" style="--accent:${def.accent}"><span class="win-next-friend__art is-shy">${animalPortrait(p.next.id, 'idle')}</span><span class="win-growth__body"><span>${plus}${line}</span><span class="progress world-progress" role="progressbar" aria-label="${esc(a.name)} coming home" aria-valuemin="${p.from}" aria-valuemax="${p.need}" aria-valuenow="${p.have}"><span data-grow-bar data-to="${pct}" style="width:${pct0}%"></span></span></span></div>`;
   }
 
   function newsMarkup(nw: MetaNews): string {
@@ -1285,7 +1310,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
           : `All three stars here. Best time ${fmtClock(app.save.journey.bestTimes[`L${mode.level}`] ?? 0)}.`;
     return `<p class="win-replay">${ICON.target}${esc(text)}</p>`;
   }
-  function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary, news: MetaNews, cupScore: ScoreBreakdown | null, growth: GrowthNews | null): void {
+  function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary, news: MetaNews, cupScore: ScoreBreakdown | null, growth: GrowthNews | null, step: WorldStep): void {
     // A visit worth making: a newly opened sanctuary first (that is the news), else a new stage or a new friend.
     const worldVisit: SanctuaryId | null = growth ? (growth.opened[0] ?? (growth.stageUp || growth.arrived.length || growth.completed ? growth.sanctuary : null)) : null;
     const next = nextAfterWin(mode);
@@ -1338,9 +1363,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         </div>
         <div class="win-stage win-stage-3">
           ${rewardsMarkup(rewards)}
-          ${growthMarkup(growth, hero)}
+          ${growthMarkup(growth, hero, step)}
           ${newsMarkup(news)}
-          ${growth ? '' : nextFriendMarkup(activeSanctuary(app.save))}
+          ${growth?.growth ? '' : step.replay ? replayWorldMarkup() : growth ? '' : nextFriendMarkup(activeSanctuary(app.save))}
         </div>
         <div class="sheet__actions">
           ${
@@ -1360,10 +1385,17 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     let leaving = false;
     // Paw Points count up while the results rise (skipped with reduced motion or a tap).
     const counter = ws.el.querySelector('[data-count]') as HTMLElement | null;
+    // The sanctuary bar moves from where it was to where it is now: one short step, a beat after the results rise.
+    const growBar = ws.el.querySelector('[data-grow-bar]') as HTMLElement | null;
+    const settleBar = () => {
+      if (growBar) growBar.style.width = `${growBar.dataset.to}%`;
+    };
     const reveal = () => {
       ws.el.classList.add('is-revealed');
       if (counter) counter.textContent = counter.dataset.count ?? counter.textContent;
+      settleBar();
     };
+    if (growBar && !app.reducedMotion) ws.scope.timeout(() => ws.scope.frame(settleBar), 650);
     if (counter && !app.reducedMotion) {
       const target = Number(counter.dataset.count);
       const t0 = performance.now() + 300;

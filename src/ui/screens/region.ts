@@ -225,6 +225,13 @@ export const regionScreen: ScreenDef = {
     if (newcomers.length) {
       const a = animalInfo(newcomers[0]);
       toast(`${a.name} the ${a.noun} came home to the ${def.short}!`, ICON.heart);
+      // Straight from the win that brought them (D38): the newcomer settles into place first (≤0.9 s, one time, never
+      // under reduced motion), then says hello like any arrival.
+      if (route.welcome?.includes(newcomers[0]) && !app.reducedMotion) {
+        const fig = el.querySelector(`.sanctuary__scene [data-friend="${newcomers[0]}"]`);
+        fig?.classList.add('is-arriving');
+        scope.timeout(() => fig?.classList.remove('is-arriving'), 900);
+      }
       scope.timeout(() => life?.play(`friend:${newcomers[0]}`, 'greet'), app.reducedMotion ? 0 : 900);
     }
 

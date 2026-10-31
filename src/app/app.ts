@@ -53,12 +53,21 @@ class App {
     // Saves from before D35 start the Pet Garden at their residents' place in its line, and any arrival that was reached
     // but not recorded (an interrupted save) happens now.
     const growthBefore = JSON.stringify(this.save.world.growth);
+    const policyBefore = this.save.world.policy;
     const friends = reconcileWorld(this.save);
     if (gift.coins > 0 || gift.decor.length) {
       if (loaded.source === 'migrated-v1') this.upgradeGift = gift;
       else if (this.save.onboarding.ladderNotice) this.ladderGift = gift;
     }
-    if (gift.coins > 0 || gift.decor.length || gift.points > 0 || pantry || friends.length || growthBefore !== JSON.stringify(this.save.world.growth))
+    if (
+      gift.coins > 0 ||
+      gift.decor.length ||
+      gift.points > 0 ||
+      pantry ||
+      friends.length ||
+      growthBefore !== JSON.stringify(this.save.world.growth) ||
+      policyBefore !== this.save.world.policy
+    )
       saveSave(this.save);
     try {
       const mq = window.matchMedia('(prefers-reduced-motion: reduce)');

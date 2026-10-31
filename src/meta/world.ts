@@ -1,10 +1,12 @@
 /**
- * The world map's progress (D35). The Farm and the Pet Garden are open from the start; the exotic regions open at
- * Journey levels. The sanctuary you're building grows by one for every puzzle you solve (Journey, Daily or Zen; the
- * Paw Cup is competition, so it doesn't count). Its animals arrive one by one at set growth counts, the Farm and the
- * regions also grow through drawn stages, and finishing a sanctuary (everyone home, last stage reached) gives a coin
- * gift. All of it is idempotent: stages and arrivals are derived from the growth count, so re-running it (startup
- * reconcile, a double tap) never grants twice.
+ * The world map's progress (D35, D38). The Farm and the Pet Garden are open from the start; the exotic regions open at
+ * Journey levels. The sanctuary you're building grows by one for every *new* puzzle you solve (Journey, Daily or Zen;
+ * the Paw Cup is competition, so it doesn't count): each Journey level grows it once, each day's Daily once, each fresh
+ * Zen board once (growth policy 2, D38). A replay of a cleared level still sharpens stars and times, but doesn't grow
+ * the world, so the fastest way to bring an animal home is to keep going. Its animals arrive one by one at set growth
+ * counts, the Farm and the regions also grow through drawn stages, and finishing a sanctuary (everyone home, last
+ * stage reached) gives a coin gift. All of it is idempotent: stages and arrivals are derived from the growth count, so
+ * re-running it (startup reconcile, a double tap) never grants twice.
  */
 
 import type { ModeRef } from '../game/modes';
@@ -130,11 +132,51 @@ export interface GrowthNews {
    * board was solved, so the solve helped the one being built now instead. Null when the board's own sanctuary grew.
    */
   redirectedFrom: SanctuaryId | null;
+  /** True when this puzzle had grown the world before (a replay), so nothing grew this time. */
+  replayed: boolean;
 }
 
 /** Whether a solved board counts toward sanctuary growth (everything but the Paw Cup; the guided first board brings the first animal home). */
 export function countsForGrowth(mode: ModeRef, _tutorial = false): boolean {
   return mode.kind !== 'cup';
+}
+
+/**
+ * Growth policy 2 (D38): a puzzle grows the world once. The puzzle is its mode key (`L8`, `D2026-10-31s`, `Z6-7000103s`),
+ * so a replay of a cleared level, of a finished Daily, or of the very same Zen board (a restart) is a new *board* but not
+ * a new *puzzle*. Zen keys are many and never come back once the next board is dealt, so only the newest are kept.
+ */
+export const GROWTH_POLICY = 2;
+const ZEN_GROWN_KEPT = 120;
+
+/** Has this puzzle already grown the world? (Boards built by hand without a key never have.) */
+export function alreadyGrown(save: Pick<SaveV2, 'world'>, puzzle: string | undefined): boolean {
+  return !!puzzle && !!save.world.grown && puzzle in save.world.grown;
+}
+
+function recordGrown(save: Pick<SaveV2, 'world'>, puzzle: string | undefined, now: Date): void {
+  if (!puzzle) return;
+  const grown = (save.world.grown ??= {});
+  grown[puzzle] = now.toISOString();
+  const zen = Object.keys(grown).filter((k) => k.startsWith('Z'));
+  for (const k of zen.slice(0, Math.max(0, zen.length - ZEN_GROWN_KEPT))) delete grown[k];
+}
+
+/**
+ * Moves a save to growth policy 2, once: every level already cleared and every Daily already done is marked as having
+ * grown the world, so replaying them grows nothing more. Growth counts, arrivals and gifts already earned are untouched.
+ */
+export function upgradeGrowthPolicy(save: Pick<SaveV2, 'world' | 'journey' | 'daily'>, now = new Date()): boolean {
+  if ((save.world.policy ?? 1) >= GROWTH_POLICY) return false;
+  const grown = (save.world.grown ??= {});
+  const at = now.toISOString();
+  for (const k of Object.keys(save.journey.clears)) if (/^L\d+$/.test(k)) grown[k] ??= at;
+  for (const d of Object.keys(save.daily.done)) {
+    grown[`D${d}`] ??= at;
+    grown[`D${d}s`] ??= at;
+  }
+  save.world.policy = GROWTH_POLICY;
+  return true;
 }
 
 /** Can a sanctuary still take growth: open and not yet complete. */
@@ -165,6 +207,8 @@ export interface SolveContext {
    * outcome is handled (a re-entered win, a replayed event log); omitted in unit tests that build boards by hand.
    */
   receipt?: string;
+  /** The puzzle's mode key (`modeKey(mode)`): a puzzle grows the world once (policy 2). Omitted by hand-built boards. */
+  puzzle?: string;
 }
 
 /** Credit receipts kept (the newest); older ones can't come back as a live board. */
@@ -191,17 +235,19 @@ function recordReceipt(save: WorldSave, receipt: string | undefined, id: Sanctua
 export function creditSolve(save: WorldSave, ctx: SolveContext, now = new Date()): GrowthNews | null {
   const opened = openRegions(save).filter((id) => !ctx.openedBefore.includes(id));
   if (alreadyCredited(save, ctx.receipt)) return null;
+  const replayed = alreadyGrown(save, ctx.puzzle);
   const { id, redirectedFrom } = beneficiaryOf(save, ctx.boardSanctuary);
-  recordReceipt(save, ctx.receipt, id);
-  if (!id) {
+  recordReceipt(save, ctx.receipt, replayed ? null : id);
+  if (!id || replayed) {
     if (!opened.length) return null;
-    const only: GrowthNews = { sanctuary: opened[0], growth: 0, stageUp: null, arrived: [], completed: false, coins: 0, opened, redirectedFrom };
+    const only: GrowthNews = { sanctuary: opened[0], growth: 0, stageUp: null, arrived: [], completed: false, coins: 0, opened, redirectedFrom, replayed };
     noteUnseen(save, only, now);
     return only;
   }
   const def = SANCTUARY_BY_ID[id];
   const before = stageOf(save, id);
   save.world.growth[id] = growthOf(save, id) + 1;
+  recordGrown(save, ctx.puzzle, now);
   const after = stageOf(save, id);
   const arrived = welcomeArrivals(save, id, now);
   const completed = isComplete(save, id);
@@ -216,6 +262,7 @@ export function creditSolve(save: WorldSave, ctx: SolveContext, now = new Date()
     coins,
     opened,
     redirectedFrom,
+    replayed: false,
   };
   noteUnseen(save, news, now);
   return news;
@@ -284,7 +331,8 @@ export function openRegions(save: Pick<SaveV2, 'journey' | 'world'>): RegionId[]
  * in too, and the next one is a fair number of puzzles away. Then any arrival that was reached but not recorded is
  * welcomed, and a sanctuary that is already finished pays its completion gift (once, by ledger id). Idempotent.
  */
-export function reconcileWorld(save: WorldSave, now = new Date()): AnimalId[] {
+export function reconcileWorld(save: WorldSave & Pick<SaveV2, 'daily'>, now = new Date()): AnimalId[] {
+  upgradeGrowthPolicy(save, now);
   if (save.world.growth.harmony === undefined) {
     const garden = SANCTUARY_BY_ID.harmony.arrivals;
     const reached = garden.filter((a) => isHome(save, a.id)).reduce((m, a) => Math.max(m, a.at), 0);

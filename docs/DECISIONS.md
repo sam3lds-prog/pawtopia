@@ -744,3 +744,25 @@ timing to beat.
   way in: pin labels 10 → 12 px, the home being built has a soft breathing halo (a still under reduced motion), locked
   homes step back (smaller, paler, quieter names), and *Expand map* doubles its width to pan around, starting on the
   home being built. The home cards below are the reliable touch targets, as before.
+
+### PR D — growth you can see, and fair (P1) — *needs the owner's yes: it changes D36's Policy A*
+The audit found that Policy A (every non-Cup solve grows the world) lets replaying one easy level rescue every animal.
+Not a bug: a product choice. This PR implements the audit's proposed rule so it can be play-tested; the owner decided on
+Policy A in D36, so **this one is only to be merged if that decision changes**.
+
+- **Growth policy 2** (`world.GROWTH_POLICY`, `save.world.policy`, `save.world.grown`): a puzzle grows the world once,
+  keyed by its mode key — each Journey level once, each day's Daily once, each fresh Zen board once (a restarted Zen
+  board is the same puzzle). `creditSolve` takes the key (`SolveContext.puzzle`); a replay is still receipted (the win
+  is handled once) but grows nothing and says `replayed`. Boards built by hand without a key (tools, the `growOnSolve`
+  shorthand, older tests) keep counting. Only the newest 120 Zen keys are kept; levels and dailies are bounded anyway.
+- **Migration once** (`upgradeGrowthPolicy`, run by `reconcileWorld` at startup): every level already cleared and every
+  Daily already done is marked as grown, so replaying them grows nothing more. Growth counts, arrivals, stages and
+  gifts already earned are untouched. Coins, Paw Points, stars, best times and leaderboard scoring are unchanged and
+  separate.
+- **The ordinary win shows the step** (`game.ts::nextFriendMarkup`): *Farm +1 · Truffle the piglet: 3 → 2 puzzles away*,
+  and the animal's bar starts where it was and slides to where it is now (900 ms, a beat after the results rise; a tap
+  settles it at once; reduced motion shows the end state). The milestone win (hero first) is as PR 4 left it. A replay
+  says so plainly — *A replay: it already grew the Farm once. New levels, the Daily and Zen boards grow it* — with the
+  next animal's standing and no *+1*; the stars and best time are what a replay is for.
+- **A true arrival settles in** (`region.ts`, `.is-arriving`): coming straight from the win that brought them, the
+  newcomer drops into place once (≤0.9 s, never under reduced motion), then says hello as before.
