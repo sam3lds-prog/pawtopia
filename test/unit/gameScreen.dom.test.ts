@@ -480,7 +480,7 @@ describe('the win sheet: milestones first, ordinary wins quick (PR 4)', () => {
     expect(app.router.route).toMatchObject({ screen: 'region', id: 'outback' });
   });
 
-  it('a replay of the level that brought an animal home is an ordinary win: no hero, nothing re-fired', () => {
+  it('a replay of the level that brought an animal home is an ordinary win: no hero, nothing re-fired, and (D38) no growth', () => {
     app.save.world.growth.farm = 3;
     app.save.inventory.companions.cotton = { unlockedAt: '2026-10-30T00:00:00.000Z' };
     start(4);
@@ -492,7 +492,62 @@ describe('the win sheet: milestones first, ordinary wins quick (PR 4)', () => {
     solveBoard();
     expect(sheet()!.querySelector('.win-hero')).toBeNull();
     expect(sheet()!.textContent).not.toMatch(/came home/);
-    expect(app.save.world.growth.farm).toBe(5);
+    // The level already grew the Farm once; a replay sharpens stars and times, it doesn't grow the world again.
+    expect(app.save.world.growth.farm).toBe(4);
+    expect(sheet()!.querySelector('[data-replay-note]')?.textContent).toMatch(/A replay: it already grew the Farm once/);
+    expect(sheet()!.textContent).not.toMatch(/\+1/);
+  });
+
+  describe('growth you can see, and fair (D38 PR D)', () => {
+    it('an ordinary win says the step the animal took and moves its bar from before to after', () => {
+      app.save.world.growth.farm = 1; // Truffle (at 4) is three puzzles away
+      app.save.inventory.companions.cotton = { unlockedAt: '2026-10-30T00:00:00.000Z' };
+      start(6);
+      solveBoard();
+      const w = sheet()!;
+      expect(w.querySelector('.win-hero')).toBeNull();
+      expect(w.querySelector('.win-plus')?.textContent).toBe('Farm +1');
+      expect(w.querySelector('.win-next-friend')?.textContent).toMatch(/Truffle the piglet: 3 → 2 puzzles away/);
+      const bar = w.querySelector<HTMLElement>('[data-grow-bar]')!;
+      // Starts where it was (0 of 3), settles where it is now (1 of 3) a beat later; a tap settles it at once.
+      expect(bar.style.width).toBe('0%');
+      expect(bar.dataset.to).toBe('33');
+      vi.advanceTimersByTime(700);
+      w.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      expect(bar.style.width).toBe('33%');
+      expect(app.save.world.growth.farm).toBe(2);
+      expect(app.save.world.grown.L6).toBeDefined();
+    });
+
+    it('under reduced motion the bar is already where it is now and the +1 does not animate', () => {
+      app.settings.reducedMotion = 'reduce';
+      app.save.world.growth.farm = 1;
+      app.save.inventory.companions.cotton = { unlockedAt: '2026-10-30T00:00:00.000Z' };
+      start(6);
+      solveBoard();
+      const w = sheet()!;
+      expect(w.classList.contains('is-revealed')).toBe(true);
+      expect(w.querySelector<HTMLElement>('[data-grow-bar]')!.style.width).toBe('33%');
+      app.settings.reducedMotion = 'system';
+    });
+
+    it('a restarted Zen board is the same puzzle: it grows the world once; a fresh Zen board counts again', () => {
+      app.save.world.growth.farm = 1;
+      app.save.inventory.companions.cotton = { unlockedAt: '2026-10-30T00:00:00.000Z' };
+      const zen = { kind: 'zen' as const, size: 5, seed: 7_000_102, rule: 'solo' as const };
+      startGame(zen);
+      solveBoard();
+      expect(app.save.world.growth.farm).toBe(2);
+      (sheet()!.querySelector('[data-act="next"]') as HTMLButtonElement).click();
+      startGame(zen); // the very same board again
+      solveBoard();
+      expect(app.save.world.growth.farm).toBe(2);
+      expect(sheet()!.querySelector('[data-replay-note]')).not.toBeNull();
+      (sheet()!.querySelector('[data-act="next"]') as HTMLButtonElement).click();
+      startGame({ ...zen, seed: 7_000_199 });
+      solveBoard();
+      expect(app.save.world.growth.farm).toBe(3);
+    });
   });
 });
 

@@ -9,8 +9,10 @@ import { balance, grant } from '../../src/meta/ledger';
 import { grantItem } from '../../src/meta/items';
 import { buyDecor, shownDecorIds } from '../../src/meta/sanctuary';
 import {
+  GROWTH_POLICY,
   activeSanctuary,
   alreadyCredited,
+  alreadyGrown,
   arrivalProgress,
   beneficiaryOf,
   countsForGrowth,
@@ -29,6 +31,7 @@ import {
   regionChat,
   setActive,
   stageOf,
+  upgradeGrowthPolicy,
 } from '../../src/meta/world';
 import { regionScene, REGION_DECOR_ART } from '../../src/ui/art/regions';
 import { hasDecorArt } from '../../src/ui/art/sanctuary';
@@ -158,16 +161,75 @@ describe('growing a sanctuary', () => {
       expect(castFor(s, 'solo', 12).sanctuary).toBe('harmony');
     });
 
-    it('credits a board once, however many times its win is handled; a replay of the level is a new board', () => {
+    it('credits a board once, however many times its win is handled; the same puzzle on a new board grows nothing more (D38)', () => {
       const s = atLevel(3);
-      const ctx = { boardSanctuary: 'farm' as const, openedBefore: openRegions(s), receipt: 'L4:one' };
+      const ctx = { boardSanctuary: 'farm' as const, openedBefore: openRegions(s), receipt: 'L4:one', puzzle: 'L4' };
       expect(creditSolve(s, ctx, NOW)?.growth).toBe(1);
       expect(alreadyCredited(s, 'L4:one')).toBe(true);
+      expect(alreadyGrown(s, 'L4')).toBe(true);
       expect(creditSolve(s, ctx, NOW)).toBeNull();
       expect(s.world.growth.farm).toBe(1);
-      // Policy A: the same level solved again on a fresh board counts again.
-      expect(creditSolve(s, { ...ctx, receipt: 'L4:two' }, NOW)?.growth).toBe(2);
-      expect(s.world.credits).toEqual({ 'L4:one': 'farm', 'L4:two': 'farm' });
+      // Policy 2: level 4 solved again on a fresh board is a replay. It is recorded (so the win is handled once) but
+      // grows nothing, and says so when there is something else to tell.
+      expect(creditSolve(s, { ...ctx, receipt: 'L4:two' }, NOW)).toBeNull();
+      expect(s.world.growth.farm).toBe(1);
+      expect(s.world.credits).toEqual({ 'L4:one': 'farm', 'L4:two': 'none' });
+      // A different level is a new puzzle; so is the Daily, so is a fresh Zen board.
+      expect(creditSolve(s, { ...ctx, receipt: 'L5:a', puzzle: 'L5' }, NOW)?.growth).toBe(2);
+      expect(creditSolve(s, { ...ctx, receipt: 'D:a', puzzle: 'D2026-10-28s' }, NOW)?.growth).toBe(3);
+      expect(creditSolve(s, { ...ctx, receipt: 'D:b', puzzle: 'D2026-10-28s' }, NOW)).toBeNull();
+      expect(creditSolve(s, { ...ctx, receipt: 'Z:a', puzzle: 'Z5-7000102s' }, NOW)?.growth).toBe(4);
+      expect(creditSolve(s, { ...ctx, receipt: 'Z:b', puzzle: 'Z5-7000102s' }, NOW)).toBeNull();
+      // Boards built by hand (no puzzle key) keep the shorthand behaviour: every one counts.
+      expect(creditSolve(s, { boardSanctuary: 'farm', openedBefore: openRegions(s), receipt: 'hand:1' }, NOW)?.growth).toBe(5);
+    });
+
+    it('a replay still announces a region that opened on the same solve', () => {
+      const s = atLevel(9);
+      const ctx = { boardSanctuary: 'farm' as const, openedBefore: openRegions(s), receipt: 'L10:one', puzzle: 'L10' };
+      expect(creditSolve(s, ctx, NOW)?.growth).toBe(1);
+      s.journey.nextLevel = 11; // the Outback opens after level 10
+      const news = creditSolve(s, { ...ctx, receipt: 'L10:two' }, NOW);
+      expect(news).toMatchObject({ growth: 0, opened: ['outback'], replayed: true });
+      expect(s.world.growth.farm).toBe(1);
+    });
+
+    it('only the newest Zen puzzles are remembered; levels and dailies are kept', () => {
+      const s = atLevel(3);
+      for (let i = 0; i < 130; i++) {
+        creditSolve(s, { boardSanctuary: 'farm', openedBefore: openRegions(s), receipt: `z${i}`, puzzle: `Z5-${7000000 + i}` }, NOW);
+        // Keep the Farm buildable: this test is about the list of puzzles, not about finishing sanctuaries.
+        s.world.growth.farm = 1;
+        s.inventory.companions = {};
+      }
+      creditSolve(s, { boardSanctuary: 'farm', openedBefore: openRegions(s), receipt: 'l', puzzle: 'L4' }, NOW);
+      const keys = Object.keys(s.world.grown);
+      expect(keys.filter((k) => k.startsWith('Z'))).toHaveLength(120);
+      expect(alreadyGrown(s, 'Z5-7000000')).toBe(false);
+      expect(alreadyGrown(s, 'Z5-7000129')).toBe(true);
+      expect(alreadyGrown(s, 'L4')).toBe(true);
+    });
+
+    it('moving to policy 2 marks what was already cleared as grown and keeps every animal and growth earned', () => {
+      const raw = { progressVersion: 2, journey: { nextLevel: 6, clears: { L1: {}, L2: {}, L3: {}, L4: {}, L5: {} } }, daily: { done: { '2026-10-27': { at: '', seconds: 1, mistakes: 0 } } }, world: { growth: { farm: 9 }, active: 'farm' }, inventory: { companions: { cotton: { unlockedAt: 'x' }, truffle: { unlockedAt: 'x' } } } };
+      const s = normalizeSave(raw, NOW);
+      expect(s.world.policy).toBeUndefined();
+      expect(upgradeGrowthPolicy(s, NOW)).toBe(true);
+      expect(s.world.policy).toBe(GROWTH_POLICY);
+      for (const k of ['L1', 'L2', 'L3', 'L4', 'L5', 'D2026-10-27', 'D2026-10-27s']) expect(alreadyGrown(s, k)).toBe(true);
+      expect(alreadyGrown(s, 'L6')).toBe(false);
+      expect(s.world.growth.farm).toBe(9);
+      expect(s.inventory.companions.truffle).toBeDefined();
+      // Once only; a fresh save is already on policy 2 with nothing to backfill.
+      expect(upgradeGrowthPolicy(s, NOW)).toBe(false);
+      expect(upgradeGrowthPolicy(defaultSave(NOW), NOW)).toBe(false);
+      // The startup reconcile runs it.
+      const t = normalizeSave(raw, NOW);
+      reconcileWorld(t, NOW);
+      expect(t.world.policy).toBe(GROWTH_POLICY);
+      expect(alreadyGrown(t, 'L3')).toBe(true);
+      // And a round trip keeps it.
+      expect(normalizeSave(JSON.parse(JSON.stringify(t)), NOW).world.grown).toEqual(t.world.grown);
     });
 
     it('a board whose sanctuary was finished while it sat saved helps the one being built now, and says so', () => {

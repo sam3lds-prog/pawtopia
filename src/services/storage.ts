@@ -184,6 +184,10 @@ export interface SaveV2 {
     credits: Record<string, string>;
     /** Per sanctuary, what happened there that the player hasn't visited yet (an arrival, a stage, its opening): the "New" marker. */
     unseen: Record<string, UnseenNews>;
+    /** Puzzles (by mode key) that have grown the world, so a replay grows nothing more (growth policy 2, D38). */
+    grown: Record<string, string>;
+    /** The growth policy this save is on: 1 = every solve counted (D35); 2 = each puzzle once (D38). Missing = 1. */
+    policy?: number;
   };
   /** The online leaderboard (opt-in). Solved boards wait here until the server has checked them. */
   leaderboard: LeaderboardSave;
@@ -416,7 +420,7 @@ export function defaultSave(now = new Date()): SaveV2 {
     inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {}, items: [], companions: {}, tricks: {} },
     sanctuary: { hidden: {}, visits: 0, affection: {}, patted: {}, fed: {} },
     ads: { day: null, rewarded: 0 },
-    world: { active: null, growth: {}, visited: {}, credits: {}, unseen: {} },
+    world: { active: null, growth: {}, visited: {}, credits: {}, unseen: {}, grown: {}, policy: 2 },
     leaderboard: defaultLeaderboard(),
     missions: { dayKey: null, weekKey: null, progress: {}, claimed: {} },
     achievements: {},
@@ -705,6 +709,8 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
               : undefined,
           )
         : {},
+      grown: isObj(x.world) ? rec(x.world.grown, strItem) : {},
+      ...(isObj(x.world) && typeof x.world.policy === 'number' && Number.isFinite(x.world.policy) ? { policy: Math.round(x.world.policy) } : {}),
     },
     leaderboard: normLeaderboard(x.leaderboard),
     missions: {

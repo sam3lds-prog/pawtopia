@@ -76,6 +76,14 @@
 - [ ] VoiceOver: the hero reads goal → level → Play → links; the pills announce their sanctuary; Expand map announces
       pressed / not pressed
 
+### D38 PR D — growth policy 2 (only if the owner accepts it)
+- [ ] Existing save: after the update, growth, animals and gifts unchanged; replaying a cleared level shows the replay
+      note and grows nothing; the next new level grows the sanctuary
+- [ ] Ordinary win: "+1" pops, "N → N−1 puzzles away", the bar slides once; a tap mid-slide settles it; Reduce Motion
+      shows the end state
+- [ ] Arrival from the win sheet: the newcomer drops into place once, then greets; opening the sanctuary any other way
+      shows no drop
+
 ## Store integration (only when ready; see roadmap)
 - [ ] StoreKit products created (remove_ads, starter_decor, cozy_theme, pet_portraits, supporter); verified entitlement
       + restore via a maintained bridge (e.g. RevenueCat Capacitor SDK); sandbox buy, restore, refund, reinstall
