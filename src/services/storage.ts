@@ -169,8 +169,11 @@ export interface SaveV2 {
   };
   /** Reward videos watched today (all placements share one gentle daily cap). */
   ads: { day: string | null; rewarded: number };
-  /** The world map: which regional sanctuary you're building, and how much each has grown (puzzles solved there). */
-  world: { active: string | null; growth: Record<string, number>; visited: Record<string, string> };
+  /**
+   * The world map: which sanctuary you're building, how much each has grown (puzzles solved for it), the last day each
+   * was visited, and credit receipts (board id → the sanctuary its solve grew, or `none`) so a board is credited once.
+   */
+  world: { active: string | null; growth: Record<string, number>; visited: Record<string, string>; credits: Record<string, string> };
   /** The online leaderboard (opt-in). Solved boards wait here until the server has checked them. */
   leaderboard: LeaderboardSave;
   missions: { dayKey: string | null; weekKey: string | null; progress: Record<string, number>; claimed: Record<string, boolean> };
@@ -221,6 +224,8 @@ export interface SavedSession {
   specVersion?: 1 | 2 | 3 | 4;
   /** Which animals the board shows (meta/cast.ts), so a resumed board looks the same. Validated on resume. */
   cast?: { a: string; b?: string; sanctuary: string };
+  /** The board's own id, minted when it started; its solve is credited to the world once under it. Missing in older saves. */
+  boardId?: string;
   savedAt: string;
   snap: SessionSnapshot;
 }
@@ -320,7 +325,7 @@ export function defaultSave(now = new Date()): SaveV2 {
     inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {}, items: [], companions: {}, tricks: {} },
     sanctuary: { hidden: {}, visits: 0, affection: {}, patted: {}, fed: {} },
     ads: { day: null, rewarded: 0 },
-    world: { active: null, growth: {}, visited: {} },
+    world: { active: null, growth: {}, visited: {}, credits: {} },
     leaderboard: defaultLeaderboard(),
     missions: { dayKey: null, weekKey: null, progress: {}, claimed: {} },
     achievements: {},
@@ -456,6 +461,7 @@ function normSavedSession(x: unknown): SavedSession | null {
     ...(isObj(x.cast) && typeof x.cast.a === 'string' && typeof x.cast.sanctuary === 'string'
       ? { cast: { a: x.cast.a, sanctuary: x.cast.sanctuary, ...(typeof x.cast.b === 'string' ? { b: x.cast.b } : {}) } }
       : {}),
+    ...(typeof x.boardId === 'string' && x.boardId.length <= 64 ? { boardId: x.boardId } : {}),
     savedAt: str(x.savedAt, ''),
     snap: x.snap as unknown as SessionSnapshot,
   };
@@ -557,6 +563,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       active: isObj(x.world) ? strOrNull(x.world.active) : null,
       growth: isObj(x.world) ? rec(x.world.growth, numItem) : {},
       visited: isObj(x.world) ? rec(x.world.visited, strItem) : {},
+      credits: isObj(x.world) ? rec(x.world.credits, strItem) : {},
     },
     leaderboard: normLeaderboard(x.leaderboard),
     missions: {

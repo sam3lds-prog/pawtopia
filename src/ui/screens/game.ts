@@ -21,7 +21,7 @@ import type { ScoreBreakdown } from '../../competitions/scoring';
 import { afterSolve, type MetaNews } from '../../app/events';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
 import { SANCTUARY_BY_ID, isRegionId, type SanctuaryId } from '../../meta/catalogs/sanctuaries';
-import { activeSanctuary, arrivalProgress, countsForGrowth, growOnSolve, nextStage, openRegions, stageOf, type GrowthNews } from '../../meta/world';
+import { activeSanctuary, arrivalProgress, countsForGrowth, creditSolve, nextStage, openRegions, stageOf, type GrowthNews } from '../../meta/world';
 import { animalInfo, withArticle, type AnimalId } from '../../meta/animals';
 import { castFor, castWord, type Cast } from '../../meta/cast';
 import { queueSolve, syncLeaderboard } from '../../app/leaderboardSync';
@@ -61,11 +61,11 @@ export const gameScreen: ScreenDef = {
       app.router.go({ screen: 'home' });
       return;
     }
-    mountGame(root, scope, active.mode, active.session, active.spec, active.cast ?? castFor(app.save, active.session.rule, active.session.puzzle.seed));
+    mountGame(root, scope, active.mode, active.session, active.spec, active.cast ?? castFor(app.save, active.session.rule, active.session.puzzle.seed), active.boardId);
   },
 };
 
-function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, spec: SpecVersion = 1, cast: Cast): void {
+function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, spec: SpecVersion = 1, cast: Cast, boardId?: string): void {
   const tutorial = isTutorial(mode, app.save);
   // The first two-animal board (level 21) is guided too, but keeps its hearts.
   const pairLesson = !tutorial && isPairLesson(mode, app.save);
@@ -121,7 +121,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         <div class="board-foot" data-foot>
           <p class="coach" data-coach aria-live="polite"></p>
           <div class="game-status">
-            <span class="status-left"><span data-progress class="num"></span><span class="status-board" aria-hidden="true">${n}×${n} · ${tierName}</span></span>
+            <span class="status-left"><span data-progress class="num"></span><span class="status-board" aria-hidden="true">${n}×${n} · ${tierName}</span>${
+              mode.kind === 'cup'
+                ? ''
+                : `<span class="status-for" data-for="${cast.sanctuary}" style="--accent:${SANCTUARY_BY_ID[cast.sanctuary].accent}" title="${esc(`This board helps the ${SANCTUARY_BY_ID[cast.sanctuary].name}, whatever you build next.`)}" aria-label="${esc(`This board helps the ${SANCTUARY_BY_ID[cast.sanctuary].short}`)}">${ICON.sprout}${esc(SANCTUARY_BY_ID[cast.sanctuary].short)}</span>`
+            }</span>
             ${rules.timer && settings.showTimer ? `<span class="game-timer num" data-timer aria-label="Time">${ICON.clock}<span>0:00</span></span>` : ''}
           </div>
         </div>
@@ -377,11 +381,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     return null;
   }
 
-  /** Places the picked animal; a wrong guess costs a heart and leaves a ✕ where it can't go. */
+  /**
+   * Places the picked animal. A wrong guess costs a heart and nothing else: the tile keeps whatever it held (empty, or
+   * the player's own ✕). It is never marked for them: on a two-animal board the tile may hold the other animal, and a
+   * ✕ the player didn't make would mislead them (or give the answer away).
+   */
   function placeAt(r: number, c: number): void {
-    const res = s.place(r, c, species());
-    if (res.wrong) s.markIfEmpty(r, c);
-    handle(res, r, c);
+    handle(s.place(r, c, species()), r, c);
   }
 
   function onDrag(r: number, c: number, m: 'mark' | 'unmark'): void {
@@ -427,11 +433,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     if (t === 'cat' || t === 'dog') {
       const v = s.cells[r][c];
       if (v === CAT || v === DOG) handle({ ignored: true }, r, c);
-      else {
-        const res = s.place(r, c, t === 'dog' ? DOG : CAT);
-        if (res.wrong) s.markIfEmpty(r, c);
-        handle(res, r, c);
-      }
+      else handle(s.place(r, c, t === 'dog' ? DOG : CAT), r, c); // a wrong guess leaves the tile as it was (see placeAt)
       return true;
     }
     handle(s.apply(r, c, t), r, c);
@@ -494,8 +496,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       coach(`Not quite. That tile can't hold ${withArticle(word)}.`);
       const g = guide;
       scope.timeout(() => guide === g && coachGuide(g.text), 1800);
-    } else if (!rules.hearts) coach(`Not ${withArticle(word)} spot. No rush, try another line of thought.`);
-    else if (s.hearts > 0) coach(`Not ${withArticle(word)} spot. ${plural(s.hearts, 'heart')} left.`);
+    } else if (!rules.hearts) coach(`Not ${withArticle(word)} spot. No rush: try another row, column or color.`);
+    else if (s.hearts > 0) coach(`Not ${withArticle(word)} spot. Try another row, column or color. ${plural(s.hearts, 'heart')} left.`);
   }
 
   function onUnits(units: UnitRef[]): void {
@@ -922,8 +924,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     const openedBefore = openRegions(app.save);
     const rec = recordWin(app.save, mode, result);
     const rewards = rewardsForWin(app.save, mode, rec, new Date(), profile.tier);
-    // Every solved puzzle (not Paw Cup) grows the sanctuary being built; the guided first board brings the first animal home.
-    const growth = countsForGrowth(mode, tutorial) ? growOnSolve(app.save, openedBefore) : null;
+    // Every solved puzzle (not Paw Cup) grows the sanctuary this board was started for, whatever is being built now; the
+    // guided first board brings the first animal home. Credited once per board (its id is the receipt).
+    const growth = countsForGrowth(mode, tutorial) ? creditSolve(app.save, { boardSanctuary: cast.sanctuary, openedBefore, receipt: boardId }) : null;
     // On the leaderboard: queue the board (with its move log) for the server to check, then send in the background.
     const queued = !tutorial && queueSolve(app.save, mode, spec, s.events, result.mistakes, result.hintsUsed);
     const cupScore = mode.kind === 'cup' ? finishAttempt(app.save, mode, s.events, s.elapsedMs()) : null;
@@ -982,6 +985,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     }
     if (g.growth > 0) {
       const def = SANCTUARY_BY_ID[g.sanctuary];
+      if (g.redirectedFrom) {
+        const from = SANCTUARY_BY_ID[g.redirectedFrom];
+        parts.push(`<p class="win-note muted">${ICON.info}The ${esc(from.name)} is finished, so this board helped the ${esc(def.short)} instead.</p>`);
+      }
       for (const id of g.arrived) {
         const a = animalInfo(id);
         parts.push(
@@ -996,26 +1003,27 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         parts.push(
           `<div class="win-growth is-up" style="--accent:${def.accent}">${ICON.sprout}<span><b>${esc(def.short)}: ${esc(g.stageUp.name)}!</b> ${esc(g.stageUp.change)}.</span></div>`,
         );
-      parts.push(nextFriendMarkup(g.sanctuary));
+      parts.push(nextFriendMarkup(g.sanctuary, true));
     }
     return parts.length ? `<div class="win-world">${parts.join('')}</div>` : '';
   }
 
-  /** The animal on its way to the sanctuary being built, and how many puzzles until it arrives. */
-  function nextFriendMarkup(where: SanctuaryId | null): string {
+  /** The animal on its way to a sanctuary and how many puzzles until it arrives; `grew` says this solve counted for it. */
+  function nextFriendMarkup(where: SanctuaryId | null, grew = false): string {
     if (!where || mode.kind === 'cup') return '';
     const p = arrivalProgress(app.save, where);
     const def = SANCTUARY_BY_ID[where];
+    const plus = grew ? `<b>${esc(def.short)} +1</b> · ` : '';
     if (!p) {
       const st = nextStage(app.save, where);
       if (!st) return '';
       const left = st.need - st.have;
-      return `<div class="win-growth" style="--accent:${def.accent}">${ICON.sprout}<span><b>${esc(def.short)} +1</b> · ${left === 1 ? 'one more puzzle' : `${left} more puzzles`} to ${esc(st.stage.name.toLowerCase())}</span></div>`;
+      return `<div class="win-growth" style="--accent:${def.accent}">${ICON.sprout}<span>${plus}${left === 1 ? 'one more puzzle' : `${left} more puzzles`} to ${esc(st.stage.name.toLowerCase())}</span></div>`;
     }
     const a = animalInfo(p.next.id);
     const span = Math.max(1, p.need - p.from);
     const pct = Math.round(((p.have - p.from) / span) * 100);
-    return `<div class="win-next-friend" style="--accent:${def.accent}"><span class="win-next-friend__art is-shy">${animalPortrait(p.next.id, 'idle')}</span><span class="win-growth__body"><span><b>${esc(a.name)} the ${esc(a.noun)}</b> is on the way: ${p.left === 1 ? 'one more puzzle' : `${p.left} more puzzles`}</span><span class="progress world-progress" role="progressbar" aria-label="${esc(a.name)} coming home" aria-valuemin="${p.from}" aria-valuemax="${p.need}" aria-valuenow="${p.have}"><span style="width:${pct}%"></span></span></span></div>`;
+    return `<div class="win-next-friend" style="--accent:${def.accent}"><span class="win-next-friend__art is-shy">${animalPortrait(p.next.id, 'idle')}</span><span class="win-growth__body"><span>${plus}<b>${esc(a.name)} the ${esc(a.noun)}</b> is on the way: ${p.left === 1 ? 'one more puzzle' : `${p.left} more puzzles`}</span><span class="progress world-progress" role="progressbar" aria-label="${esc(a.name)} coming home" aria-valuemin="${p.from}" aria-valuemax="${p.need}" aria-valuenow="${p.have}"><span style="width:${pct}%"></span></span></span></div>`;
   }
 
   function newsMarkup(nw: MetaNews): string {
@@ -1081,9 +1089,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     return `<p class="win-replay">${ICON.target}${esc(text)}</p>`;
   }
   function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary, news: MetaNews, cupScore: ScoreBreakdown | null, growth: GrowthNews | null): void {
-    // A visit worth making: a new stage, a new friend, or a newly opened sanctuary.
-    const worldVisit: SanctuaryId | null =
-      growth && (growth.stageUp || growth.arrived.length || growth.opened.length) ? (growth.growth > 0 ? growth.sanctuary : growth.opened[0]) : null;
+    // A visit worth making: a newly opened sanctuary first (that is the news), else a new stage or a new friend.
+    const worldVisit: SanctuaryId | null = growth ? (growth.opened[0] ?? (growth.stageUp || growth.arrived.length ? growth.sanctuary : null)) : null;
     const next = nextAfterWin(mode);
     const arrived = growth?.growth ? growth.arrived : [];
     const meet = arrived.length > 0;
@@ -1135,7 +1142,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         <div class="sheet__actions">
           <button class="btn btn--block" data-act="${firstBoard && meet ? 'meet' : 'next'}" data-autofocus>${esc(primaryLabel)}</button>
           <div class="win-secondary">
-            ${firstBoard && meet ? '' : meet ? `<button class="btn btn--quiet" data-act="meet">${ICON.home}Meet ${esc(animalInfo(arrived[0]).name)}</button>` : worldVisit ? `<button class="btn btn--quiet" data-act="region">${ICON.globe}Visit the ${esc(SANCTUARY_BY_ID[worldVisit].short)}</button>` : `<button class="btn btn--quiet" data-act="sanctuary">${ICON.home}Visit sanctuary</button>`}
+            ${firstBoard && meet ? '' : growth?.opened.length && worldVisit ? `<button class="btn btn--quiet" data-act="region">${ICON.globe}Explore the ${esc(SANCTUARY_BY_ID[worldVisit].short)}</button>` : meet ? `<button class="btn btn--quiet" data-act="meet">${ICON.home}Meet ${esc(animalInfo(arrived[0]).name)}</button>` : worldVisit ? `<button class="btn btn--quiet" data-act="region">${ICON.globe}Visit the ${esc(SANCTUARY_BY_ID[worldVisit].short)}</button>` : `<button class="btn btn--quiet" data-act="sanctuary">${ICON.home}Visit sanctuary</button>`}
             <button class="btn btn--quiet" data-act="share" aria-label="Share result">${ICON.share}${firstBoard ? 'Share result' : 'Share'}</button>
           </div>
         </div>`,
@@ -1174,8 +1181,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       leaving = true;
       ws.close();
       if (a.act === 'meet' || a.act === 'sanctuary' || a.act === 'region') {
-        // The sanctuary the news is about: the Pet Garden's own screen, or the Farm's or a region's.
-        const where = a.act === 'sanctuary' ? (activeSanctuary(app.save) ?? 'harmony') : (worldVisit ?? growth?.sanctuary ?? 'harmony');
+        // The sanctuary the news is about: a newcomer's home, the region that opened, or the one being built.
+        const where: SanctuaryId =
+          a.act === 'meet' ? (growth?.sanctuary ?? 'harmony') : a.act === 'region' ? (worldVisit ?? growth?.sanctuary ?? 'harmony') : (activeSanctuary(app.save) ?? 'harmony');
         const welcome = a.act === 'meet' ? arrived : [];
         if (isRegionId(where))
           app.router.go({ screen: 'region', id: where, fresh: growth?.stageUp && growth.sanctuary === where ? stageOf(app.save, where) : 0, welcome });

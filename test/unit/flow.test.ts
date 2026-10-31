@@ -53,6 +53,17 @@ describe('resume after the app is closed', () => {
     expect(back.session.cells).toEqual(s.cells);
   });
 
+  it('keeps the board id, so a resumed board is credited to the world under the id it started with', () => {
+    const mode = { kind: 'level' as const, level: 4 };
+    const s = new Session(puzzleFor(mode));
+    const saved = JSON.parse(JSON.stringify(captureSession(mode, s, new Date(), 4, { a: 'cotton', sanctuary: 'farm' }, 'L4:k1x:abc')));
+    expect(saved.boardId).toBe('L4:k1x:abc');
+    expect(resumeSession(saved)?.boardId).toBe('L4:k1x:abc');
+    // Older saves had none; resuming one works and simply has no id (the game mints one).
+    delete saved.boardId;
+    expect(resumeSession(saved)?.boardId).toBeUndefined();
+  });
+
   it('refuses to resume when the layout digest or generator version differs', () => {
     const mode = { kind: 'level' as const, level: 2 };
     const s = new Session(puzzleFor(mode));

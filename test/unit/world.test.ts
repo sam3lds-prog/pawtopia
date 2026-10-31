@@ -10,8 +10,11 @@ import { grantItem } from '../../src/meta/items';
 import { buyDecor, shownDecorIds } from '../../src/meta/sanctuary';
 import {
   activeSanctuary,
+  alreadyCredited,
   arrivalProgress,
+  beneficiaryOf,
   countsForGrowth,
+  creditSolve,
   growOnSolve,
   isComplete,
   isOpen,
@@ -133,6 +136,90 @@ describe('growing a sanctuary', () => {
     expect(activeSanctuary(s)).toBe('harmony');
     expect(arrivalProgress(s, 'harmony')).toMatchObject({ next: { id: 'juniper' }, have: 0, need: 1, left: 1 });
     expect(grant(s, 'world:complete:farm', 150, 'gift', NOW)).toBe(false);
+  });
+
+  describe('a board helps the sanctuary it started for (2026-10-31 review, P0)', () => {
+    it('switching what you build mid-board changes the next board, not the one on the table', () => {
+      const s = atLevel(3);
+      const board = castFor(s, 'solo', 11);
+      expect(board.sanctuary).toBe('farm');
+      expect(setActive(s, 'harmony')).toBe(true);
+      const news = creditSolve(s, { boardSanctuary: board.sanctuary, openedBefore: openRegions(s), receipt: 'L4:a' }, NOW);
+      expect(news).toMatchObject({ sanctuary: 'farm', growth: 1, arrived: ['cotton'], redirectedFrom: null });
+      expect(s.world.growth.farm).toBe(1);
+      expect(s.world.growth.harmony ?? 0).toBe(0);
+      // The player's choice stands, and the next board is the Pet Garden's.
+      expect(s.world.active).toBe('harmony');
+      expect(activeSanctuary(s)).toBe('harmony');
+      expect(castFor(s, 'solo', 12).sanctuary).toBe('harmony');
+    });
+
+    it('credits a board once, however many times its win is handled; a replay of the level is a new board', () => {
+      const s = atLevel(3);
+      const ctx = { boardSanctuary: 'farm' as const, openedBefore: openRegions(s), receipt: 'L4:one' };
+      expect(creditSolve(s, ctx, NOW)?.growth).toBe(1);
+      expect(alreadyCredited(s, 'L4:one')).toBe(true);
+      expect(creditSolve(s, ctx, NOW)).toBeNull();
+      expect(s.world.growth.farm).toBe(1);
+      // Policy A: the same level solved again on a fresh board counts again.
+      expect(creditSolve(s, { ...ctx, receipt: 'L4:two' }, NOW)?.growth).toBe(2);
+      expect(s.world.credits).toEqual({ 'L4:one': 'farm', 'L4:two': 'farm' });
+    });
+
+    it('a board whose sanctuary was finished while it sat saved helps the one being built now, and says so', () => {
+      const s = atLevel(3);
+      const held = castFor(s, 'solo', 1); // a Farm board, left in progress
+      solve(s, 26); // meanwhile the Farm is finished on other boards
+      expect(isComplete(s, 'farm')).toBe(true);
+      expect(beneficiaryOf(s, held.sanctuary)).toEqual({ id: 'harmony', redirectedFrom: 'farm' });
+      const news = creditSolve(s, { boardSanctuary: held.sanctuary, openedBefore: openRegions(s) }, NOW);
+      expect(news).toMatchObject({ sanctuary: 'harmony', growth: 1, redirectedFrom: 'farm', arrived: ['juniper'] });
+      expect(s.world.growth.farm).toBe(26);
+    });
+
+    it('with nothing left to build, a solve grows nothing but still announces a region that opened', () => {
+      const s = atLevel(9);
+      solve(s, 26);
+      setActive(s, 'harmony');
+      solve(s, 53);
+      expect(activeSanctuary(s)).toBeNull();
+      const before = openRegions(s);
+      expect(creditSolve(s, { boardSanctuary: 'farm', openedBefore: before, receipt: 'x' }, NOW)).toBeNull();
+      expect(s.world.credits.x).toBe('none');
+      s.journey.nextLevel = 11; // this solve cleared level 10: the Outback opens, and there is something to build again
+      const news = creditSolve(s, { boardSanctuary: 'farm', openedBefore: before, receipt: 'y' }, NOW);
+      expect(news).toMatchObject({ sanctuary: 'outback', growth: 1, opened: ['outback'], redirectedFrom: 'farm' });
+      // A board with no sanctuary of its own: the region that opened is what it helps.
+      const t = atLevel(10);
+      solve(t, 26);
+      setActive(t, 'harmony');
+      solve(t, 53);
+      solve(t, 25); // the Outback too
+      expect(activeSanctuary(t)).toBeNull();
+      t.journey.nextLevel = 26; // the Savanna opens on this solve
+      const only = creditSolve(t, { boardSanctuary: null, openedBefore: ['farm', 'outback'] }, NOW);
+      expect(only).toMatchObject({ sanctuary: 'savanna', growth: 1, opened: ['savanna'], redirectedFrom: null });
+    });
+
+    it('never moves the choice of what to build; the shorthand still credits the active sanctuary', () => {
+      const s = atLevel(3);
+      expect(s.world.active).toBeNull();
+      expect(growOnSolve(s, openRegions(s), NOW)?.sanctuary).toBe('farm');
+      expect(s.world.active).toBeNull();
+      expect(creditSolve(s, { boardSanctuary: 'farm', openedBefore: [] }, NOW)?.sanctuary).toBe('farm');
+      expect(s.world.active).toBeNull();
+    });
+
+    it('keeps only the newest receipts, and a save round trip keeps them', () => {
+      const s = atLevel(3);
+      for (let i = 0; i < 70; i++) creditSolve(s, { boardSanctuary: 'farm', openedBefore: [], receipt: `r${i}` }, NOW);
+      expect(Object.keys(s.world.credits)).toHaveLength(60);
+      expect(alreadyCredited(s, 'r0')).toBe(false);
+      expect(alreadyCredited(s, 'r69')).toBe(true);
+      const back = normalizeSave(JSON.parse(JSON.stringify(s)), NOW);
+      expect(back.world.credits).toEqual(s.world.credits);
+      expect(normalizeSave({ progressVersion: 2, world: { growth: { farm: 2 } } }, NOW).world.credits).toEqual({});
+    });
   });
 
   it('progress toward the next animal counts from the last arrival', () => {

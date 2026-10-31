@@ -6,7 +6,7 @@
  */
 
 import { app } from '../../app/app';
-import { playMode } from '../../app/gameFlow';
+import { buildHereMessage, playMode } from '../../app/gameFlow';
 import { DECOR, DECOR_BY_ID, STARTER_DECOR, decorHome, decorOf, type DecorId } from '../../meta/catalogs/decor';
 import type { PetId } from '../../meta/catalogs/pets';
 import { chooseStarter, isShown, owns, sanctuaryChat, setShown, shownDecorIds } from '../../meta/sanctuary';
@@ -265,7 +265,7 @@ export const sanctuaryScreen: ScreenDef = {
         app.persist();
         sfx('coin');
         track('region_build', { region: 'harmony' });
-        toast('Now building the Pet Garden. Your boards will show who is coming home here.');
+        toast(buildHereMessage('harmony'));
         render();
       }
     });

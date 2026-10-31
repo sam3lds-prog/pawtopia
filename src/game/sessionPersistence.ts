@@ -12,6 +12,7 @@ export function captureSession(
   now = new Date(),
   spec: SpecVersion = currentSpec(mode),
   cast?: SavedSession['cast'],
+  boardId?: string,
 ): SavedSession | null {
   // Only boards still in play are resumable. A won board is done; a lost one ended with its loss sheet
   // (restoring it would bring back a board that ignores every tap).
@@ -22,6 +23,7 @@ export function captureSession(
     generatorVersion: GENERATOR_VERSION,
     specVersion: spec,
     ...(cast ? { cast: { ...cast } } : {}),
+    ...(boardId ? { boardId } : {}),
     savedAt: now.toISOString(),
     // Paw Cup keeps its full input log so the attempt is scored by replaying every move, across resumes; Journey and
     // Daily keep theirs too, so a resumed board can still be checked by the leaderboard server.
@@ -33,7 +35,7 @@ export function captureSession(
  * Rebuilds a saved board. Returns null (and the caller should drop the save) when the generator
  * version changed, the regenerated layout differs, or the snapshot doesn't fit the board.
  */
-export function resumeSession(saved: SavedSession | null): { mode: ModeRef; session: Session; spec: SpecVersion; cast?: SavedSession['cast'] } | null {
+export function resumeSession(saved: SavedSession | null): { mode: ModeRef; session: Session; spec: SpecVersion; cast?: SavedSession['cast']; boardId?: string } | null {
   if (!saved) return null;
   if (saved.generatorVersion !== GENERATOR_VERSION) return null;
   // Saves from before specs were versioned were all made under spec 1, so they get their original board back.
@@ -48,7 +50,7 @@ export function resumeSession(saved: SavedSession | null): { mode: ModeRef; sess
   const rules = rulesFor(saved.mode);
   const session = Session.restore(puzzle, saved.snap, { hearts: rules.hearts, maxHearts: rules.maxHearts });
   if (!session || session.outcome !== 'playing') return null;
-  return { mode: saved.mode, session, spec, ...(saved.cast ? { cast: saved.cast } : {}) };
+  return { mode: saved.mode, session, spec, ...(saved.cast ? { cast: saved.cast } : {}), ...(saved.boardId ? { boardId: saved.boardId } : {}) };
 }
 
 /** True when the saved board has real progress worth offering to resume. */

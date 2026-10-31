@@ -532,3 +532,31 @@ buttons on two-animal boards. Slow-down pace, board sizes and the Daily left to 
   named in Settings and in How to play.
 - Kept: hearts, hints and the Paw Cup's rules; the two-animal engine and every shipped two-animal board; nothing
   pay-to-win.
+
+## 2026-10-31 · D36 — Journey, World and puzzle UX review (revises D35's controls and win flow)
+Owner decisions (2026-10-31), from the Journey/World/puzzle UX review of `main` @ `9e47172`: the default controls move
+to **one tap places the selected animal** (an explicit ✕ tool for marking; the D35 tap/double-tap scheme and the tap
+cycle stay as options and existing players are told once); the bottom bar becomes **four tabs, Journey / World /
+Challenges / Shop**, with Home folded into Journey; the work ships as **five stacked pull requests** (correctness,
+controls, navigation, win flow, delight) and nothing is merged without the owner. World growth keeps **Policy A**:
+every Journey, Daily and Zen solve counts (replays too); the Paw Cup never does.
+
+### PR 1 — correctness (P0)
+- **A wrong guess leaves the tile as it was** (`game.ts::placeAt`, `::keyApply`): the attempted animal fades as a
+  ghost with a strike and a heart is lost, but nothing is marked for the player. Before, every wrong placement wrote a
+  ✕, which on a two-animal board is false when the tile holds the other animal and on any board gives away what a
+  heart just paid for. The player's own ✕ (made first, by keyboard or by hand) stays. `Board.render` keeps a mistake's
+  ghost across a re-render.
+- **A board helps the sanctuary it started for** (`world.ts::creditSolve`, `::beneficiaryOf`): the win credits the
+  board's saved `cast.sanctuary`, not whatever is being built at the time. Choosing another sanctuary while a board is
+  saved changes the *next* board; the saved one keeps its promise, and the Build-here toast says so. Only a board whose
+  sanctuary was finished while it sat saved helps the one being built now, and the win sheet says it did
+  (`GrowthNews.redirectedFrom`). With nothing left to build, nothing grows. Crediting never moves `world.active`.
+- **One credit per board** (`world.credits`): every board gets an id when it starts (`gameFlow.newBoardId`, saved
+  with the board as `boardId`); its solve is credited once under it, whatever handles the win again. The newest sixty
+  receipts are kept. Boards saved before ids existed get one on resume.
+- **A region that opens is the news** (`game.ts::showWin`): when a solve opens a sanctuary, the win's visit action is
+  "Explore the Outback" and goes there, even when the same solve also grew the Farm. Meeting a newcomer goes to the
+  newcomer's home.
+- The board's header shows which sanctuary it helps (a chip beside the size; in the status line on short phones), and
+  the win's world line reads "Farm +1 · Truffle is on the way: 2 more puzzles".

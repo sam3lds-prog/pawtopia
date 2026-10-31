@@ -125,6 +125,11 @@ export interface GrowthNews {
   coins: number;
   /** Sanctuaries that opened with this solve (a Journey milestone). */
   opened: RegionId[];
+  /**
+   * The sanctuary the board was for when its credit went elsewhere: it was finished (or no longer open) by the time the
+   * board was solved, so the solve helped the one being built now instead. Null when the board's own sanctuary grew.
+   */
+  redirectedFrom: SanctuaryId | null;
 }
 
 /** Whether a solved board counts toward sanctuary growth (everything but the Paw Cup; the guided first board brings the first animal home). */
@@ -132,15 +137,63 @@ export function countsForGrowth(mode: ModeRef, _tutorial = false): boolean {
   return mode.kind !== 'cup';
 }
 
+/** Can a sanctuary still take growth: open and not yet complete. */
+export function canGrow(save: WorldSave, id: SanctuaryId): boolean {
+  return isOpen(save, id) && !isComplete(save, id);
+}
+
 /**
- * Records one solved puzzle for the sanctuary being built. `openedBefore` is the list of open regions before the win
- * was recorded (so a sanctuary that just opened can be announced). Returns null when nothing is being built.
+ * Which sanctuary a solved board helps. A board helps the sanctuary it was cast for when it started (`cast.sanctuary`),
+ * whatever the player chose to build since: switching sanctuaries changes the *next* board, never one already on the
+ * table. Only when that sanctuary can't grow any more (it was finished while the board sat saved) does the credit go
+ * to the one being built now; with nothing to build, nothing grows.
  */
-export function growOnSolve(save: WorldSave, openedBefore: RegionId[], now = new Date()): GrowthNews | null {
-  const opened = openRegions(save).filter((id) => !openedBefore.includes(id));
-  const id = activeSanctuary(save);
-  if (!id) return opened.length ? { sanctuary: opened[0], growth: 0, stageUp: null, arrived: [], completed: false, coins: 0, opened } : null;
-  save.world.active = id;
+export function beneficiaryOf(save: WorldSave, boardSanctuary: SanctuaryId | null | undefined): { id: SanctuaryId | null; redirectedFrom: SanctuaryId | null } {
+  if (boardSanctuary && canGrow(save, boardSanctuary)) return { id: boardSanctuary, redirectedFrom: null };
+  const fallback = activeSanctuary(save);
+  return { id: fallback, redirectedFrom: boardSanctuary && fallback ? boardSanctuary : null };
+}
+
+/** Everything a win needs to credit the world exactly once, for the right sanctuary. */
+export interface SolveContext {
+  /** The sanctuary the board was cast for when it started (its saved `cast.sanctuary`); null for a board that had none. */
+  boardSanctuary: SanctuaryId | null;
+  /** Regions open before the win was recorded, so a region that just opened can be announced. */
+  openedBefore: RegionId[];
+  /**
+   * The board's id (`app.active.boardId`). A completed board is credited at most once under it, however many times the
+   * outcome is handled (a re-entered win, a replayed event log); omitted in unit tests that build boards by hand.
+   */
+  receipt?: string;
+}
+
+/** Credit receipts kept (the newest); older ones can't come back as a live board. */
+const RECEIPTS_KEPT = 60;
+
+/** Has this board's solve already grown the world? */
+export function alreadyCredited(save: WorldSave, receipt: string | undefined): boolean {
+  return !!receipt && !!save.world.credits && receipt in save.world.credits;
+}
+
+function recordReceipt(save: WorldSave, receipt: string | undefined, id: SanctuaryId | null): void {
+  if (!receipt) return;
+  const credits = (save.world.credits ??= {});
+  credits[receipt] = id ?? 'none';
+  const keys = Object.keys(credits);
+  for (const k of keys.slice(0, Math.max(0, keys.length - RECEIPTS_KEPT))) delete credits[k];
+}
+
+/**
+ * Records one solved puzzle for the sanctuary the board was for (see `beneficiaryOf`), welcomes any animal whose count
+ * was reached, pays a finished sanctuary's gift, and reports what happened. Never moves `world.active`: the player's
+ * choice of what to build next is theirs. Returns null when nothing grew and nothing opened. Idempotent per receipt.
+ */
+export function creditSolve(save: WorldSave, ctx: SolveContext, now = new Date()): GrowthNews | null {
+  const opened = openRegions(save).filter((id) => !ctx.openedBefore.includes(id));
+  if (alreadyCredited(save, ctx.receipt)) return null;
+  const { id, redirectedFrom } = beneficiaryOf(save, ctx.boardSanctuary);
+  recordReceipt(save, ctx.receipt, id);
+  if (!id) return opened.length ? { sanctuary: opened[0], growth: 0, stageUp: null, arrived: [], completed: false, coins: 0, opened, redirectedFrom } : null;
   const def = SANCTUARY_BY_ID[id];
   const before = stageOf(save, id);
   save.world.growth[id] = growthOf(save, id) + 1;
@@ -157,7 +210,16 @@ export function growOnSolve(save: WorldSave, openedBefore: RegionId[], now = new
     completed: completed && coins > 0,
     coins,
     opened,
+    redirectedFrom,
   };
+}
+
+/**
+ * Records one solved puzzle for the sanctuary being built right now. For boards that know which sanctuary they were
+ * started for, use `creditSolve`; this is the shorthand for tools and tests that only have a save.
+ */
+export function growOnSolve(save: WorldSave, openedBefore: RegionId[], now = new Date()): GrowthNews | null {
+  return creditSolve(save, { boardSanctuary: activeSanctuary(save), openedBefore }, now);
 }
 
 /** Regions (the Farm and the exotic ones) that are open. */
