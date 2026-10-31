@@ -584,6 +584,23 @@
   height: 60%;
 }
 
+/* The sanctuary this board helps (fixed when the board started; building elsewhere changes the next board). */
+.status-for {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px 1px 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--accent, var(--muted-ink));
+  white-space: nowrap;
+}
+.status-for .ico {
+  width: 13px;
+  height: 13px;
+}
+
 /* Small phones: tighten chrome so the board keeps its space. */
 @media (max-height: 700px) {
   .game {

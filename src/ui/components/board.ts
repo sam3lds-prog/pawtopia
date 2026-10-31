@@ -175,7 +175,10 @@ export class Board {
             this.petEls.delete(petKey);
             this.opts.onPetRemoved?.(r, c);
           }
-          el.replaceChildren();
+          // A mistake's fading ghost and strike outlive the re-render (a double tap empties its own ✕ just before the
+          // wrong animal appears, so the cell's content changes in the same beat).
+          const transient = [...el.querySelectorAll<HTMLElement>('.cell__ghost, .cell__strike')];
+          el.replaceChildren(...transient);
           if (isPet) {
             const pet = this.opts.pet(r, c, val as Species);
             pet.classList.add('cell__pet');

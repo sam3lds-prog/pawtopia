@@ -432,6 +432,20 @@
   gap: var(--s2);
   margin-top: var(--s2);
 }
+.win-note {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  text-align: left;
+  font-size: var(--t-sm);
+  margin: 0 0 var(--s2);
+}
+.win-note .ico {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
 .win-growth {
   display: flex;
   align-items: center;

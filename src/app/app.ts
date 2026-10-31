@@ -27,8 +27,8 @@ type Listener = () => void;
 class App {
   save: SaveV2;
   router!: Router;
-  /** The board on screen (or last on screen), for saving on background. */
-  active: { mode: ModeRef; session: Session; spec?: SpecVersion; cast?: Cast } | null = null;
+  /** The board on screen (or last on screen), for saving on background. `boardId` is minted when a board starts (gameFlow). */
+  active: { mode: ModeRef; session: Session; spec?: SpecVersion; cast?: Cast; boardId?: string } | null = null;
   /** Development or tester build: test purchases and dev entitlements count here (never in release). */
   readonly isDev = TEST_BUILD;
   private listeners = new Set<Listener>();
@@ -135,8 +135,8 @@ class App {
   /** Saves the in-progress board (called on every move and when the app is backgrounded). */
   saveActive(): void {
     if (!this.active) return;
-    const { mode, session, spec, cast } = this.active;
-    const snap = captureSession(mode, session, new Date(), spec, cast);
+    const { mode, session, spec, cast, boardId } = this.active;
+    const snap = captureSession(mode, session, new Date(), spec, cast, boardId);
     if (mode.kind === 'cup') {
       const k = modeKey(mode);
       if (snap) this.save.cup.open[k] = snap;

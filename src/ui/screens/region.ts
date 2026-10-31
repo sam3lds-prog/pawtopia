@@ -6,7 +6,7 @@
  */
 
 import { app } from '../../app/app';
-import { playMode } from '../../app/gameFlow';
+import { buildHereMessage, playMode } from '../../app/gameFlow';
 import { afterDecorChange } from '../../app/events';
 import { COMPANIONS, COMPANION_BY_ID, type CompanionId } from '../../meta/catalogs/companions';
 import { decorOf, type DecorId } from '../../meta/catalogs/decor';
@@ -281,7 +281,7 @@ export const regionScreen: ScreenDef = {
             app.persist();
             sfx('coin');
             track('region_build', { region: id });
-            toast(`Now building the ${def.name}. Every puzzle you solve helps it grow.`);
+            toast(buildHereMessage(id));
             render();
           }
           break;

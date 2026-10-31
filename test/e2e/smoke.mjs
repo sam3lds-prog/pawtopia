@@ -182,19 +182,24 @@ try {
   const givens = await page.evaluate(() => window.__pt.app.active.session.puzzle.givens.length);
   check('the resumed board keeps its placements', placedCount === givens + 1, `${placedCount} vs ${givens + 1}`);
 
-  // Five hearts on casual boards; a wrong animal is a fading ghost with a strike, and the tile is marked ✕
+  // Five hearts on casual boards; a wrong animal is a fading ghost with a strike, and the tile is left as it was (no ✕)
   check('Journey boards show five hearts', (await page.$$('[data-hearts] .ico')).length === 5);
   const wrongCell = await emptyTile();
   await dblTap(wrongCell[0], wrongCell[1]);
   const afterWrong = await page.evaluate(([r, c]) => {
     const s = window.__pt.app.active.session;
-    return { hearts: s.hearts, cell: s.cells[r][c] };
+    return { hearts: s.hearts, cell: s.cells[r][c], mark: !!document.querySelector(`.cell[data-r="${r}"][data-c="${c}"] .cell__mark`) };
   }, wrongCell);
   const strike = await page.$(`.cell[data-r="${wrongCell[0]}"][data-c="${wrongCell[1]}"] .cell__strike`);
-  check('a wrong double-tap costs one heart and leaves a ✕', afterWrong.hearts === 4 && afterWrong.cell === 3, JSON.stringify(afterWrong));
+  check('a wrong double-tap costs one heart and leaves the tile empty, not ✕', afterWrong.hearts === 4 && afterWrong.cell === 0 && !afterWrong.mark, JSON.stringify(afterWrong));
   check('the mistake shows a fading ghost with a strike', !!strike);
   await page.waitForTimeout(800);
   check('the ghost and strike are gone afterwards', !(await page.$('.cell__strike')) && !(await page.$('.cell__ghost')));
+  // The board says which sanctuary it is for.
+  check('the board header names the sanctuary the board helps', (await page.textContent('[data-for]'))?.includes('Farm'));
+  // Erase mode on the same empty tile: nothing to take back, so a ✕ must be placed first for the Erase check below.
+  await page.click(`.cell[data-r="${wrongCell[0]}"][data-c="${wrongCell[1]}"]`);
+  await page.waitForTimeout(450);
   check('regions are separated by soft seams, not dark lines', await page.evaluate(() => getComputedStyle(document.querySelector('.board__lines .div')).stroke !== 'rgb(52, 67, 63)'));
 
   // Erase is a mode; undo, redo and How to play live in the pause sheet
@@ -490,6 +495,34 @@ try {
   const g1 = await page.evaluate(() => window.__pt.app.save.world.growth.farm ?? 0);
   check('solving a puzzle grows the sanctuary being built by one', g1 === g0 + 1, `${g0} → ${g1}`);
   check('the win sheet says who is coming home next', /is on the way/.test((await page.textContent('.win-sheet')) ?? ''));
+  check('the win sheet credits the sanctuary by name (+1)', /Farm \+1/.test((await page.textContent('.win-sheet')) ?? ''));
+  await page.click('[data-act="next"]');
+  await page.waitForTimeout(200);
+
+  // A board helps the sanctuary it started for: start a Farm board, choose to build the Pet Garden, come back and finish it
+  await page.evaluate(() => window.__pt.start({ kind: 'level', level: 5 }));
+  await page.waitForTimeout(200);
+  await solveActive({ stopAfter: 1 }).catch(() => {});
+  const heldId = await page.evaluate(() => window.__pt.app.active.boardId);
+  check('a board has an id of its own, saved with it', typeof heldId === 'string' && heldId.startsWith('L5:'), String(heldId));
+  await page.evaluate(() => window.__pt.go({ screen: 'sanctuary' }));
+  await page.waitForSelector('.region-progress [data-act="build"]');
+  await page.click('.region-progress [data-act="build"]');
+  await page.waitForTimeout(150);
+  check('choosing the Pet Garden says the saved Farm board still helps the Farm', /saved Farm board still helps the Farm/.test((await page.textContent('.toast')) ?? ''));
+  const gFarm0 = await page.evaluate(() => window.__pt.app.save.world.growth.farm ?? 0);
+  const gGarden0 = await page.evaluate(() => window.__pt.app.save.world.growth.harmony ?? 0);
+  await page.evaluate(() => window.__pt.go({ screen: 'home' }));
+  await page.click('[data-act="continue"]');
+  await page.waitForTimeout(300);
+  check('the resumed Farm board keeps its id and its sanctuary', await page.evaluate((id) => window.__pt.app.active.boardId === id && window.__pt.app.active.cast.sanctuary === 'farm', heldId));
+  await solveActive();
+  const gAfter = await page.evaluate(() => ({ farm: window.__pt.app.save.world.growth.farm ?? 0, garden: window.__pt.app.save.world.growth.harmony ?? 0, active: window.__pt.app.save.world.active }));
+  check('finishing it grows the Farm, not the Pet Garden', gAfter.farm === gFarm0 + 1 && gAfter.garden === gGarden0 && gAfter.active === 'harmony', JSON.stringify(gAfter));
+  check('the credit is recorded once under the board id', await page.evaluate((id) => window.__pt.app.save.world.credits[id] === 'farm', heldId));
+  await page.click('[data-act="next"]');
+  await page.waitForTimeout(300);
+  check('the next fresh board is for the Pet Garden', await page.evaluate(() => window.__pt.app.active.cast.sanctuary === 'harmony'));
   await page.evaluate(() => window.__pt.go({ screen: 'shop', sanctuary: 'amazon' }));
   check('a locked sanctuary’s decorations cannot be bought yet', !!(await page.$('.shop-card.is-locked[data-decor="waterfall"]')));
 
