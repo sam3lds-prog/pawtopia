@@ -31,6 +31,21 @@ function diagram(cells: Tile[], regions: number[], verdict: 'ok' | 'no' | null, 
 export interface RulesOptions {
   rule: Rule;
   cast: Cast;
+  /** Level 21's bridge: the same two-animal rules, framed as what changes from here, before the guided lesson. */
+  bridge?: boolean;
+}
+
+/** The controls, in one sentence, for the scheme in Settings. */
+export function controlsLine(rule: Rule, animalWord: string): string {
+  const what = rule === 'solo' ? withArticle(animalWord) : 'the animal you picked below the board';
+  switch (app.settings.controls) {
+    case 'classic':
+      return `<b>Tap</b> a tile once to mark it ✕, again to place ${esc(what)}, and once more to clear it.`;
+    case 'tap':
+      return `<b>Tap</b> a tile to mark it ✕. <b>Double-tap</b> to place ${esc(what)}. No quick double tap? Settings → Controls.`;
+    default:
+      return `<b>Tap</b> a tile to place ${esc(what)}. The <b>✕</b> tool marks tiles empty (drag across a few); <b>Erase</b> takes a tile back.`;
+  }
 }
 
 /** The rule the player is on now (one animal until the two-animal lesson), with the animals their boards show. */
@@ -40,7 +55,7 @@ export function currentRules(): RulesOptions {
 }
 
 export function showRules(scope: Scope, onClose?: () => void, o: RulesOptions = currentRules()): void {
-  const { rule, cast } = o;
+  const { rule, cast, bridge } = o;
   const a = cast.a;
   const b = cast.b ?? (cast.a === 'truffle' ? 'cotton' : 'truffle');
   const wa = castWord(cast, 'a');
@@ -68,21 +83,19 @@ export function showRules(scope: Scope, onClose?: () => void, o: RulesOptions = 
           <p>${esc(capitalize(withArticle(wa)))} and ${esc(withArticle(wb))} never sit <b>side by side</b>. Diagonal neighbors are fine.</p>
         </li>`;
   const sh = openSheet(scope, {
-    title: 'How to play',
+    title: bridge ? 'A second animal joins' : 'How to play',
     onClose,
+    className: bridge ? 'rules-bridge' : '',
     body: `
+      ${bridge ? `<p class="sheet__lead">From here every board has two animals. Twenty levels of ${esc(pluralNoun(wa))} taught you the lines; the same logic finds both.</p>` : ''}
       <ol class="rules">
         ${items}
         <li>
           <span class="rules__icon">${ICON.mark}</span>
-          <p>${
-            app.settings.controls === 'classic'
-              ? `<b>Tap</b> a tile once to mark it ✕, again to place ${rule === 'solo' ? esc(withArticle(wa)) : 'the animal you picked below the board'}, and once more to clear it.`
-              : `<b>Tap</b> a tile to mark it ✕. <b>Double-tap</b> to place ${rule === 'solo' ? esc(withArticle(wa)) : 'the animal you picked below the board'}. No quick double tap? Settings → Controls → Tap cycle.`
-          } A wrong guess costs a heart. Every board has one answer you can reach by logic alone.</p>
+          <p>${controlsLine(rule, wa)} A wrong guess costs a heart. Every board has one answer you can reach by logic alone.</p>
         </li>
       </ol>
-      <div class="sheet__actions"><button class="btn btn--block" data-act="ok">Got it</button></div>`,
+      <div class="sheet__actions"><button class="btn btn--block" data-act="ok">${bridge ? 'Show me' : 'Got it'}</button></div>`,
   });
   sh.scope.on(sh.el, 'click', (e) => {
     if ((e.target as HTMLElement).closest('[data-act="ok"]')) sh.close();

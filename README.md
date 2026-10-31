@@ -4,8 +4,8 @@
 
 Pawtopia is a cozy, portrait-first logic puzzle for iPhone. For the first 20 levels every row, column and color region
 needs exactly **one animal**, and animals never touch, not even at a corner. From level 21 each line holds **two
-animals**, one of each kind, never side by side. Every board has one answer you can reach by logic alone. Tap a tile
-to mark it ✕; double-tap to place the animal.
+animals**, one of each kind, never side by side. Every board has one answer you can reach by logic alone. Pick a tool
+under the board (the animal, ✕ or Erase) and tap a tile; one tap places the animal.
 
 Every puzzle you solve builds a sanctuary: the Farm first (a sheep, a piglet, a calf, a goat kid, a chick, a pony),
 then the Pet Garden's bunny, cats and dogs, then the Outback, Savanna, Arctic and Amazon as the Journey opens them.

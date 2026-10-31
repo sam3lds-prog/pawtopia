@@ -523,9 +523,10 @@
   transform: translateY(1px);
 }
 
-/* ---------- Board controls (D35) ----------
-   One row. One-animal boards: Erase and Hint. Two-animal boards: the two animal buttons (which animal a double tap
-   places), then Erase and Hint. Erase is a mode, shown pressed while it's on. */
+/* ---------- Board controls (D35, D36) ----------
+   One row. Place scheme (default): the tool bar (animal(s), ✕, Erase; one pressed) and Hint. Tap and tap-cycle
+   schemes: one-animal boards have Erase and Hint; two-animal boards add the two animal buttons (which animal a double
+   tap places). Erase is a mode there, shown pressed while it's on. */
 .controls {
   display: flex;
   gap: 6px;
@@ -537,15 +538,29 @@
 .controls .tools {
   flex: 2.2;
 }
+.controls--place .tools {
+  flex: 3.3;
+}
+.controls--place.controls--solo .tools {
+  flex: 2.6;
+}
 .controls .act {
   flex: 1;
   min-height: 68px;
 }
-.controls--solo .act {
+.controls--solo:not(.controls--place) .act {
   min-height: 60px;
   flex-direction: row;
   gap: 8px;
   font-size: 15px;
+}
+.tool--mark[aria-checked='true'] {
+  color: var(--ink);
+}
+/* The ✕ tool is on: the board's edge says so, with the same dashed ring Erase uses. */
+.game.is-marking .board {
+  outline: 2px dashed var(--muted-ink);
+  outline-offset: 3px;
 }
 .act--erase[aria-pressed='true'] {
   background: var(--brand-tint);
@@ -1029,4 +1044,28 @@
   font-size: 12px;
   font-weight: 800;
   opacity: 0.85;
+}
+
+/* ---------- One-time notices on the hub (D36) ---------- */
+.notice-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--t-lg);
+}
+.notice-card h2 .ico {
+  width: 20px;
+  height: 20px;
+  color: var(--brand-dark);
+}
+.notice-card p {
+  margin: var(--s2) 0 0;
+}
+.notice-card__actions {
+  display: flex;
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+.notice-card__actions .btn {
+  flex: 1;
 }

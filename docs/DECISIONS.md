@@ -560,3 +560,23 @@ every Journey, Daily and Zen solve counts (replays too); the Paw Cup never does.
   newcomer's home.
 - The board's header shows which sanctuary it helps (a chip beside the size; in the status line on short phones), and
   the win's world line reads "Farm +1 · Truffle is on the way: 2 more puzzles".
+
+### PR 2 — controls: one tap places (P0/P1)
+- **Default scheme `place`** (`storage.ControlScheme`): a tool bar under the board with the board's animal(s), ✕ and
+  Erase, one pressed at a time (a radiogroup); one tap on a tile applies the tool. A one-animal board shows its animal
+  pressed from the start, so a new player's first placement is one tap. Pressing ✕ or Erase a second time goes back to
+  the animal. The ✕ tool drags a run of tiles; the animal tool never drags, and in Large board mode nothing acts on
+  pointer-down, so a pan can't mark. A tap on a placed animal does nothing but say how to take it back (Erase or Undo):
+  an accidental tap never erases. Keyboard: arrows move; Enter applies the pressed tool; 1/2 place; X or Space marks;
+  Delete erases; Z/Y undo/redo; H hint; E and X (off a cell) switch tools.
+- **The other schemes stay**: `tap` (D35: tap ✕, double-tap places; Erase toggles) and `classic` (tap cycle), named
+  in Settings with a one-line picture each, and How to play describes whichever is on.
+- **Existing players move with the default and are told once** (`storage.normalizeSave`): a save whose `controls` is
+  D35's default `tap` (never a choice made under these options, marked by `controlsVersion: 2`) becomes `place`, and
+  `onboarding.controlsNotice` shows one card on the hub with "Got it" and "Choose controls". A player who chose the tap
+  cycle keeps it; a save that never played, and a fresh install, get the default silently. The retired `tools`
+  spelling (the first pick-a-tool scheme) is `place` again.
+- **Level 21 opens with a bridge** (`rules.showRules({ bridge })`): one sheet, the two-animal rules drawn with the
+  board's own animals and the controls in one line, then the guided lesson places the first two. Shown once
+  (`pairRulesSeen`). Level 19 and 20 tips say what is coming.
+- Coaching under each scheme says what the player actually does ("tap it", "double-tap it", "tap it twice").
