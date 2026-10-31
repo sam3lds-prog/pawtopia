@@ -45,6 +45,17 @@
       the credit is recorded once (`world.credits`)
 - [ ] Five-player usability script (docs/DECISIONS.md D36, §10 of the review plan): tasks 1–5 without coaching
 
+### D38 PR A — saved boards per mode
+- [ ] Half-play a Journey level, leave; play and finish the Daily; Continue resumes the very same Journey board (cells,
+      mistakes, hearts, hint used, clock)
+- [ ] The reverse (Daily first, then a level and a Zen); all three offered on the hub; kill the app and relaunch: still
+      all three
+- [ ] "Play level N" from the World, the Farm, the Pet Garden and the level path while a *different* level is saved:
+      the question appears every time; *Resume* opens the saved board, *Not now* changes nothing
+- [ ] Tap a Zen size with a Zen board in progress: the question; *Resume* opens it and the next Zen board is still new
+- [ ] Install the previous build over this one (rollback): the newest saved board is still offered; come back to this
+      build: nothing finished is offered again
+
 ## Store integration (only when ready; see roadmap)
 - [ ] StoreKit products created (remove_ads, starter_decor, cozy_theme, pet_portraits, supporter); verified entitlement
       + restore via a maintained bridge (e.g. RevenueCat Capacitor SDK); sandbox buy, restore, refund, reinstall

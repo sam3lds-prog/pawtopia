@@ -12,7 +12,7 @@
 
 import { type KV, platformKV, safeParse } from './kv';
 import type { ModeRef } from '../game/modes';
-import { isValidModeRef } from '../game/modes';
+import { isValidModeRef, modeKey } from '../game/modes';
 import { isSessionEvent, type SessionEvent, type SessionSnapshot } from '../game/session';
 import { dailySpec, levelSpec } from '../engine/levels';
 import { SOLO_LEVELS, levelRewardKey, pairSourceOf } from '../game/specs';
@@ -229,7 +229,71 @@ export interface SaveV2 {
     /** The sanctuary's "tap a decoration, the animals use it" cue has been acted on or dismissed. */
     decorTipSeen: boolean;
   };
+  /**
+   * Boards in progress, one slot per mode (D38): the Journey board, the Daily and the latest Zen board. Starting or
+   * finishing a board of one mode never touches another mode's board. Paw Cup attempts live in `cup.open`.
+   */
+  sessions: SavedSessions;
+  /**
+   * The most recently saved of `sessions` (or null when there is none), kept so a build from before D38 — which knew
+   * one slot — still finds the latest board. Never read by this build except to migrate: `normalizeSave` folds it into
+   * `sessions`, and `syncSessionMirror` rewrites it after every change.
+   */
   lastSession: SavedSession | null;
+}
+
+/** The modes that keep one resumable board each (every mode but the Paw Cup). */
+export type SessionSlot = 'level' | 'daily' | 'zen';
+export const SESSION_SLOTS: readonly SessionSlot[] = ['level', 'daily', 'zen'];
+export type SavedSessions = Record<SessionSlot, SavedSession | null>;
+
+export function emptySessions(): SavedSessions {
+  return { level: null, daily: null, zen: null };
+}
+
+/** The slot a mode's board is kept in, or null for a Paw Cup attempt (those are kept per board in `cup.open`). */
+export function slotOf(mode: ModeRef): SessionSlot | null {
+  return mode.kind === 'cup' ? null : mode.kind;
+}
+
+/** The saved board for exactly this mode (same level, same day, same Zen seed), if there is one. */
+export function savedSession(save: Pick<SaveV2, 'sessions' | 'cup'>, mode: ModeRef): SavedSession | null {
+  if (mode.kind === 'cup') return save.cup.open[modeKey(mode)] ?? null;
+  const s = save.sessions[mode.kind];
+  return s && modeKey(s.mode) === modeKey(mode) ? s : null;
+}
+
+/** The newest saved board across the slots (what a pre-D38 build would call `lastSession`). */
+export function newestSession(save: Pick<SaveV2, 'sessions'>): SavedSession | null {
+  let best: SavedSession | null = null;
+  for (const k of SESSION_SLOTS) {
+    const s = save.sessions[k];
+    if (s && (!best || s.savedAt > best.savedAt)) best = s;
+  }
+  return best;
+}
+
+/** Keeps `lastSession` equal to the newest slot, for builds that only know that one field. Call after any slot change. */
+export function syncSessionMirror(save: Pick<SaveV2, 'sessions' | 'lastSession'>): void {
+  save.lastSession = newestSession(save);
+}
+
+/** Puts a board in its mode's slot (or empties the slot with null) and updates the mirror. Paw Cup goes to `cup.open`. */
+export function setSavedSession(save: Pick<SaveV2, 'sessions' | 'lastSession' | 'cup'>, mode: ModeRef, snap: SavedSession | null): void {
+  if (mode.kind === 'cup') {
+    const k = modeKey(mode);
+    if (snap) save.cup.open[k] = snap;
+    else delete save.cup.open[k];
+    return;
+  }
+  save.sessions[mode.kind] = snap;
+  syncSessionMirror(save);
+}
+
+/** Forgets every saved board outside the Paw Cup (tester shortcuts, a reset). */
+export function clearSessions(save: Pick<SaveV2, 'sessions' | 'lastSession'>): void {
+  save.sessions = emptySessions();
+  save.lastSession = null;
 }
 
 /** News a sanctuary holds until it is visited: who came home, the stage reached, whether it just opened. */
@@ -372,6 +436,7 @@ export function defaultSave(now = new Date()): SaveV2 {
       sceneTapTipSeen: false,
       decorTipSeen: false,
     },
+    sessions: emptySessions(),
     lastSession: null,
   };
 }
@@ -497,6 +562,36 @@ function normSavedSession(x: unknown): SavedSession | null {
 }
 
 /**
+ * The saved boards of a stored save, one slot per mode (D38). Three shapes arrive here:
+ *  - a save from this build: `sessions` holds the boards and `lastSession` mirrors the newest;
+ *  - a save from before D38: no `sessions`, one board in `lastSession` → it takes its mode's slot (the one-time
+ *    migration; running it again changes nothing, since the mirror then equals that slot);
+ *  - a save a pre-D38 build touched after this build wrote it (a rollback): that build only knew `lastSession`. A
+ *    board it saved there is newer than its slot, so it replaces it; a `lastSession` it set to null means it finished
+ *    or dropped the board it knew — the newest one — so that slot is emptied rather than offering a finished board.
+ */
+function normSessions(x: Record<string, unknown>): SavedSessions {
+  const out = emptySessions();
+  const src = isObj(x.sessions) ? x.sessions : {};
+  for (const k of SESSION_SLOTS) {
+    const s = normSavedSession(src[k]);
+    if (s && s.mode.kind === k) out[k] = s;
+  }
+  const last = normSavedSession(x.lastSession);
+  if (last) {
+    const slot = slotOf(last.mode);
+    if (slot) {
+      const cur = out[slot];
+      if (!cur || last.savedAt > cur.savedAt) out[slot] = last;
+    }
+  } else if (x.lastSession === null && 'sessions' in x) {
+    const newest = newestSession({ sessions: out });
+    if (newest) out[slotOf(newest.mode) as SessionSlot] = null;
+  }
+  return out;
+}
+
+/**
  * Whether a stored save already uses D35's level numbering even though it has no `ladder` field: builds between the
  * one-animal levels and the ladder field wrote the one-animal onboarding flags or spec-4 boards.
  */
@@ -505,8 +600,8 @@ function isD35Save(x: Record<string, unknown>): boolean {
   if ('soloRulesSeen' in ob || 'pairLessonDone' in ob) return true;
   const j = isObj(x.journey) ? x.journey : {};
   if (isObj(j.clears) && Object.values(j.clears).some((c) => isObj(c) && c.spec === 4)) return true;
-  const last = isObj(x.lastSession) ? x.lastSession : null;
-  return !!last && last.specVersion === 4 && isObj(last.mode) && last.mode.kind === 'level';
+  const level = normSessions(x).level;
+  return !!level && level.specVersion === 4;
 }
 
 /** Coerces any parsed JSON into a complete, well-typed v2 save. */
@@ -525,6 +620,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
   const pu = isObj(x.purchases) ? x.purchases : {};
   const ra = isObj(pu.removeAds) ? pu.removeAds : {};
   const ob = isObj(x.onboarding) ? x.onboarding : {};
+  const sessions = normSessions(x);
 
   return {
     progressVersion: 2,
@@ -651,7 +747,8 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       sceneTapTipSeen: bool(ob.sceneTapTipSeen, false),
       decorTipSeen: bool(ob.decorTipSeen, false),
     },
-    lastSession: normSavedSession(x.lastSession),
+    sessions,
+    lastSession: newestSession({ sessions }),
   };
 }
 
@@ -732,7 +829,8 @@ export function upgradeLadder(save: SaveV2): boolean {
   const cleared = Object.keys(j.clears).filter((k) => /^L[1-9]\d*$/.test(k));
   if (j.nextLevel <= 1 && cleared.length === 0) {
     // Nothing to move, but a two-animal level 1 left in progress would otherwise resume as the one-animal level 1.
-    if (save.lastSession?.mode.kind === 'level' && save.lastSession.specVersion !== 4) save.lastSession = null;
+    if (save.sessions.level && save.sessions.level.specVersion !== 4) save.sessions.level = null;
+    syncSessionMirror(save);
     return false;
   }
   const up = (L: number) => L + SOLO_LEVELS;
@@ -758,12 +856,13 @@ export function upgradeLadder(save: SaveV2): boolean {
   j.bestTimes = times;
   j.nextLevel = up(j.nextLevel);
 
-  const last = save.lastSession;
+  const last = save.sessions.level;
   if (last && last.mode.kind === 'level') {
     const L = last.mode.level;
-    if (sameBoard(L, last.specVersion)) save.lastSession = { ...last, mode: { kind: 'level', level: up(L) }, specVersion: 4 };
-    else save.lastSession = null; // a board from a retired spec can't be reached at its new number
+    if (sameBoard(L, last.specVersion)) save.sessions.level = { ...last, mode: { kind: 'level', level: up(L) }, specVersion: 4 };
+    else save.sessions.level = null; // a board from a retired spec can't be reached at its new number
   }
+  syncSessionMirror(save);
   for (const p of save.leaderboard.pending) {
     if (p.mode.kind !== 'level' || !sameBoard(p.mode.level, p.spec)) continue; // retired specs are refused by design
     p.mode = { kind: 'level', level: up(p.mode.level) };

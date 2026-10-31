@@ -8,7 +8,7 @@
  */
 
 import { app } from '../../app/app';
-import { playMode, resumableMode, resumeGame, savedFor, startGame } from '../../app/gameFlow';
+import { nextZenMode, playMode, resumableMode, resumableSessions, resumeGame, savedBoardLine, savedFor, startGame } from '../../app/gameFlow';
 import { hasMeaningfulProgress } from '../../game/sessionPersistence';
 import { addDaysKey, localDateKey, localWeekStart } from '../../game/dates';
 import { modeTitle, puzzleFor, sizeFor } from '../../game/puzzles';
@@ -18,7 +18,7 @@ import { liveStreak } from '../../meta/progression';
 import { openSheet, toast } from '../components/sheet';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
 import { claimMissionDetailed, missionStates, type MissionDef } from '../../meta/missions';
-import { CASUAL_HEARTS, FIRST_PAIR_LEVEL, dailyFor, playsSolo, type ModeRef } from '../../game/modes';
+import { CASUAL_HEARTS, FIRST_PAIR_LEVEL, dailyFor, modeKey, playsSolo, type ModeRef } from '../../game/modes';
 import { MAX_NEW_BOARD_SIZE } from '../../game/specs';
 import { itemBalance } from '../../meta/items';
 import { sfx } from '../../services/audio';
@@ -222,10 +222,10 @@ function mountHub(root: HTMLElement, scope: Scope): void {
   const save = app.save;
   const level = save.journey.nextLevel;
   const chapter = chapterOf(level);
-  const saved = resumableMode();
-  // Continue is the Journey's: the saved Journey board, else the next level. A saved Daily or Zen gets its own line.
-  const resumeLevel: ModeRef | null = saved && saved.kind === 'level' ? saved : null;
-  const otherSaved: ModeRef | null = saved && saved.kind !== 'level' && saved.kind !== 'cup' ? saved : null;
+  // Continue is the Journey's: the saved Journey board, else the next level. A saved Daily or Zen gets its own line
+  // (each mode keeps one board, D38).
+  const resumeLevel: ModeRef | null = resumableMode('level');
+  const otherSaved = resumableSessions().filter((s) => s.mode.kind !== 'level');
   const todayKey = localDateKey();
   const dailyMode = dailyFor(todayKey, level);
   const daily = { dateKey: todayKey, size: sizeFor(dailyMode), solo: dailyMode.kind === 'daily' && dailyMode.rule === 'solo' };
@@ -239,7 +239,7 @@ function mountHub(root: HTMLElement, scope: Scope): void {
   const curLevel = curMode.kind === 'level' ? curMode.level : level;
   const continueTitle = resumeLevel ? `Resume level ${curLevel}` : `Play level ${level}`;
   // A resumable board keeps the spec it was issued under (an old 9×9 save still shows as 9×9).
-  const thumbSpec = resumeLevel ? (save.lastSession?.specVersion ?? 1) : undefined;
+  const thumbSpec = resumeLevel ? (save.sessions.level?.specVersion ?? 1) : undefined;
   const thumbSize = sizeFor(curMode, thumbSpec);
   const rule = playsSolo(curLevel) ? 'One animal' : 'Two animals';
 
@@ -272,15 +272,15 @@ function mountHub(root: HTMLElement, scope: Scope): void {
         </div>
       </section>
 
-      ${
-        otherSaved
-          ? `<button class="card card--tap resume-other" data-act="resume-other">
+      ${otherSaved
+        .map(
+          (sv) => `<button class="card card--tap resume-other" data-act="resume-other" data-resume="${esc(modeKey(sv.mode))}">
           <span class="card__icon">${ICON.resume}</span>
-          <span class="card__body"><span class="card__title">${esc(modeTitle(otherSaved))} in progress</span><span class="card__sub">Saved where you left it. Resume it any time.</span></span>
+          <span class="card__body"><span class="card__title">${esc(modeTitle(sv.mode))} in progress</span><span class="card__sub">${esc(savedBoardLine(sv))}. Resume it any time.</span></span>
           ${ICON.chevron}
-        </button>`
-          : ''
-      }
+        </button>`,
+        )
+        .join('')}
 
       <div class="daily-block">
         <button class="card card--tap daily-card ${dailyDone ? 'is-done' : ''}" data-act="daily">
@@ -438,12 +438,8 @@ function mountHub(root: HTMLElement, scope: Scope): void {
     }
     const z = t.closest('[data-zen]') as HTMLElement | null;
     if (z) {
-      const size = Number(z.dataset.zen);
-      const seed = save.zen.nextSeed;
-      save.zen.nextSeed = seed + 1;
-      app.persist();
-      // Zen follows the Journey: one-animal boards until the second animal has been introduced (D35).
-      startGame({ kind: 'zen', size, seed: 7_000_000 + seed * 97 + size, ...(playsSolo(level) ? { rule: 'solo' as const } : {}) });
+      // A new Zen board of that size; with a Zen board already in progress, playMode asks before letting it go.
+      playMode(nextZenMode(Number(z.dataset.zen)));
       return;
     }
     const a = actionOf(e);
@@ -456,7 +452,7 @@ function mountHub(root: HTMLElement, scope: Scope): void {
         break;
       case 'continue':
         if (resumeLevel) {
-          if (!resumeGame()) {
+          if (!resumeGame(savedFor(resumeLevel))) {
             toast("That saved board couldn't be restored, so it starts fresh.");
             startGame(resumeLevel);
           }
@@ -464,16 +460,18 @@ function mountHub(root: HTMLElement, scope: Scope): void {
         break;
       case 'journey':
       case 'play-next':
-        // The one saved board slot would be overwritten: never throw away a board with progress without asking.
-        if (resumeLevel && curLevel !== level) confirmDropSaved(scope, curLevel, level, () => playMode({ kind: 'level', level }));
-        else playMode({ kind: 'level', level });
+        // With a different Journey board saved, playMode asks before letting it go (D38).
+        playMode({ kind: 'level', level });
         break;
-      case 'resume-other':
-        if (otherSaved && !resumeGame()) {
+      case 'resume-other': {
+        const key = (t.closest('[data-resume]') as HTMLElement | null)?.dataset.resume;
+        const sv = otherSaved.find((x) => modeKey(x.mode) === key) ?? null;
+        if (sv && !resumeGame(sv)) {
           toast("That saved board couldn't be restored.");
           app.router.refresh();
         }
         break;
+      }
       case 'daily':
         if (dailyDone) toast(`Today's board is done. A new one arrives tomorrow.`);
         else playMode(dailyMode);
@@ -494,26 +492,6 @@ function mountHub(root: HTMLElement, scope: Scope): void {
         app.router.go({ screen: 'profile' });
         break;
     }
-  });
-}
-
-/** "Play level N instead" while a Journey board is saved: say what it costs, and let the player keep it. */
-function confirmDropSaved(scope: Scope, savedLevel: number, level: number, go: () => void): void {
-  const placed = app.save.lastSession?.snap.history?.length ?? 0;
-  const sh = openSheet(scope, {
-    title: `Start level ${level}?`,
-    center: true,
-    body: `<p class="sheet__lead">Your level ${savedLevel} board${placed ? ` (${plural(placed, 'move')} so far)` : ''} will be cleared. Only one board is kept at a time.</p>
-      <div class="sheet__actions">
-        <button class="btn btn--quiet" data-act="keep" data-autofocus>Keep level ${savedLevel}</button>
-        <button class="btn btn--block" data-act="go">Start level ${level}</button>
-      </div>`,
-  });
-  sh.scope.on(sh.el, 'click', (e) => {
-    const a = actionOf(e);
-    if (!a) return;
-    sh.close();
-    if (a.act === 'go') go();
   });
 }
 

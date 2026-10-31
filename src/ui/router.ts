@@ -151,7 +151,7 @@ interface HistoryEntry {
 const HISTORY_MAX = 24;
 
 export class Router {
-  private scope: Scope | null = null;
+  private scope_: Scope | null = null;
   private current: CanonicalRoute | null = null;
   private registry: Registry | null = null;
   private readonly listeners = new Set<(r: CanonicalRoute, def: ScreenDef) => void>();
@@ -169,6 +169,11 @@ export class Router {
 
   get route(): CanonicalRoute | null {
     return this.current;
+  }
+
+  /** The current screen's scope, for a sheet that belongs to whatever screen is showing (null before the first mount). */
+  get scope(): Scope | null {
+    return this.scope_;
   }
 
   /** The screen Back would return to, if any. */
@@ -214,10 +219,10 @@ export class Router {
   private mount(route: CanonicalRoute, scroll: number): void {
     if (!this.registry) throw new Error('router not registered');
     const def = this.registry[route.screen];
-    this.scope?.dispose();
+    this.scope_?.dispose();
     this.root.replaceChildren();
     const scope = new Scope();
-    this.scope = scope;
+    this.scope_ = scope;
     this.current = route;
     this.root.dataset.screen = route.screen;
     for (const fn of this.listeners) fn(route, def);
