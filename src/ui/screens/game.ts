@@ -229,7 +229,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     el.classList.toggle('is-erasing', erasing);
     el.classList.toggle('is-marking', placeScheme && tool === 'mark');
     const hintLabel = el.querySelector('[data-hint-label]');
-    if (hintLabel) hintLabel.textContent = !hint ? 'Hint' : hint.tier === 1 ? 'Closer' : 'Show me';
+    // Three steps, named for what they do: a look, the reason, the placement.
+    if (hintLabel) hintLabel.textContent = !hint ? 'Hint' : hint.tier === 1 ? 'Explain' : 'Place it';
     const badge = el.querySelector('[data-hint-badge]') as HTMLElement | null;
     if (badge) {
       // What the next tap costs: the board's first look is free; otherwise one ticket per hint target.
@@ -350,8 +351,21 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     coachEl.classList.remove('is-guide');
   }
 
+  /** A replay of a solved level has personal goals: the stars still to earn, or the best time to beat. */
+  function replayGoal(): string | null {
+    if (mode.kind !== 'level') return null;
+    const clear = app.save.journey.clears[`L${mode.level}`];
+    if (!clear) return null;
+    const missing = [!clear.clean ? 'no mistakes' : '', !clear.hintFree ? 'no hints' : ''].filter(Boolean);
+    if (missing.length) return `Replay. ${missing.length === 2 ? 'Two stars' : 'One star'} to earn: solve it with ${missing.join(' and ')}.`;
+    const best = app.save.journey.bestTimes[`L${mode.level}`];
+    return best ? `Replay. All three stars are yours; your best is ${fmtClock(best)}.` : 'Replay. All three stars are yours.';
+  }
+
   function defaultCoach(): string {
     if (mode.kind === 'cup') return `Paw Cup rules: no hints, ${numberWord(CUP_HEARTS).toLowerCase()} hearts, your time counts.`;
+    const goal = replayGoal();
+    if (goal) return goal;
     const tip = mode.kind === 'level' ? levelTip(mode.level, wordOf(CAT), wordOf(DOG)) : null;
     if (tip) return tip;
     if (mode.kind === 'zen') return 'No clock, no hearts. Take all the time you like.';
@@ -499,6 +513,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       sfx('place');
       haptic('place');
       board.flash([[r, c]], 'is-fresh', 720);
+      // One-animal boards: the color this animal settles is done; its tiles glow for a beat (overlay only).
+      if (solo && !app.reducedMotion) board.flash(s.unitCells({ kind: 'region', index: s.puzzle.regions[r][c] }), 'is-glow', 700);
       const key = keyOf(r, c);
       if (res.completed?.length) {
         const units = res.completed;
@@ -803,6 +819,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       if (tool === 'cat' || tool === 'dog') faces.curiousOne(tool, [0, 1.3]);
       coach(toolCoach());
       paint();
+      return;
+    }
+    // The difficulty chip: a tap says why the board is as hard as it is (never what the next move is).
+    if ((e.target as HTMLElement).closest('.chip--board')) {
+      coach(`${tierName}: ${difficultyReason(profile)}`);
       return;
     }
     const a = actionOf(e);

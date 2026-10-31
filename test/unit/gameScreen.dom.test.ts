@@ -368,3 +368,125 @@ describe('the win sheet: milestones first, ordinary wins quick (PR 4)', () => {
     expect(app.save.world.growth.farm).toBe(5);
   });
 });
+
+describe('small kindnesses on the board (PR 5)', () => {
+  it('a replay says which stars are still to earn; the difficulty chip explains itself on a tap', () => {
+    app.save.journey.clears.L5 = { firstClearAt: '2026-10-30T00:00:00.000Z', bestSeconds: 83, bestMistakes: 1, clean: false, hintFree: true, stars: 2 };
+    app.save.journey.bestTimes.L5 = 83;
+    start(5);
+    expect(coach()).toBe('Replay. One star to earn: solve it with no mistakes.');
+    (document.querySelector('.chip--board') as HTMLElement).click();
+    expect(coach()).toMatch(/^(Easy|Medium|Hard|Expert): /);
+    expect(coach()).not.toMatch(/row \d|column \d/i); // the reason never names a move
+  });
+
+  it('a fully starred replay offers the best time to beat', () => {
+    app.save.journey.clears.L5 = { firstClearAt: '2026-10-30T00:00:00.000Z', bestSeconds: 61, bestMistakes: 0, clean: true, hintFree: true, stars: 3 };
+    app.save.journey.bestTimes.L5 = 61;
+    start(5);
+    expect(coach()).toBe('Replay. All three stars are yours; your best is 1:01.');
+  });
+
+  it('hint steps are named for what they do: Hint, Explain, Place it', () => {
+    app.save.inventory.items.push({ id: 'test:hints', item: 'hint', delta: 3, at: '2026-10-30T00:00:00.000Z', source: 'gift' });
+    start(5);
+    const label = () => document.querySelector('[data-hint-label]')?.textContent;
+    expect(label()).toBe('Hint');
+    (document.querySelector('[data-act="hint"]') as HTMLButtonElement).click();
+    expect(label()).toBe('Explain');
+    expect(coach()).toMatch(/Look at/);
+    (document.querySelector('[data-act="hint"]') as HTMLButtonElement).click();
+    expect(label()).toBe('Place it');
+  });
+
+  it('on a one-animal board, placing an animal glows its whole color for a beat (overlay only)', () => {
+    start(5);
+    const s = app.active!.session;
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    tap(r, c);
+    const region = s.puzzle.regions[r][c];
+    const glowing = [...document.querySelectorAll<HTMLElement>('.cell.is-glow')].map((e) => Number(e.dataset.r) * 100 + Number(e.dataset.c));
+    const expected = s.unitCells({ kind: 'region', index: region }).map(([rr, cc]) => rr * 100 + cc);
+    expect(glowing.sort()).toEqual(expected.sort());
+  });
+});
+
+describe('hardening: large boards, assistive tech, no videos (review gaps)', () => {
+  it('Large board mode: a finger moving across tiles pans, it never marks or places', () => {
+    app.settings.largeBoard = true;
+    start(5);
+    const s = app.active!.session;
+    expect(document.querySelector('.board.is-pannable')).not.toBeNull();
+    toolBtn('mark')!.click();
+    const row = [...Array(s.size).keys()].filter((c) => !s.givenMask[0][c]).map((c) => [0, c] as [number, number]);
+    drag(row);
+    expect(s.events.filter((e) => e.type === 'mark' || e.type === 'place')).toHaveLength(0);
+    for (const [r, c] of row) expect(s.cells[r][c]).toBe(EMPTY);
+    // A click (a real tap, not a pan) still applies the tool.
+    cell(0, row[0][1]).click();
+    expect(s.cells[0][row[0][1]]).toBe(MARK);
+    app.settings.largeBoard = false;
+  });
+
+  it('a ✕ drag changes exactly the tiles under the finger and nothing else', () => {
+    start(5);
+    const s = app.active!.session;
+    const before = s.cells.map((r) => r.slice());
+    toolBtn('mark')!.click();
+    const run = [...Array(s.size).keys()].filter((c) => !s.givenMask[1][c]).slice(0, 3).map((c) => [1, c] as [number, number]);
+    drag(run);
+    for (let r = 0; r < s.size; r++)
+      for (let c = 0; c < s.size; c++) {
+        const touched = run.some(([rr, cc]) => rr === r && cc === c);
+        expect(s.cells[r][c]).toBe(touched ? MARK : before[r][c]);
+      }
+  });
+
+  it('tool buttons tell a screen reader what a tap will do, and cells say what they hold', () => {
+    start(30);
+    expect(toolBtn('cat')?.getAttribute('aria-label')).toMatch(/^[A-Z][a-z]+: a tap places an? [a-z ]+$/);
+    expect(toolBtn('mark')?.getAttribute('aria-label')).toMatch(/^Mark empty: a tap marks a tile ✕/);
+    expect(toolBtn('erase')?.getAttribute('aria-label')).toMatch(/^Erase: a tap takes an animal or a ✕ back$/);
+    expect(document.querySelector('.tools--place')?.getAttribute('role')).toBe('radiogroup');
+    expect(toolBtn('cat')?.getAttribute('role')).toBe('radio');
+    const s = app.active!.session;
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    toolBtn('mark')!.click();
+    tap(r, c);
+    expect(cell(r, c).getAttribute('aria-label')).toMatch(/marked empty$/);
+  });
+
+  it('under reduced motion a placement does not glow the color (the overlay flash is skipped)', () => {
+    app.settings.reducedMotion = 'reduce';
+    expect(app.reducedMotion).toBe(true);
+    start(5);
+    const s = app.active!.session;
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    tap(r, c);
+    expect(s.cells[r][c]).toBe(CAT);
+    expect(document.querySelectorAll('.cell.is-glow')).toHaveLength(0);
+    app.settings.reducedMotion = 'system';
+  });
+
+  it('with no video network, the hearts sheet never offers a video and the Journey loop still runs', async () => {
+    const ads = await import('../../src/services/ads');
+    const spy = vi.spyOn(ads.ads, 'available', 'get').mockReturnValue(false);
+    try {
+      start(5);
+      const s = app.active!.session;
+      // Lose every heart: the loss sheet must offer Try again and Back, never a video.
+      const [r, c] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+      for (let i = 0; i < s.maxHearts; i++) tap(r, c);
+      expect(s.outcome).toBe('lost');
+      const sheet = document.querySelector('.sheet')!;
+      expect(sheet.textContent).toMatch(/Out of hearts/);
+      expect(sheet.querySelector('[data-act="revive"]')).toBeNull();
+      expect(sheet.textContent).not.toMatch(/video/i);
+      expect(sheet.querySelector('[data-act="restart"]')).not.toBeNull();
+      (sheet.querySelector('[data-act="leave"]') as HTMLButtonElement).click();
+      expect(app.router.route?.screen).toBe('journey');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

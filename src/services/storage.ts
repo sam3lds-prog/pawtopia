@@ -229,6 +229,10 @@ export interface SaveV2 {
     controlsNotice: boolean;
     /** The World's one-line explanation (one home grows at a time) has been dismissed. */
     worldTipSeen: boolean;
+    /** The sanctuary's "try tapping an animal" cue has been acted on or dismissed. */
+    sceneTapTipSeen: boolean;
+    /** The sanctuary's "tap a decoration, the animals use it" cue has been acted on or dismissed. */
+    decorTipSeen: boolean;
   };
   lastSession: SavedSession | null;
 }
@@ -372,6 +376,8 @@ export function defaultSave(now = new Date()): SaveV2 {
       ladderNotice: false,
       controlsNotice: false,
       worldTipSeen: false,
+      sceneTapTipSeen: false,
+      decorTipSeen: false,
     },
     lastSession: null,
   };
@@ -662,6 +668,8 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       ladderNotice: bool(ob.ladderNotice, false),
       controlsNotice: bool(ob.controlsNotice, controlsMoved && (ob.tutorialDone === true || int(ob.sessions, 0) > 0)),
       worldTipSeen: bool(ob.worldTipSeen, false),
+      sceneTapTipSeen: bool(ob.sceneTapTipSeen, false),
+      decorTipSeen: bool(ob.decorTipSeen, false),
     },
     lastSession: normSavedSession(x.lastSession),
   };

@@ -263,3 +263,37 @@ describe('the World', () => {
 });
 
 export { CAT };
+
+describe('first run and first visits (PR 5)', () => {
+  it('the welcome shows the Farm and the animal on the first board, and the button names her', () => {
+    app.replaceSave(defaultSave(new Date(2026, 9, 31, 12)));
+    router.reset({ screen: 'welcome' });
+    expect(el('.welcome__tile .pet')?.dataset.pet).toBe('cotton');
+    expect(text('.welcome__story')).toMatch(/Meadow Farm/);
+    expect(text('.welcome__story')).toMatch(/Cotton the sheep/);
+    expect(text('.welcome [data-act="start"]')).toBe('Meet Cotton');
+    expect(document.querySelector('.welcome [data-pet="mochi"], .welcome [data-pet="biscuit"]')).toBeNull();
+  });
+
+  it('the Farm shows one cue to tap an animal, once; tapping one is what dismisses it', () => {
+    router.reset({ screen: 'region', id: 'farm' });
+    expect(text('[data-scene-cue="tap"]')).toMatch(/Try tapping an animal/);
+    (el('.sanctuary__scene .sanctuary__pet') as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(el('[data-scene-cue]')).toBeNull();
+    expect(app.save.onboarding.sceneTapTipSeen).toBe(true);
+    router.refresh();
+    expect(el('[data-scene-cue="tap"]')).toBeNull();
+  });
+
+  it('the decoration cue waits for a decoration that can be used, and its close remembers', () => {
+    app.save.onboarding.sceneTapTipSeen = true;
+    router.reset({ screen: 'region', id: 'farm' });
+    expect(el('[data-scene-cue]')).toBeNull();
+    app.save.inventory.decor.tractor = { ownedAt: '2026-10-30T00:00:00.000Z' };
+    router.refresh();
+    expect(text('[data-scene-cue="decor"]')).toMatch(/Tap a decoration/);
+    (el('[data-scene-cue="decor"] [data-act="cue-ok"]') as HTMLElement).click();
+    expect(el('[data-scene-cue]')).toBeNull();
+    expect(app.save.onboarding.decorTipSeen).toBe(true);
+  });
+});

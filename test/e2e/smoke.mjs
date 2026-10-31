@@ -121,6 +121,7 @@ try {
   await reload();
   await page.waitForSelector('.welcome');
   check('first run shows the welcome screen', true);
+  check('the welcome shows the Farm and Cotton, the animal on the first board', !!(await page.$('.welcome__tile .pet[data-pet="cotton"]')) && !(await page.$('.welcome [data-pet="mochi"]')) && (await page.textContent('.welcome [data-act="start"]'))?.trim() === 'Meet Cotton');
 
   // Guided tutorial: a one-animal board with the sheep (D35)
   await page.click('[data-act="start"]');
@@ -172,6 +173,7 @@ try {
   await page.waitForSelector('.region');
   await page.waitForSelector('.sheet [data-choose="wheelbarrow"]');
   check('meeting her opens the Farm, with Farm starter gifts', !!(await page.$('[data-choose="trough"]')));
+  check('the first visit offers a cue to tap an animal', /Try tapping an animal/.test((await page.textContent('[data-scene-cue="tap"]').catch(() => '')) ?? ''));
   await page.click('[data-choose="wheelbarrow"]');
   await page.click('.sheet [data-act="play"]');
   check('starter flow continues to level 2', (await title()) === 'Level 2');
@@ -307,6 +309,7 @@ try {
   check('a fresh board offers a free first hint', (await page.textContent('[data-hint-badge]'))?.trim() === 'Free');
   await page.click('[data-act="hint"]');
   check('the first look costs no ticket', (await hintCount()) === t0, `${t0} → ${await hintCount()}`);
+  check('after the look, the button offers to explain', (await page.textContent('[data-hint-label]'))?.trim() === 'Explain');
   await page.click('[data-act="hint"]');
   check('the exact cell costs one ticket', (await hintCount()) === t0 - 1, `${t0} → ${await hintCount()}`);
   await page.click('[data-act="hint"]');
@@ -388,6 +391,7 @@ try {
   });
   await page.click('.sanctuary__scene .sanctuary__pet');
   check('tapping an animal in the scene makes it react', await page.evaluate(() => window.__seen.has('is-greet') || window.__seen.has('is-love')));
+  check('tapping an animal is what dismisses the cue, for good', !(await page.$('[data-scene-cue="tap"]')) && (await page.evaluate(() => window.__pt.app.save.onboarding.sceneTapTipSeen)));
   await page.waitForTimeout(10_000);
   const seen = await page.evaluate(() => [...window.__seen]);
   check('the garden comes alive by itself within 10 seconds', seen.some((c) => c !== 'is-love' && c !== 'is-greet'), seen.join(','));

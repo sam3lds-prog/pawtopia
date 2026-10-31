@@ -1,11 +1,16 @@
-/** First run: a calm splash, the two-sentence story, then straight into a guided first board. */
+/**
+ * First run: a calm splash of the Farm with the sheep who is on the first board, a two-sentence story, then straight
+ * into the guided first board. The art is what the player is about to play (D36): not cats and dogs, who come later.
+ */
 
 import { app } from '../../app/app';
 import { startGame } from '../../app/gameFlow';
+import { castFor } from '../../meta/cast';
+import { animalInfo } from '../../meta/animals';
 import { track } from '../../services/analytics';
-import { petSvg } from '../art/pets';
-import { sceneBackdrop } from '../art/scene';
-import { actionOf, h } from '../dom';
+import { animalSvg } from '../art/animals';
+import { regionThumb } from '../art/regions';
+import { actionOf, esc, h } from '../dom';
 import type { ScreenDef } from '../router';
 
 /** Fresh installs that haven't started the tutorial see the welcome screen instead of Home. */
@@ -19,21 +24,23 @@ export const welcomeScreen: ScreenDef = {
   title: 'Pawtopia',
   mount(root, scope) {
     track('onboarding_step', { step: 'welcome' });
+    // The animal on the very first board (the Farm's sheep for a fresh save), so the splash shows what comes next.
+    const first = castFor(app.save, 'solo', 1);
+    const a = animalInfo(first.a);
     const el = h(`
       <div class="welcome">
         <div class="welcome__art" aria-hidden="true">
-          <svg class="welcome__scene" viewBox="0 0 360 200" preserveAspectRatio="xMidYMid slice">${sceneBackdrop({ id: 'welcome' })}</svg>
-          <div class="welcome__pair">
-            <span class="welcome__tile" style="--rc:var(--r1)">${petSvg('mochi')}</span>
-            <span class="welcome__tile" style="--rc:var(--r2)">${petSvg('biscuit')}</span>
+          <svg class="welcome__scene" viewBox="0 40 360 220" preserveAspectRatio="xMidYMid slice">${regionThumb('farm', 1, 'welcome')}</svg>
+          <div class="welcome__pair welcome__pair--one">
+            <span class="welcome__tile" style="--rc:var(--r1)">${animalSvg(first.a, { mood: 'happy' })}</span>
           </div>
         </div>
         <div class="welcome__copy">
           <h1 class="wordmark wordmark--lg" data-autofocus>Pawtopia</h1>
-          <p class="welcome__story">Our animal neighbors need a little room to get along. Solve their puzzles and give them a happy home.</p>
+          <p class="welcome__story">Meadow Farm is waiting for its first friend. Solve a little logic puzzle and ${esc(a.name)} the ${esc(a.noun)} moves in. More animals follow, home by home.</p>
         </div>
         <div class="welcome__actions">
-          <button class="btn btn--block btn--lg" data-act="start">Meet the neighbors</button>
+          <button class="btn btn--block btn--lg" data-act="start">Meet ${esc(a.name)}</button>
           <button class="btn btn--quiet" data-act="skip">I know how to play</button>
         </div>
       </div>`);

@@ -26,6 +26,7 @@ import { mountTrickTray } from '../components/tricks';
 import { createScene3D } from '../components/scene3d';
 import { trickBadge } from '../art/tricks';
 import { toast } from '../components/sheet';
+import { dismissSceneCue, sceneCue, sceneCueMarkup, type SceneCue } from '../components/sceneCues';
 import { esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { Route, ScreenDef } from '../router';
@@ -160,6 +161,7 @@ export const regionScreen: ScreenDef = {
           <p class="sanctuary__chat" data-chat ${chat ? '' : 'hidden'}>${ICON.heart}<span>${esc(chat ?? '')}</span></p>
           <button class="scene-tricks" data-act="tricks" aria-controls="${trayHost.id}" aria-expanded="${tray.isOpen}" hidden>${trickBadge('sparkle')}Tricks</button>
         </div>
+        <div data-cue-slot></div>
         ${progressCard()}
         <section aria-labelledby="animals-title">
           <div class="section-head"><h2 id="animals-title">Animals</h2><span class="muted num">${welcomed.length} of ${friendsHere.length}</span></div>
@@ -198,6 +200,9 @@ export const regionScreen: ScreenDef = {
       const svg = el.querySelector<SVGSVGElement>('.sanctuary__scene svg');
       life = svg ? startSceneLife(svg, `region-${id}`) : null;
       acts = svg && open ? startSceneActivities(svg, el.querySelector('[data-chat]'), () => app.reducedMotion, animalName) : null;
+      // One cue at a time, once: tap an animal; later, use a decoration.
+      const slot = el.querySelector('[data-cue-slot]');
+      if (slot) slot.innerHTML = sceneCueMarkup(open ? sceneCue(!!svg?.querySelector('.sanctuary__pet'), !!svg?.querySelector('[data-decor].has-act')) : null);
       s3d.attach(open ? el.querySelector<HTMLElement>('.sanctuary__scene') : null, svg);
       const btn = tricksBtn();
       if (btn) btn.hidden = !open || !svg?.querySelector('.sanctuary__pet');
@@ -230,14 +235,21 @@ export const regionScreen: ScreenDef = {
         else tray.openFor(undefined, true);
         return;
       }
+      const cueOk = t.closest('[data-act="cue-ok"]') as HTMLElement | null;
+      if (cueOk) {
+        dismissSceneCue(el, (cueOk.closest('[data-scene-cue]') as HTMLElement).dataset.sceneCue as SceneCue);
+        return;
+      }
       const fig = t.closest('.sanctuary__scene .sanctuary__pet') as HTMLElement | null;
       if (fig) {
+        if (!app.save.onboarding.sceneTapTipSeen) dismissSceneCue(el, 'tap');
         life?.tap(fig);
         tray.open(fig as unknown as SVGGElement);
         return;
       }
       const dec = t.closest('.sanctuary__scene [data-decor].has-act') as HTMLElement | null;
       if (dec) {
+        if (!app.save.onboarding.decorTipSeen) dismissSceneCue(el, 'decor');
         if (acts && !acts.busy && !acts.play(dec.dataset.decor!)) {
           const anyone = !!el.querySelector('.sanctuary__scene .sanctuary__pet');
           toast(anyone ? 'Everyone’s busy with a trick. Try again in a moment.' : 'Once an animal lives here, they’ll love this.');
