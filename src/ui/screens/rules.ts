@@ -35,17 +35,11 @@ export interface RulesOptions {
   bridge?: boolean;
 }
 
-/** The controls, in one sentence, for the scheme in Settings. */
+/** The controls, in one sentence, for the scheme in Settings (D37). */
 export function controlsLine(rule: Rule, animalWord: string): string {
   const what = rule === 'solo' ? withArticle(animalWord) : 'the animal you picked below the board';
-  switch (app.settings.controls) {
-    case 'classic':
-      return `<b>Tap</b> a tile once to mark it ✕, again to place ${esc(what)}, and once more to clear it.`;
-    case 'tap':
-      return `<b>Tap</b> a tile to mark it ✕. <b>Double-tap</b> to place ${esc(what)}. No quick double tap? Settings → Controls.`;
-    default:
-      return `<b>Tap</b> a tile to place ${esc(what)}. The <b>✕</b> tool marks tiles empty (drag across a few); <b>Erase</b> takes a tile back.`;
-  }
+  if (app.settings.controls === 'classic') return `<b>Tap</b> a tile once to mark it ✕, again to place ${esc(what)}. <b>Erase</b> takes ✕ marks back.`;
+  return `<b>Tap</b> a tile to mark it ✕ (drag to mark a few). <b>Double-tap</b> to place ${esc(what)}. <b>Erase</b> takes ✕ marks back. No quick double tap? Settings → Controls.`;
 }
 
 /** The rule the player is on now (one animal until the two-animal lesson), with the animals their boards show. */
@@ -92,7 +86,7 @@ export function showRules(scope: Scope, onClose?: () => void, o: RulesOptions = 
         ${items}
         <li>
           <span class="rules__icon">${ICON.mark}</span>
-          <p>${controlsLine(rule, wa)} A wrong guess costs a heart. Every board has one answer you can reach by logic alone.</p>
+          <p>${controlsLine(rule, wa)} A wrong guess costs a heart and is marked in red. Every board has one answer you can reach by logic alone.</p>
         </li>
       </ol>
       <div class="sheet__actions"><button class="btn btn--block" data-act="ok">${bridge ? 'Show me' : 'Got it'}</button></div>`,

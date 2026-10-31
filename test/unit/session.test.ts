@@ -229,3 +229,57 @@ describe('snapshots', () => {
     expect(Session.restore(p, snap2)).toBeNull();
   });
 });
+
+describe('mistake marks (D37)', () => {
+  const p = generatePuzzle({ size: 6, seed: 9 });
+
+  it('a wrong animal is remembered on its tile, once per animal, and costs one heart each time it is really tried', () => {
+    const s = new Session(p);
+    const [r, c] = firstFree(s, (r, c) => p.solution[r][c] === EMPTY);
+    expect(s.errorsAt(r, c)).toEqual([]);
+    expect(s.place(r, c, CAT).wrong).toBe(true);
+    expect(s.errorsAt(r, c)).toEqual([CAT]);
+    expect(s.hasError(r, c, CAT)).toBe(true);
+    expect(s.hasError(r, c, DOG)).toBe(false);
+    s.place(r, c, DOG);
+    expect(s.errorsAt(r, c)).toEqual([CAT, DOG]);
+    expect(s.cells[r][c]).toBe(EMPTY);
+    expect(s.mistakes).toBe(2);
+    // Not a board change: Undo has nothing of it to take back.
+    expect(s.canUndo()).toBe(false);
+    expect(s.undo()).toBe(false);
+    expect(s.errorsAt(r, c)).toEqual([CAT, DOG]);
+    // A right animal never leaves a mark.
+    const [rr, cc] = firstFree(s, (r, c) => p.solution[r][c] !== EMPTY);
+    s.place(rr, cc, p.solution[rr][cc] as Species);
+    expect(s.errorsAt(rr, cc)).toEqual([]);
+  });
+
+  it('survives a snapshot round trip; a mark that could not be true is dropped on restore', () => {
+    const s = new Session(p);
+    const [r, c] = firstFree(s, (r, c) => p.solution[r][c] === EMPTY);
+    s.place(r, c, CAT);
+    const snap = JSON.parse(JSON.stringify(s.snapshot()));
+    expect(snap.errors).toEqual([[r, c, CAT]]);
+    const back = Session.restore(p, snap)!;
+    expect(back.errorsAt(r, c)).toEqual([CAT]);
+    // Tampered: a "mistake" where the animal really lives, a given, out of range, a bad species.
+    const [tr, tc] = firstFree(s, (r, c) => p.solution[r][c] === CAT);
+    const given = p.givens[0];
+    const bad = { ...snap, errors: [[tr, tc, CAT], ...(given ? [[given.r, given.c, given.kind === CAT ? DOG : CAT]] : []), [99, 0, CAT], [r, c, 7]] };
+    const restored = Session.restore(p, bad)!;
+    expect(restored.errorsAt(tr, tc)).toEqual([]);
+    if (given) expect(restored.errorsAt(given.r, given.c)).toEqual([]);
+    expect(restored.errorsAt(r, c)).toEqual([]);
+    // Older saves have none.
+    const { errors: _drop, ...old } = snap;
+    expect(Session.restore(p, old)!.errorsAt(r, c)).toEqual([]);
+  });
+
+  it('the move log is unchanged: a wrong guess is still one place event, so the server replays it the same', () => {
+    const s = new Session(p);
+    const [r, c] = firstFree(s, (r, c) => p.solution[r][c] === EMPTY);
+    s.place(r, c, CAT);
+    expect(s.events.filter((e) => e.type !== 'pause' && e.type !== 'resume')).toEqual([{ t: expect.any(Number), type: 'place', r, c, s: CAT }]);
+  });
+});

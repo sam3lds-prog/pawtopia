@@ -42,9 +42,7 @@ function controlsPreview(c: Settings['controls']): string {
   const dot = `<span class="cp-arrow" aria-hidden="true">·</span>`;
   if (c === 'classic')
     return `<span class="cp-steps" aria-label="Tap cycle: each tap goes empty, then cross, then the animal, then empty">${step(ICON.mark, '1st tap: ✕')}${arrow}${step(ICON.paw, '2nd: animal')}${arrow}${step(ICON.erase, '3rd: clear')}</span>`;
-  if (c === 'tap')
-    return `<span class="cp-steps" aria-label="Tap marks a cross, double-tap places the animal, Erase takes things back">${step(ICON.mark, 'Tap: ✕')}${arrow}${step(ICON.paw, 'Double-tap: animal')}${arrow}${step(ICON.erase, 'Erase: undo a tile')}</span>`;
-  return `<span class="cp-steps" aria-label="Pick a tool below the board, then tap a tile: the animal places it, the cross marks it empty, Erase takes it back">${step(ICON.paw, 'Animal: tap places')}${dot}${step(ICON.mark, '✕: tap marks')}${dot}${step(ICON.erase, 'Erase: tap clears')}</span>`;
+  return `<span class="cp-steps" aria-label="Tap marks a cross, double-tap places the animal, Erase takes crosses back">${step(ICON.mark, 'Tap: ✕')}${dot}${step(ICON.paw, 'Double-tap: animal')}${dot}${step(ICON.erase, 'Erase: ✕ only')}</span>`;
 }
 
 export interface SettingsOptions {
@@ -72,14 +70,13 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
           'controls',
           'Controls',
           [
-            ['place', 'One tap places'],
             ['tap', 'Tap ✕, double-tap'],
             ['classic', 'Tap cycle'],
           ],
-          'One tap places and Tap cycle need no quick double tap: easier with VoiceOver or Switch Control',
+          'Tap cycle needs no quick double tap: easier with VoiceOver or Switch Control',
         )}
         <p class="controls-preview" data-controls-preview aria-live="polite">${controlsPreview(app.settings.controls)}</p>
-        ${sw('autoMark', 'Dot impossible tiles', 'A small dot shows where no animal can go')}
+        ${sw('autoMark', 'Dot impossible tiles', 'On Easy boards, a small dot shows where no animal can go')}
         ${sw('showTimer', 'Show the clock')}
         ${sw('largeBoard', 'Large board', 'Bigger tiles you can scroll around on small phones')}
       </div>

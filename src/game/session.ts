@@ -81,6 +81,8 @@ export interface SessionSnapshot {
   revives?: number;
   /** The replayable input log. Kept for Paw Cup boards so a resumed attempt can be verified from its first move. */
   events?: SessionEvent[];
+  /** Mistakes left on the board (D37): each tile where a wrong animal was tried, and which. Missing in older saves. */
+  errors?: Array<[number, number, Species]>;
 }
 
 const MAX_EVENTS = 4000;
@@ -117,6 +119,11 @@ export class Session {
   private paidTargets = new Set<string>();
   /** Deepest hint tier opened on this board (0 = none, 1 nudge, 2 exact cell + reason, 3 placed). For stars/analytics. */
   hintTierReached = 0;
+  /**
+   * Tiles where a wrong animal was tried, and which (D37): the board keeps a mark there. A record of a paid mistake, not
+   * a board change: Undo, Erase and drag-marking never touch it, and it doesn't count toward anything but the display.
+   */
+  private errorTiles = new Map<string, Species[]>();
 
   constructor(puzzle: Puzzle, opts: SessionOptions = {}) {
     this.puzzle = puzzle;
@@ -274,6 +281,9 @@ export class Session {
     this.log({ t: this.elapsedMs(), type: 'place', r, c, s: species });
     const correct = this.puzzle.solution[r][c] === species;
     if (!correct) {
+      const key = `${r},${c}`;
+      const tried = this.errorTiles.get(key) ?? [];
+      if (!tried.includes(species)) this.errorTiles.set(key, [...tried, species]);
       this.mistakes++;
       if (this.heartsEnabled) {
         this.hearts--;
@@ -389,6 +399,16 @@ export class Session {
     }
     if (paid) this.paidTargets.add(`${h.r},${h.c}`);
     this.hintTierReached = Math.max(this.hintTierReached, tier);
+  }
+
+  /** The animals tried and found wrong on a tile (empty when none). */
+  errorsAt(r: number, c: number): readonly Species[] {
+    return this.errorTiles.get(`${r},${c}`) ?? [];
+  }
+
+  /** Has this animal already been tried, and found wrong, on this tile? */
+  hasError(r: number, c: number, species: Species): boolean {
+    return this.errorsAt(r, c).includes(species);
   }
 
   /** A treat can give a heart back right now (hearts on, board not won, not already full unless lost). */
@@ -561,6 +581,9 @@ export class Session {
         ...(this.freeTarget ? { free: this.freeTarget } : {}),
       },
       revives: this.revives,
+      ...(this.errorTiles.size
+        ? { errors: [...this.errorTiles].flatMap(([k, sps]) => sps.map((sp) => [...(k.split(',').map(Number) as [number, number]), sp] as [number, number, Species])) }
+        : {}),
     };
   }
 
@@ -615,6 +638,18 @@ export class Session {
     s.outcome = snap.outcome === 'lost' && s.heartsEnabled ? 'lost' : 'playing';
     if (Array.isArray(snap.events)) {
       for (const e of snap.events.slice(0, MAX_EVENTS)) if (isSessionEvent(e)) s.events.push({ ...e });
+    }
+    // Mistake marks: kept only where they are true (a real wrong guess on a tile that can hold a guess).
+    if (Array.isArray(snap.errors)) {
+      for (const e of snap.errors) {
+        if (!Array.isArray(e) || e.length !== 3) continue;
+        const [r, c, sp] = e;
+        if (!Number.isInteger(r) || !Number.isInteger(c) || r < 0 || c < 0 || r >= n || c >= n) continue;
+        if ((sp !== CAT && sp !== DOG) || s.givenMask[r][c] || puzzle.solution[r][c] === sp) continue;
+        const key = `${r},${c}`;
+        const tried = s.errorTiles.get(key) ?? [];
+        if (!tried.includes(sp)) s.errorTiles.set(key, [...tried, sp]);
+      }
     }
     s.checkWin();
     return s;

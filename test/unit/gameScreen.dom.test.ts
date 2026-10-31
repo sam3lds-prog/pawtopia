@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 /**
- * The play screen's input rules, mounted for real in a DOM: what one tap does under each control scheme, what a wrong
- * placement leaves behind, and what a solve credits. These cover the P0 items of the Journey/World review (D36).
+ * The play screen's input rules, mounted for real in a DOM (D37): a tap marks ✕, a double tap places, a wrong animal
+ * costs a heart and leaves a mistake mark, Erase only takes ✕ marks back, Hint shows the player's hint count, and dots
+ * appear on Easy boards only. Plus what a solve credits and what the win sheet shows (D36).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from '../../src/app/app';
@@ -19,7 +20,7 @@ const blank = { tab: null, title: 'x', mount: () => {} };
 function mountRouter(): Router {
   document.body.innerHTML = '<div id="app"></div>';
   const router = new Router(document.getElementById('app')!);
-  const reg = {} as Record<CanonicalRoute["screen"], typeof blank>;
+  const reg = {} as Record<CanonicalRoute['screen'], typeof blank>;
   for (const k of ['journey', 'pets', 'challenges', 'shop', 'sanctuary', 'world', 'region', 'gallery', 'welcome', 'profile'] as const) reg[k] = blank;
   router.register({ ...reg, game: gameScreen } as never);
   app.router = router;
@@ -28,10 +29,16 @@ function mountRouter(): Router {
 
 const cell = (r: number, c: number) => document.querySelector<HTMLButtonElement>(`.cell[data-r="${r}"][data-c="${c}"]`)!;
 const toolBtn = (t: string) => document.querySelector<HTMLButtonElement>(`[data-tool="${t}"]`);
+const eraseBtn = () => document.querySelector<HTMLButtonElement>('[data-act="erase"]')!;
 const coach = () => document.querySelector('[data-coach]')?.textContent ?? '';
+const key = (r: number, c: number, k: string) => cell(r, c).dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
 
-/** A pointer tap on a cell, the way the board listens for it. */
-function tap(r: number, c: number): void {
+/** The clock the double-tap window reads; each tap moves it on, so taps are slow unless a test says otherwise. */
+let nowMs = 1_000;
+
+/** A pointer tap on a cell, the way the board listens for it, `gapMs` after the previous one. */
+function tap(r: number, c: number, gapMs = 1_000): void {
+  nowMs += gapMs;
   const el = cell(r, c);
   const box = { x: 10 + c * 40, y: 10 + r * 40 };
   document.elementFromPoint = () => el;
@@ -39,8 +46,15 @@ function tap(r: number, c: number): void {
   el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerId: 1, clientX: box.x, clientY: box.y }));
 }
 
+/** Two quick taps on one tile: the place gesture. */
+function dblTap(r: number, c: number): void {
+  tap(r, c);
+  tap(r, c, 60);
+}
+
 /** Finger down on one cell, moved across others, lifted. */
 function drag(cells: Array<[number, number]>): void {
+  nowMs += 1_000;
   const [first, ...rest] = cells;
   const el0 = cell(first[0], first[1]);
   document.elementFromPoint = () => el0;
@@ -53,13 +67,15 @@ function drag(cells: Array<[number, number]>): void {
   el0.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerId: 2 }));
 }
 
-function find(pred: (r: number, c: number) => boolean): [number, number] {
+function find(pred: (r: number, c: number) => boolean, skip: Array<[number, number]> = []): [number, number] {
   const s = app.active!.session;
-  for (let r = 0; r < s.size; r++) for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] === EMPTY && pred(r, c)) return [r, c];
+  for (let r = 0; r < s.size; r++)
+    for (let c = 0; c < s.size; c++)
+      if (!s.givenMask[r][c] && s.cells[r][c] === EMPTY && !s.errorsAt(r, c).length && pred(r, c) && !skip.some(([a, b]) => a === r && b === c)) return [r, c];
   throw new Error('no such cell');
 }
 
-function start(level: number, controls: ControlScheme = 'place'): void {
+function start(level: number, controls: ControlScheme = 'tap'): void {
   app.settings.controls = controls;
   if (level > 20) app.save.journey.nextLevel = Math.max(app.save.journey.nextLevel, level);
   startGame({ kind: 'level', level });
@@ -73,139 +89,189 @@ beforeEach(() => {
   // Past the tutorial and the lessons: ordinary boards with hearts.
   Object.assign(app.save.onboarding, { tutorialDone: true, seenRules: true, soloRulesSeen: true, pairRulesSeen: true, pairLessonDone: true });
   app.active = null;
+  nowMs = 1_000;
+  vi.spyOn(performance, 'now').mockImplementation(() => nowMs);
   mountRouter();
 });
 afterEach(() => {
   app.active = null;
+  vi.restoreAllMocks();
 });
 
-describe('one tap places (the default scheme, D36)', () => {
-  it('a one-animal board: the animal is the pressed tool; one tap places it with one event', () => {
+describe('tap marks, double-tap places (D37)', () => {
+  it('a one-animal board has Erase and Hint, no ✕ button; a tap marks, a slow second tap clears', () => {
     start(5); // no level tip, so the coach line is the scheme's
     const s = app.active!.session;
-    expect(toolBtn('cat')?.getAttribute('aria-checked')).toBe('true');
-    expect(toolBtn('mark')).not.toBeNull();
-    expect(toolBtn('erase')).not.toBeNull();
-    expect(document.querySelector('[data-act="erase"]')).toBeNull();
-    expect(coach()).toMatch(/Tap a tile to place/);
-    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    expect(document.querySelectorAll('[data-tool]')).toHaveLength(0);
+    expect(eraseBtn()).not.toBeNull();
+    expect(coach()).toMatch(/Tap to mark ✕, double-tap to place/);
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
     tap(r, c);
+    expect(s.cells[r][c]).toBe(MARK);
+    expect(cell(r, c).querySelector('.cell__mark')).not.toBeNull();
+    tap(r, c);
+    expect(s.cells[r][c]).toBe(EMPTY);
+  });
+
+  it('a double tap places the animal with exactly one place event, and one Undo empties the tile', () => {
+    start(5);
+    const s = app.active!.session;
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    dblTap(r, c);
     expect(s.cells[r][c]).toBe(CAT);
     expect(placeEvents()).toHaveLength(1);
     expect(s.mistakes).toBe(0);
+    s.undo();
+    expect(s.cells[r][c]).toBe(EMPTY);
   });
 
-  it('a tap on a placed animal does nothing but say how to take it back', () => {
-    start(4);
+  it('a wrong double tap costs one heart and leaves a red mistake mark; trying it again costs nothing', () => {
+    start(5);
     const s = app.active!.session;
-    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
-    tap(r, c);
-    tap(r, c);
-    expect(s.cells[r][c]).toBe(CAT);
-    expect(coach()).toMatch(/Erase/);
-    // Erase takes it back, and Erase stays pressed until it is tapped again.
-    toolBtn('erase')!.click();
-    expect(toolBtn('erase')?.getAttribute('aria-checked')).toBe('true');
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    dblTap(r, c);
+    expect(s.hearts).toBe(s.maxHearts - 1);
+    expect(s.cells[r][c]).toBe(EMPTY);
+    expect(s.errorsAt(r, c)).toEqual([CAT]);
+    expect(cell(r, c).querySelector('.cell__err')).not.toBeNull();
+    expect(cell(r, c).querySelector('.cell__mark')).toBeNull();
+    expect(cell(r, c).getAttribute('aria-label')).toMatch(/a mistake, no animal here$/);
+    expect(coach()).toMatch(/so it's marked/);
+    // The same guess again, on purpose or a double-fired tap: no second heart, no second event.
+    const events = s.events.length;
+    dblTap(r, c);
+    expect(s.hearts).toBe(s.maxHearts - 1);
+    expect(s.events.length).toBe(events);
+    expect(coach()).toMatch(/You already tried/);
+    // A single tap on a mistake doesn't turn it into a ✕; the mark stays, and survives a re-mount and an Undo.
     tap(r, c);
     expect(s.cells[r][c]).toBe(EMPTY);
-    expect(toolBtn('erase')?.getAttribute('aria-checked')).toBe('true');
-    toolBtn('erase')!.click();
-    expect(toolBtn('cat')?.getAttribute('aria-checked')).toBe('true');
+    expect(coach()).toMatch(/A mistake was marked here/);
+    app.router.refresh();
+    s.undo();
+    app.router.refresh();
+    expect(cell(r, c).querySelector('.cell__err')).not.toBeNull();
   });
 
-  it('the ✕ tool marks with a tap, marks a run with a drag, and gives the animal back on a second press', () => {
-    start(4);
+  it('a mistake on a tile the player had marked ✕ replaces their ✕', () => {
+    start(5);
     const s = app.active!.session;
-    toolBtn('mark')!.click();
-    expect(toolBtn('mark')?.getAttribute('aria-checked')).toBe('true');
-    expect(document.querySelector('.game')?.classList.contains('is-marking')).toBe(true);
-    const a = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
-    tap(a[0], a[1]);
-    expect(s.cells[a[0]][a[1]]).toBe(MARK);
-    tap(a[0], a[1]);
-    expect(s.cells[a[0]][a[1]]).toBe(EMPTY);
-    // A drag across row 0's free tiles marks exactly those.
-    const row = [...Array(s.size).keys()].filter((c) => !s.givenMask[0][c] && s.cells[0][c] === EMPTY).map((c) => [0, c] as [number, number]);
-    drag(row);
-    for (const [r, c] of row) expect(s.cells[r][c]).toBe(MARK);
-    expect(placeEvents()).toHaveLength(0);
-    toolBtn('mark')!.click();
-    expect(toolBtn('cat')?.getAttribute('aria-checked')).toBe('true');
-    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
-    tap(r, c);
-    expect(s.cells[r][c]).toBe(CAT);
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    key(r, c, 'x');
+    expect(s.cells[r][c]).toBe(MARK);
+    key(r, c, '1');
+    expect(s.hearts).toBe(s.maxHearts - 1);
+    expect(s.cells[r][c]).toBe(EMPTY);
+    expect(cell(r, c).querySelector('.cell__err')).not.toBeNull();
+    expect(cell(r, c).querySelector('.cell__mark')).toBeNull();
   });
 
-  it('a two-animal board: pick an animal, then one tap places it; the pick is remembered', () => {
+  it('two-animal boards: animal buttons, no ✕ button; a wrong cat on a dog tile marks "no cat", and the dog still fits', () => {
     start(30);
     const s = app.active!.session;
     expect(s.rule).toBe('pair');
-    expect(document.querySelectorAll('[data-tool]')).toHaveLength(4);
-    toolBtn('dog')!.click();
-    expect(toolBtn('dog')?.getAttribute('aria-checked')).toBe('true');
+    expect([...document.querySelectorAll<HTMLElement>('[data-tool]')].map((b) => b.dataset.tool)).toEqual(['cat', 'dog']);
     const [r, c] = find((r, c) => s.puzzle.solution[r][c] === DOG);
+    toolBtn('cat')!.click();
+    dblTap(r, c);
+    expect(s.hearts).toBe(s.maxHearts - 1);
+    // Not a red ✕: that would say the tile is empty. The struck cat says only "no cat here".
+    expect(cell(r, c).querySelector('.cell__err')).toBeNull();
+    expect(cell(r, c).querySelector('.cell__tried .pet, .cell__tried svg')).not.toBeNull();
+    expect(cell(r, c).getAttribute('aria-label')).toMatch(/: not a [a-z ]+, a mistake$/);
     tap(r, c);
+    expect(coach()).toMatch(/^No [a-z ]+ here\. If an? [a-z ]+ lives here, pick it below and double-tap\.$/);
+    toolBtn('dog')!.click();
+    dblTap(r, c);
     expect(s.cells[r][c]).toBe(DOG);
-    expect(placeEvents()).toHaveLength(1);
+    expect(cell(r, c).querySelector('.cell__tried')).toBeNull();
     expect(app.settings.lastSpecies).toBe('dog');
   });
 
-  it('a wrong tap costs one heart and leaves the tile as it was (empty, or the player\'s own ✕)', () => {
+  it('two-animal boards: both animals wrong on one tile make it a red ✕ (no animal lives there)', () => {
     start(30);
     const s = app.active!.session;
-    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === DOG);
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
     toolBtn('cat')!.click();
-    tap(r, c);
-    expect(s.hearts).toBe(s.maxHearts - 1);
-    expect(s.cells[r][c]).toBe(EMPTY);
-    expect(cell(r, c).querySelector('.cell__mark')).toBeNull();
-    expect(cell(r, c).querySelector('.cell__ghost')).not.toBeNull();
-    expect(s.events[s.events.length - 1]).toMatchObject({ type: 'place', r, c, s: CAT });
-    // On a tile the player marked ✕ themselves, a wrong keyboard placement keeps their ✕.
-    const [r2, c2] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
-    cell(r2, c2).dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true }));
-    expect(s.cells[r2][c2]).toBe(MARK);
-    cell(r2, c2).dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true }));
+    dblTap(r, c);
+    expect(cell(r, c).querySelector('.cell__tried')).not.toBeNull();
+    toolBtn('dog')!.click();
+    dblTap(r, c);
     expect(s.hearts).toBe(s.maxHearts - 2);
-    expect(s.cells[r2][c2]).toBe(MARK);
+    expect(cell(r, c).querySelector('.cell__err')).not.toBeNull();
+    expect(cell(r, c).querySelector('.cell__tried')).toBeNull();
   });
 
-  it('keyboard: Enter applies the pressed tool; 1 and 2 place directly; x marks', () => {
+  it('Erase takes back ✕ marks only: animals and mistakes stay; a drag clears a run of ✕', () => {
+    start(5);
+    const s = app.active!.session;
+    const x = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    tap(x[0], x[1]);
+    const a = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    dblTap(a[0], a[1]);
+    const m = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    dblTap(m[0], m[1]);
+    expect([s.cells[x[0]][x[1]], s.cells[a[0]][a[1]], s.errorsAt(m[0], m[1]).length]).toEqual([MARK, CAT, 1]);
+    eraseBtn().click();
+    expect(eraseBtn().getAttribute('aria-pressed')).toBe('true');
+    expect(coach()).toMatch(/Animals and mistakes stay/);
+    tap(x[0], x[1]);
+    expect(s.cells[x[0]][x[1]]).toBe(EMPTY);
+    tap(a[0], a[1]);
+    expect(s.cells[a[0]][a[1]]).toBe(CAT);
+    expect(coach()).toMatch(/Erase only takes back ✕ marks/);
+    tap(m[0], m[1]);
+    expect(s.errorsAt(m[0], m[1])).toEqual([CAT]);
+    expect(coach()).toMatch(/Mistakes stay marked/);
+    // Erase stays on; a drag lifts a run of ✕ and passes over everything else.
+    eraseBtn().click();
+    const row = [...Array(s.size).keys()].filter((c) => !s.givenMask[s.size - 1][c] && s.cells[s.size - 1][c] === EMPTY && !s.errorsAt(s.size - 1, c).length).slice(0, 3).map((c) => [s.size - 1, c] as [number, number]);
+    drag(row);
+    for (const [r, c] of row) expect(s.cells[r][c]).toBe(MARK);
+    eraseBtn().click();
+    drag(row);
+    for (const [r, c] of row) expect(s.cells[r][c]).toBe(EMPTY);
+    // Delete on the keyboard follows the same rule.
+    eraseBtn().click();
+    key(a[0], a[1], 'Delete');
+    expect(s.cells[a[0]][a[1]]).toBe(CAT);
+  });
+
+  it('a ✕ drag marks exactly the tiles under the finger, passing over mistakes', () => {
+    start(5);
+    const s = app.active!.session;
+    const m = find((r, c) => s.puzzle.solution[r][c] === EMPTY && r === 1);
+    dblTap(m[0], m[1]);
+    const before = s.cells.map((r) => r.slice());
+    const run = [...Array(s.size).keys()].filter((c) => !s.givenMask[1][c] && s.cells[1][c] === EMPTY).map((c) => [1, c] as [number, number]);
+    const start0 = run.find(([r, c]) => !s.errorsAt(r, c).length)!;
+    drag([start0, ...run.filter((t) => t !== start0)]);
+    for (let r = 0; r < s.size; r++)
+      for (let c = 0; c < s.size; c++) {
+        const touched = run.some(([rr, cc]) => rr === r && cc === c) && !s.errorsAt(r, c).length;
+        expect(s.cells[r][c]).toBe(touched ? MARK : before[r][c]);
+      }
+    expect(s.errorsAt(m[0], m[1])).toEqual([CAT]);
+  });
+
+  it('keyboard: Enter places the picked animal, 2 the other; x marks; a wrong guess is marked', () => {
     start(30);
     const s = app.active!.session;
     const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
-    cell(r, c).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    key(r, c, 'Enter');
     expect(s.cells[r][c]).toBe(CAT);
     const [r2, c2] = find((r, c) => s.puzzle.solution[r][c] === DOG);
-    cell(r2, c2).dispatchEvent(new KeyboardEvent('keydown', { key: '2', bubbles: true }));
+    key(r2, c2, '2');
     expect(s.cells[r2][c2]).toBe(DOG);
-    toolBtn('mark')!.click();
     const [r3, c3] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
-    cell(r3, c3).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    key(r3, c3, 'x');
     expect(s.cells[r3][c3]).toBe(MARK);
-  });
-});
-
-describe('the other schemes still work', () => {
-  it('tap and double-tap (D35): a tap marks ✕, a quick second tap places, a wrong one leaves the tile empty', () => {
-    start(5, 'tap');
-    const s = app.active!.session;
-    expect(document.querySelector('[data-act="erase"]')).not.toBeNull();
-    expect(toolBtn('mark')).toBeNull();
-    expect(coach()).toMatch(/double-tap/);
-    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
-    tap(r, c);
-    expect(s.cells[r][c]).toBe(MARK);
-    tap(r, c);
-    expect(s.cells[r][c]).toBe(CAT);
-    const [wr, wc] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
-    tap(wr, wc);
-    tap(wr, wc);
-    expect(s.hearts).toBe(s.maxHearts - 1);
-    expect(s.cells[wr][wc]).toBe(EMPTY);
+    key(r3, c3, '1');
+    expect(s.errorsAt(r3, c3)).toEqual([CAT]);
+    expect(s.cells[r3][c3]).toBe(EMPTY);
   });
 
-  it('tap cycle: empty → ✕ → animal, no timing', () => {
+  it('the tap cycle needs no timing: empty → ✕ → animal; a wrong one is marked; animals stay', () => {
     start(5, 'classic');
     const s = app.active!.session;
     expect(coach()).toMatch(/Tap once to mark/);
@@ -214,6 +280,67 @@ describe('the other schemes still work', () => {
     expect(s.cells[r][c]).toBe(MARK);
     tap(r, c);
     expect(s.cells[r][c]).toBe(CAT);
+    tap(r, c);
+    expect(s.cells[r][c]).toBe(CAT);
+    const [w, v] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    tap(w, v);
+    tap(w, v);
+    expect(s.hearts).toBe(s.maxHearts - 1);
+    expect(s.cells[w][v]).toBe(EMPTY);
+    expect(cell(w, v).querySelector('.cell__err')).not.toBeNull();
+  });
+});
+
+describe('Hint shows your hints; dots only on Easy boards (D37)', () => {
+  const badge = () => document.querySelector('[data-hint-badge]')?.textContent?.trim();
+  const label = () => document.querySelector('[data-hint-label]')?.textContent;
+  const give = (n: number) => app.save.inventory.items.push({ id: `test:hints:${n}`, item: 'hint', delta: n, at: '2026-10-30T00:00:00.000Z', source: 'gift' });
+
+  it('the badge is always the hint count; the first look is labelled free and costs nothing', () => {
+    give(3);
+    start(5);
+    expect(badge()).toBe('3');
+    expect(label()).toBe('Free hint');
+    expect(document.querySelector('[data-act="hint"]')?.getAttribute('aria-label')).toMatch(/free this time\. You have 3 hints\./);
+    (document.querySelector('[data-act="hint"]') as HTMLButtonElement).click();
+    expect(label()).toBe('Explain');
+    expect(badge()).toBe('3');
+    (document.querySelector('[data-act="hint"]') as HTMLButtonElement).click();
+    expect(label()).toBe('Place it');
+    expect(badge()).toBe('2');
+  });
+
+  it('Zen shows the count too (its hints stay free)', () => {
+    give(4);
+    app.settings.controls = 'tap';
+    startGame({ kind: 'zen', size: 6, seed: 7_000_123, rule: 'solo' });
+    expect(badge()).toBe('4');
+    (document.querySelector('[data-act="hint"]') as HTMLButtonElement).click();
+    (document.querySelector('[data-act="hint"]') as HTMLButtonElement).click();
+    expect(badge()).toBe('4');
+  });
+
+  it('dots on tiles no animal can reach show on an Easy board, never on a harder one', () => {
+    start(4); // 6×6 Easy
+    expect(document.querySelector('.chip--board')?.textContent).toMatch(/Easy/);
+    let s = app.active!.session;
+    let [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    dblTap(r, c);
+    expect(document.querySelectorAll('.cell__dot').length).toBeGreaterThan(0);
+    start(5); // 6×6 Medium
+    expect(document.querySelector('.chip--board')?.textContent).toMatch(/Medium/);
+    s = app.active!.session;
+    [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    dblTap(r, c);
+    expect(s.cells[r][c]).toBe(CAT);
+    expect(document.querySelectorAll('.cell__dot')).toHaveLength(0);
+    // And the setting still turns them off on Easy boards.
+    app.settings.autoMark = false;
+    start(4);
+    s = app.active!.session;
+    [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    dblTap(r, c);
+    expect(document.querySelectorAll('.cell__dot')).toHaveLength(0);
   });
 });
 
@@ -226,7 +353,7 @@ describe('a solve credits the sanctuary the board started for (P0)', () => {
         if (want === EMPTY || s.givenMask[r][c] || s.cells[r][c] === want) continue;
         if (!document.querySelector('.cell')) return;
         toolBtn(want === CAT ? 'cat' : 'dog')?.click();
-        tap(r, c);
+        dblTap(r, c);
         if (s.outcome === 'won') return;
       }
   }
@@ -269,7 +396,7 @@ describe('level 21: the bridge, then the lesson', () => {
     const sheet = document.querySelector('.rules-bridge');
     expect(sheet).not.toBeNull();
     expect(sheet?.textContent).toMatch(/A second animal joins/);
-    expect(sheet?.textContent).toMatch(/Tap a tile to place the animal you picked/);
+    expect(sheet?.textContent).toMatch(/Double-tap to place the animal you picked/);
     expect(document.querySelector('.cell.is-guide')).toBeNull();
     (sheet!.querySelector('[data-act="ok"]') as HTMLButtonElement).click();
     expect(document.querySelector('.rules-bridge')).toBeNull();
@@ -294,7 +421,7 @@ describe('the win sheet: milestones first, ordinary wins quick (PR 4)', () => {
         const want = s.puzzle.solution[r][c];
         if (want === EMPTY || s.givenMask[r][c] || s.cells[r][c] === want) continue;
         toolBtn(want === CAT ? 'cat' : 'dog')?.click();
-        tap(r, c);
+        dblTap(r, c);
         if (s.outcome === 'won') return;
       }
   }
@@ -387,23 +514,11 @@ describe('small kindnesses on the board (PR 5)', () => {
     expect(coach()).toBe('Replay. All three stars are yours; your best is 1:01.');
   });
 
-  it('hint steps are named for what they do: Hint, Explain, Place it', () => {
-    app.save.inventory.items.push({ id: 'test:hints', item: 'hint', delta: 3, at: '2026-10-30T00:00:00.000Z', source: 'gift' });
-    start(5);
-    const label = () => document.querySelector('[data-hint-label]')?.textContent;
-    expect(label()).toBe('Hint');
-    (document.querySelector('[data-act="hint"]') as HTMLButtonElement).click();
-    expect(label()).toBe('Explain');
-    expect(coach()).toMatch(/Look at/);
-    (document.querySelector('[data-act="hint"]') as HTMLButtonElement).click();
-    expect(label()).toBe('Place it');
-  });
-
   it('on a one-animal board, placing an animal glows its whole color for a beat (overlay only)', () => {
     start(5);
     const s = app.active!.session;
     const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
-    tap(r, c);
+    dblTap(r, c);
     const region = s.puzzle.regions[r][c];
     const glowing = [...document.querySelectorAll<HTMLElement>('.cell.is-glow')].map((e) => Number(e.dataset.r) * 100 + Number(e.dataset.c));
     const expected = s.unitCells({ kind: 'region', index: region }).map(([rr, cc]) => rr * 100 + cc);
@@ -417,41 +532,24 @@ describe('hardening: large boards, assistive tech, no videos (review gaps)', () 
     start(5);
     const s = app.active!.session;
     expect(document.querySelector('.board.is-pannable')).not.toBeNull();
-    toolBtn('mark')!.click();
     const row = [...Array(s.size).keys()].filter((c) => !s.givenMask[0][c]).map((c) => [0, c] as [number, number]);
     drag(row);
     expect(s.events.filter((e) => e.type === 'mark' || e.type === 'place')).toHaveLength(0);
     for (const [r, c] of row) expect(s.cells[r][c]).toBe(EMPTY);
-    // A click (a real tap, not a pan) still applies the tool.
+    // A click (a real tap, not a pan) still marks.
     cell(0, row[0][1]).click();
     expect(s.cells[0][row[0][1]]).toBe(MARK);
     app.settings.largeBoard = false;
   });
 
-  it('a ✕ drag changes exactly the tiles under the finger and nothing else', () => {
-    start(5);
-    const s = app.active!.session;
-    const before = s.cells.map((r) => r.slice());
-    toolBtn('mark')!.click();
-    const run = [...Array(s.size).keys()].filter((c) => !s.givenMask[1][c]).slice(0, 3).map((c) => [1, c] as [number, number]);
-    drag(run);
-    for (let r = 0; r < s.size; r++)
-      for (let c = 0; c < s.size; c++) {
-        const touched = run.some(([rr, cc]) => rr === r && cc === c);
-        expect(s.cells[r][c]).toBe(touched ? MARK : before[r][c]);
-      }
-  });
-
-  it('tool buttons tell a screen reader what a tap will do, and cells say what they hold', () => {
+  it('animal buttons tell a screen reader what a double tap places, and cells say what they hold', () => {
     start(30);
-    expect(toolBtn('cat')?.getAttribute('aria-label')).toMatch(/^[A-Z][a-z]+: a tap places an? [a-z ]+$/);
-    expect(toolBtn('mark')?.getAttribute('aria-label')).toMatch(/^Mark empty: a tap marks a tile ✕/);
-    expect(toolBtn('erase')?.getAttribute('aria-label')).toMatch(/^Erase: a tap takes an animal or a ✕ back$/);
-    expect(document.querySelector('.tools--place')?.getAttribute('role')).toBe('radiogroup');
+    expect(toolBtn('cat')?.getAttribute('aria-label')).toMatch(/^[A-Z][a-z]+: a double tap places an? [a-z ]+$/);
+    expect(document.querySelector('.tools')?.getAttribute('role')).toBe('radiogroup');
     expect(toolBtn('cat')?.getAttribute('role')).toBe('radio');
+    expect(eraseBtn().getAttribute('aria-pressed')).toBe('false');
     const s = app.active!.session;
     const [r, c] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
-    toolBtn('mark')!.click();
     tap(r, c);
     expect(cell(r, c).getAttribute('aria-label')).toMatch(/marked empty$/);
   });
@@ -462,7 +560,7 @@ describe('hardening: large boards, assistive tech, no videos (review gaps)', () 
     start(5);
     const s = app.active!.session;
     const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
-    tap(r, c);
+    dblTap(r, c);
     expect(s.cells[r][c]).toBe(CAT);
     expect(document.querySelectorAll('.cell.is-glow')).toHaveLength(0);
     app.settings.reducedMotion = 'system';
@@ -474,9 +572,11 @@ describe('hardening: large boards, assistive tech, no videos (review gaps)', () 
     try {
       start(5);
       const s = app.active!.session;
-      // Lose every heart: the loss sheet must offer Try again and Back, never a video.
-      const [r, c] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
-      for (let i = 0; i < s.maxHearts; i++) tap(r, c);
+      // Lose every heart (a different wrong tile each time): the loss sheet must offer Try again and Back, never a video.
+      for (let i = 0; i < s.maxHearts; i++) {
+        const [r, c] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+        dblTap(r, c);
+      }
       expect(s.outcome).toBe('lost');
       const sheet = document.querySelector('.sheet')!;
       expect(sheet.textContent).toMatch(/Out of hearts/);

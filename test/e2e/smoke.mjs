@@ -46,12 +46,12 @@ async function reload() {
 const coins = () => page.evaluate(() => window.__pt.app.coins());
 const title = () => page.textContent('.game-title h1').catch(() => null);
 
-/** One tap on a tile (D36 default: the pressed animal tool places). */
+/** One tap on a tile: marks ✕ (D37). */
 async function tapCell(r, c) {
   await page.click(`.cell[data-r="${r}"][data-c="${c}"]`);
 }
 
-/** Double-taps a tile (the D35 'tap' scheme: a double tap places the picked animal). */
+/** Double-taps a tile: places the picked animal (D37). */
 async function dblTap(r, c) {
   await page.dblclick(`.cell[data-r="${r}"][data-c="${c}"]`, { delay: 10 });
 }
@@ -64,18 +64,10 @@ async function pick(species) {
 
 const scheme = () => page.evaluate(() => window.__pt.app.settings.controls);
 
-/** Places an animal the way the current control scheme does it. */
+/** Places an animal: pick it (two-animal boards), then double-tap. */
 async function place(r, c, species) {
   await pick(species);
-  if ((await scheme()) === 'place') await tapCell(r, c);
-  else await dblTap(r, c);
-}
-
-async function setControls(c) {
-  await page.evaluate((v) => {
-    window.__pt.app.settings.controls = v;
-    window.__pt.app.persist();
-  }, c);
+  await dblTap(r, c);
 }
 
 async function solveActive({ stopAfter = Infinity, pace = 0 } = {}) {
@@ -97,7 +89,7 @@ async function solveActive({ stopAfter = Infinity, pace = 0 } = {}) {
 const emptyTile = () =>
   page.evaluate(() => {
     const s = window.__pt.app.active.session;
-    for (let r = 0; r < s.size; r++) for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] === 0 && s.puzzle.solution[r][c] === 0) return [r, c];
+    for (let r = 0; r < s.size; r++) for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] === 0 && s.puzzle.solution[r][c] === 0 && !s.errorsAt(r, c).length) return [r, c];
     return null;
   });
 
@@ -129,29 +121,27 @@ try {
   check('tutorial highlights exactly one tile', (await page.$$('.cell.is-guide')).length === 1);
   check('tutorial board is forgiving (no hearts shown)', !(await page.$('[data-hearts]')));
   check('the first board is a one-animal board', await page.evaluate(() => window.__pt.app.active.session.rule === 'solo'));
-  check('a fresh install is on one-tap controls', (await scheme()) === 'place');
-  check('a one-animal board has the animal, ✕ and Erase as tools, and Hint', (await page.$$('.controls--solo .tools--place [data-tool]')).length === 3 && (await page.$$('.controls--solo .act')).length === 1 && !(await page.$('.controls [data-act="undo"]')));
-  check('the animal is the pressed tool from the start', (await page.getAttribute('[data-tool="cat"]', 'aria-checked')) === 'true');
-  check('the coach says to tap the tile', /tap it/i.test((await page.textContent('[data-coach]')) ?? '') && !/double/i.test((await page.textContent('[data-coach]')) ?? ''));
+  check('a fresh install plays tap ✕ / double-tap', (await scheme()) === 'tap');
+  check('a one-animal board has only Erase and Hint below it (no ✕ button)', !(await page.$('[data-tool]')) && (await page.$$('.controls--solo .act')).length === 2 && !(await page.$('.controls [data-act="undo"]')));
+  check('the coach says to double-tap the tile', /double-tap it/i.test((await page.textContent('[data-coach]')) ?? ''));
 
-  // The ✕ tool marks with a tap and clears with another; the animal tool never marks.
+  // A tap marks ✕ and a second, slow tap clears it again; animals only come with a double tap.
   const free0 = await emptyTile();
-  await page.click('[data-tool="mark"]');
-  check('pressing ✕ makes it the tool', (await page.getAttribute('[data-tool="mark"]', 'aria-checked')) === 'true' && (await page.getAttribute('[data-tool="cat"]', 'aria-checked')) === 'false');
   await tapCell(free0[0], free0[1]);
-  check('with ✕ pressed, a tap marks ✕', (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], free0)) === 3);
+  check('a tap marks ✕', (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], free0)) === 3);
+  await page.waitForTimeout(500);
   await tapCell(free0[0], free0[1]);
-  check('a second tap clears the ✕', (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], free0)) === 0);
-  await page.click('[data-tool="mark"]');
-  check('pressing ✕ again goes back to the animal', (await page.getAttribute('[data-tool="cat"]', 'aria-checked')) === 'true');
+  check('a second tap later clears the ✕', (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], free0)) === 0);
+  await page.waitForTimeout(500);
 
-  // Facial-only: placing an animal never transforms its element, and its face reacts. One tap places.
+  // Facial-only: placing an animal never transforms its element, and its face reacts. A double tap places.
   const g = await page.$('.cell.is-guide');
   const box0 = await g.boundingBox();
   const placesBefore = await page.evaluate(() => window.__pt.app.active.session.events.filter((e) => e.type === 'place').length);
-  await g.click();
+  await g.dblclick({ delay: 10 });
   await page.waitForTimeout(60);
-  check('one tap places the animal with exactly one place event', (await page.evaluate(() => window.__pt.app.active.session.events.filter((e) => e.type === 'place').length)) === placesBefore + 1);
+  check('a double tap places the animal with exactly one place event', (await page.evaluate(() => window.__pt.app.active.session.events.filter((e) => e.type === 'place').length)) === placesBefore + 1);
+  check('the first board is Easy, so tiles no sheep can reach get a dot', (await page.textContent('.chip--board'))?.includes('Easy') && (await page.$$('.board .cell__dot')).length > 0);
   check('the board shows the animal being brought home (Cotton the sheep)', !!(await page.$('.board .pet[data-pet="cotton"]')));
   const moods = await page.$$eval('.board .pet', (els) => els.map((e) => e.dataset.mood));
   check('a correct placement makes a face react', moods.some((m) => m === 'happy' || m === 'proud'), moods.join(','));
@@ -213,111 +203,91 @@ try {
   const givens = await page.evaluate(() => window.__pt.app.active.session.puzzle.givens.length);
   check('the resumed board keeps its placements', placedCount === givens + 1, `${placedCount} vs ${givens + 1}`);
 
-  // Five hearts on casual boards; a wrong animal is a fading ghost with a strike, and the tile is left as it was (no ✕)
+  // Five hearts on casual boards; a wrong animal is a fading ghost with a strike, then a red mistake mark that stays
   check('Journey boards show five hearts', (await page.$$('[data-hearts] .ico')).length === 5);
+  check('a Medium board shows no dots: marking is up to the player', (await page.textContent('.chip--board'))?.includes('Medium') && (await page.$$('.board .cell__dot')).length === 0);
   const wrongCell = await emptyTile();
-  await tapCell(wrongCell[0], wrongCell[1]);
+  await dblTap(wrongCell[0], wrongCell[1]);
   const afterWrong = await page.evaluate(([r, c]) => {
     const s = window.__pt.app.active.session;
-    return { hearts: s.hearts, cell: s.cells[r][c], mark: !!document.querySelector(`.cell[data-r="${r}"][data-c="${c}"] .cell__mark`) };
+    return { hearts: s.hearts, cell: s.cells[r][c], errs: s.errorsAt(r, c).length };
   }, wrongCell);
-  const strike = await page.$(`.cell[data-r="${wrongCell[0]}"][data-c="${wrongCell[1]}"] .cell__strike`);
-  check('a wrong tap costs one heart and leaves the tile empty, not ✕', afterWrong.hearts === 4 && afterWrong.cell === 0 && !afterWrong.mark, JSON.stringify(afterWrong));
-  check('the mistake shows a fading ghost with a strike', !!strike);
+  const wrongSel = `.cell[data-r="${wrongCell[0]}"][data-c="${wrongCell[1]}"]`;
+  check('a wrong double tap costs one heart and leaves a mistake on the tile', afterWrong.hearts === 4 && afterWrong.cell === 0 && afterWrong.errs === 1, JSON.stringify(afterWrong));
+  check('the mistake shows a fading ghost with a strike', !!(await page.$(`${wrongSel} .cell__strike`)));
   await page.waitForTimeout(800);
-  check('the ghost and strike are gone afterwards', !(await page.$('.cell__strike')) && !(await page.$('.cell__ghost')));
+  check('the ghost and strike fade; a red mistake mark stays', !(await page.$('.cell__strike')) && !(await page.$('.cell__ghost')) && !!(await page.$(`${wrongSel} .cell__err`)));
+  await dblTap(wrongCell[0], wrongCell[1]);
+  check('the same wrong guess again costs nothing', (await page.evaluate(() => window.__pt.app.active.session.hearts)) === 4 && /already tried/.test((await page.textContent('[data-coach]')) ?? ''));
+  await page.waitForTimeout(450);
   // The board says which sanctuary it is for.
   check('the board header names the sanctuary the board helps', (await page.textContent('[data-for]'))?.includes('Farm'));
-  // A ✕ for the Erase check below: drag the ✕ tool across the tile (a one-tile drag is a tap).
-  await page.click('[data-tool="mark"]');
-  await tapCell(wrongCell[0], wrongCell[1]);
-  check('the ✕ tool marks the tile', (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], wrongCell)) === 3);
   check('regions are separated by soft seams, not dark lines', await page.evaluate(() => getComputedStyle(document.querySelector('.board__lines .div')).stroke !== 'rgb(52, 67, 63)'));
 
-  // Erase is a tool that stays pressed; undo, redo and How to play live in the pause sheet
-  await page.click('[data-tool="erase"]');
-  check('Erase stays pressed until it is tapped again', (await page.getAttribute('[data-tool="erase"]', 'aria-checked')) === 'true');
+  // Erase is a mode that stays on, and it only takes ✕ marks back: animals and mistakes stay
+  const xTile = await emptyTile();
+  await tapCell(xTile[0], xTile[1]);
+  await page.waitForTimeout(450);
+  const animalTile = await page.evaluate(() => {
+    const s = window.__pt.app.active.session;
+    for (let r = 0; r < s.size; r++) for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] === 1) return [r, c];
+    return null;
+  });
+  await page.click('[data-act="erase"]');
+  check('Erase stays on until it is tapped again', (await page.getAttribute('[data-act="erase"]', 'aria-pressed')) === 'true');
+  await tapCell(xTile[0], xTile[1]);
+  check('with Erase on, a tap takes the ✕ back', (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], xTile)) === 0);
+  await tapCell(animalTile[0], animalTile[1]);
+  check('Erase leaves a placed animal where it is', (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], animalTile)) === 1);
   await tapCell(wrongCell[0], wrongCell[1]);
-  check('with Erase pressed, a tap takes the ✕ back', (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], wrongCell)) === 0 && (await page.getAttribute('[data-tool="erase"]', 'aria-checked')) === 'true');
-  await page.click('[data-tool="erase"]');
-  check('pressing Erase again goes back to the animal', (await page.getAttribute('[data-tool="cat"]', 'aria-checked')) === 'true');
+  check('Erase leaves a mistake mark where it is', !!(await page.$(`${wrongSel} .cell__err`)) && /Mistakes stay marked/.test((await page.textContent('[data-coach]')) ?? ''));
+  await page.click('[data-act="erase"]');
   await page.click('[data-act="pause"]');
   check('the pause sheet has undo, redo and How to play', !!(await page.$('.sheet [data-act="undo"]')) && !!(await page.$('.sheet [data-act="rules"]')));
   await page.click('.sheet [data-act="rules"]');
   check('How to play explains the one-animal rule with the board animal', /One piglet/.test((await page.textContent('.rules')) ?? ''));
   check('How to play uses real plurals', /Piglets never touch/.test((await page.textContent('.rules')) ?? ''));
-  check('How to play describes one-tap controls', /Tap<\/b> a tile to place/.test((await page.innerHTML('.rules')) ?? ''));
+  check('How to play describes tap ✕ and double-tap to place, and red mistakes', /Double-tap<\/b> to place/.test((await page.innerHTML('.rules')) ?? '') && /marked in red/.test((await page.textContent('.rules')) ?? ''));
   await page.click('[data-act="ok"]');
   await page.waitForTimeout(200);
 
-  // A tap on a placed animal never takes it away; Space never does either
+  // One Undo after a double-tap empties the tile (the first tap's ✕ goes with it); a tap or Space never takes an animal away
   const right = await page.evaluate(() => {
     const s = window.__pt.app.active.session;
     for (let r = 0; r < s.size; r++) for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] === 0 && s.puzzle.solution[r][c] === 1) return [r, c];
     return null;
   });
   const cellAt = () => page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], right);
+  await dblTap(right[0], right[1]);
+  check('a double-tap on the right tile places the animal', (await cellAt()) === 1);
+  await page.waitForTimeout(450);
   await tapCell(right[0], right[1]);
-  check('a tap on the right tile places the animal', (await cellAt()) === 1);
-  await tapCell(right[0], right[1]);
-  check('a second tap on a placed animal leaves it and says how to erase', (await cellAt()) === 1 && /Erase/.test((await page.textContent('[data-coach]')) ?? ''));
+  check('a tap on a placed animal leaves it', (await cellAt()) === 1);
   await page.click('[data-act="pause"]');
   await page.click('.sheet [data-act="undo"]');
   await page.waitForTimeout(150);
-  check('one Undo after a tap empties the tile', (await cellAt()) === 0);
-  await tapCell(right[0], right[1]);
+  check('one Undo after a double-tap empties the tile', (await cellAt()) === 0);
+  await page.waitForTimeout(450);
+  await dblTap(right[0], right[1]);
   await page.focus(`.cell[data-r="${right[0]}"][data-c="${right[1]}"]`);
   await page.keyboard.press('Space');
   check('Space never takes an animal away', (await cellAt()) === 1);
 
-  // The D35 scheme is still there: tap marks ✕, a quick second tap places, one Undo empties the tile again
-  await setControls('tap');
-  await page.evaluate(() => window.__pt.app.router.refresh());
-  await page.waitForTimeout(200);
-  check('tap/double-tap keeps Erase and Hint only on one-animal boards', !(await page.$('[data-tool]')) && (await page.$$('.controls--solo .act')).length === 2 && (await page.getAttribute('[data-act="erase"]', 'aria-pressed')) === 'false');
-  const right2 = await page.evaluate(() => {
-    const s = window.__pt.app.active.session;
-    for (let r = 0; r < s.size; r++) for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] === 0 && s.puzzle.solution[r][c] === 1) return [r, c];
-    return null;
-  });
-  const cellAt2 = () => page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], right2);
-  await page.click(`.cell[data-r="${right2[0]}"][data-c="${right2[1]}"]`);
-  check('a tap marks ✕', (await cellAt2()) === 3);
-  await page.waitForTimeout(500);
-  await page.click(`.cell[data-r="${right2[0]}"][data-c="${right2[1]}"]`);
-  check('a second tap later clears the ✕', (await cellAt2()) === 0);
-  await page.waitForTimeout(500);
-  await dblTap(right2[0], right2[1]);
-  check('a double-tap on the right tile places the animal', (await cellAt2()) === 1);
-  await page.click('[data-act="pause"]');
-  await page.click('.sheet [data-act="undo"]');
-  await page.waitForTimeout(150);
-  check('one Undo after a double-tap empties the tile', (await cellAt2()) === 0);
-  await page.waitForTimeout(450);
-  const wrong2 = await emptyTile();
-  const heartsNow = await page.evaluate(() => window.__pt.app.active.session.hearts);
-  await dblTap(wrong2[0], wrong2[1]);
-  check('a wrong double-tap costs one heart and leaves the tile empty', (await page.evaluate(([r, c]) => ({ h: window.__pt.app.active.session.hearts, v: window.__pt.app.active.session.cells[r][c] }), wrong2)).h === heartsNow - 1 && (await page.evaluate(([r, c]) => window.__pt.app.active.session.cells[r][c], wrong2)) === 0);
-  await page.waitForTimeout(800);
-  await setControls('place');
-  await page.evaluate(() => window.__pt.app.router.refresh());
-  await page.waitForTimeout(200);
-
   // Hints: the board's first look is free, the exact cell costs one hint, placing that cell costs nothing more
   const hintCount = () => page.evaluate(() => window.__pt.app.save.inventory.items.filter((e) => e.item === 'hint').reduce((a, e) => a + e.delta, 0));
   const t0 = await hintCount();
-  check('a fresh board offers a free first hint', (await page.textContent('[data-hint-badge]'))?.trim() === 'Free');
+  check('Hint shows how many hints you have, and says the first look is free', (await page.textContent('[data-hint-badge]'))?.trim() === String(t0) && (await page.textContent('[data-hint-label]'))?.trim() === 'Free hint');
   await page.click('[data-act="hint"]');
   check('the first look costs no ticket', (await hintCount()) === t0, `${t0} → ${await hintCount()}`);
   check('after the look, the button offers to explain', (await page.textContent('[data-hint-label]'))?.trim() === 'Explain');
   await page.click('[data-act="hint"]');
-  check('the exact cell costs one ticket', (await hintCount()) === t0 - 1, `${t0} → ${await hintCount()}`);
+  check('the exact cell costs one ticket, and the count on Hint goes down', (await hintCount()) === t0 - 1 && (await page.textContent('[data-hint-badge]'))?.trim() === String(t0 - 1), `${t0} → ${await hintCount()}`);
   await page.click('[data-act="hint"]');
   check('placing that same cell costs nothing more', (await hintCount()) === t0 - 1, `${t0} → ${await hintCount()}`);
 
   // Extra lives: one heart back from the hearts button, kept with the board
   const wc = await emptyTile();
-  await tapCell(wc[0], wc[1]);
+  await dblTap(wc[0], wc[1]);
   const heartsBefore = await page.evaluate(() => window.__pt.app.active.session.hearts);
   const treatsBefore = await page.evaluate(() => window.__pt.app.save.inventory.items.filter((e) => e.item === 'life').reduce((a, e) => a + e.delta, 0));
   await page.click('[data-act="hearts"]');
@@ -491,7 +461,7 @@ try {
     coach: document.querySelector('[data-coach]')?.textContent ?? '',
     cast: window.__pt.app.active.cast,
   }));
-  check('level 21 teaches two animals on a guided board', lesson.rule === 'pair' && lesson.animals === 2 && lesson.tools === 4 && /two animals/i.test(lesson.coach), JSON.stringify(lesson));
+  check('level 21 teaches two animals on a guided board', lesson.rule === 'pair' && lesson.animals === 2 && lesson.tools === 2 && /two animals/i.test(lesson.coach), JSON.stringify(lesson));
   check('the lesson pairs the animal coming home with a different kind already home', !!lesson.cast.b && lesson.cast.a !== lesson.cast.b, JSON.stringify(lesson.cast));
   await reachPairs(25);
   await page.evaluate(() => window.__pt.go({ screen: 'home' }));

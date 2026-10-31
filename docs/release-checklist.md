@@ -23,11 +23,12 @@
 - [ ] Upgrade test: install v1 build, play to level ~14, install Pawtopia over it → progress, coins, pets carried over once
 
 ### D36 (Journey / World / controls review) — not yet checked on a device
-- [ ] One-tap controls on a real finger: no accidental placements while scrolling the Journey, no marks while panning a
-      Large board; the ✕ drag marks exactly the tiles under the finger; a tap on a placed animal never erases
-- [ ] Two-animal boards: five controls in a row (two animals, ✕, Erase, Hint) legible and tappable at 320 and 375
-- [ ] Existing save on a device: the one-time "one tap places" card shows once; Settings → Controls → *Tap ✕, double-tap*
-      restores the old feel; a save that chose *Tap cycle* is untouched
+- [ ] (D37) Tap ✕ / double-tap on a real finger: the double-tap window (380 ms) feels right; no marks while panning a
+      Large board; a ✕ drag marks exactly the tiles under the finger; a tap on a placed animal never erases it
+- [ ] (D37) Mistake marks: a red ✕ (one-animal board, or both animals tried) and the struck animal (two-animal board)
+      are legible at 320 and in High contrast; Erase leaves them; the same wrong double-tap twice costs one heart
+- [ ] (D37) Hint shows the hint count; dots appear on Easy boards only
+- [ ] Existing save on a device: progress untouched; a save that chose *Tap cycle* keeps it
 - [ ] Journey: goal card, level and Continue visible without scrolling on an SE (375×667) with the tab bar; Daily/Zen
       a swipe below
 - [ ] World: goal panel and Play above the map on an SE; map pins tappable; "New" dot visible on the tab
@@ -35,10 +36,11 @@
       were, at the same scroll position; a tab tap starts afresh
 - [ ] Win sheet: ordinary win is quick (one button); an arrival/region/stage shows the hero; both scroll under
       Dynamic Type; reduced motion skips the hero pop
-- [ ] VoiceOver: tool buttons announce "Sheep: a tap places a sheep", "Mark empty…", "Erase…"; the World tab announces
+- [ ] VoiceOver: animal buttons announce "Sheep: a double tap places a sheep"; mistakes read "a mistake, no animal here"
+      or "not a cat, a mistake"; Hint reads the count; the World tab announces
       "something new to see" when a marker is set; the win sheet's main action is the first thing focused
 - [ ] Level 21 bridge sheet reads well on a small phone; "Show me" lands on the glowing tile
-- [ ] First run: the Farm welcome, Cotton on the tile, "Meet Cotton" → one tap places on the first board
+- [ ] First run: the Farm welcome, Cotton on the tile, "Meet Cotton" → the guided board says to double-tap
 - [ ] Interrupt mid-gesture (call, notification) during a ✕ drag: no stray marks; background during the win sheet →
       the credit is recorded once (`world.credits`)
 - [ ] Five-player usability script (docs/DECISIONS.md D36, §10 of the review plan): tasks 1–5 without coaching
