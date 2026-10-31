@@ -25,7 +25,6 @@ import { sfx } from '../../services/audio';
 import { track } from '../../services/analytics';
 import { miniBoard } from '../components/board';
 import { coinPill } from '../components/wallet';
-import { controlsNoticeMarkup, handleControlsNotice } from '../components/notices';
 import { actionOf, capitalize, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { CanonicalRoute, Scope, ScreenDef } from '../router';
@@ -304,7 +303,6 @@ function mountHub(root: HTMLElement, scope: Scope): void {
         </div>
       </div>
 
-      ${controlsNoticeMarkup()}
       ${
         !save.onboarding.seenPantryIntro && save.onboarding.tutorialDone
           ? `<section class="card pantry-intro" data-pantry-intro aria-labelledby="pantry-title">
@@ -450,7 +448,6 @@ function mountHub(root: HTMLElement, scope: Scope): void {
     }
     const a = actionOf(e);
     if (!a) return;
-    if (handleControlsNotice(a.act, el, scope)) return;
     switch (a.act) {
       case 'pantry-ok':
         app.save.onboarding.seenPantryIntro = true;

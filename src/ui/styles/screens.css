@@ -642,10 +642,10 @@
   transform: translateY(1px);
 }
 
-/* ---------- Board controls (D35, D36) ----------
-   One row. Place scheme (default): the tool bar (animal(s), ✕, Erase; one pressed) and Hint. Tap and tap-cycle
-   schemes: one-animal boards have Erase and Hint; two-animal boards add the two animal buttons (which animal a double
-   tap places). Erase is a mode there, shown pressed while it's on. */
+/* ---------- Board controls (D35, D37) ----------
+   One row. One-animal boards: Erase and Hint. Two-animal boards: the two animal buttons (which animal a double tap
+   places), then Erase and Hint. No separate ✕ button: a tap marks. Erase is a mode, shown pressed while it's on, and
+   only takes ✕ marks back. Hint carries the player's hint count. */
 .controls {
   display: flex;
   gap: 6px;
@@ -657,29 +657,15 @@
 .controls .tools {
   flex: 2.2;
 }
-.controls--place .tools {
-  flex: 3.3;
-}
-.controls--place.controls--solo .tools {
-  flex: 2.6;
-}
 .controls .act {
   flex: 1;
   min-height: 68px;
 }
-.controls--solo:not(.controls--place) .act {
+.controls--solo .act {
   min-height: 60px;
   flex-direction: row;
   gap: 8px;
   font-size: 15px;
-}
-.tool--mark[aria-checked='true'] {
-  color: var(--ink);
-}
-/* The ✕ tool is on: the board's edge says so, with the same dashed ring Erase uses. */
-.game.is-marking .board {
-  outline: 2px dashed var(--muted-ink);
-  outline-offset: 3px;
 }
 .act--erase[aria-pressed='true'] {
   background: var(--brand-tint);
@@ -1113,22 +1099,22 @@
   box-shadow: 0 0 0 2px var(--canvas);
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 2px;
-  padding: 0 5px;
-  min-height: 18px;
+  padding: 0 6px;
+  min-width: 22px;
+  min-height: 22px;
   border-radius: 999px;
-  background: var(--canvas-deep);
-  color: var(--ink);
-  font-size: 11px;
+  /* The player's hint count (D37): gold like the hint bulb, so it reads as "yours to spend". */
+  background: var(--gold-soft);
+  color: var(--gold-ink);
+  border: 1px solid #ecd9b0;
+  font-size: 12px;
   font-weight: 800;
 }
 .act__badge .ico {
   width: 14px;
   height: 14px;
-}
-.act__badge.is-free {
-  background: var(--brand-tint);
-  color: var(--brand-dark);
 }
 .act:disabled .act__badge {
   opacity: 0.5;
@@ -1171,26 +1157,3 @@
   opacity: 0.85;
 }
 
-/* ---------- One-time notices on the hub (D36) ---------- */
-.notice-card h2 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--t-lg);
-}
-.notice-card h2 .ico {
-  width: 20px;
-  height: 20px;
-  color: var(--brand-dark);
-}
-.notice-card p {
-  margin: var(--s2) 0 0;
-}
-.notice-card__actions {
-  display: flex;
-  gap: var(--s2);
-  margin-top: var(--s3);
-}
-.notice-card__actions .btn {
-  flex: 1;
-}

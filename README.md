@@ -4,8 +4,8 @@
 
 Pawtopia is a cozy, portrait-first logic puzzle for iPhone. For the first 20 levels every row, column and color region
 needs exactly **one animal**, and animals never touch, not even at a corner. From level 21 each line holds **two
-animals**, one of each kind, never side by side. Every board has one answer you can reach by logic alone. Pick a tool
-under the board (the animal, ✕ or Erase) and tap a tile; one tap places the animal.
+animals**, one of each kind, never side by side. Every board has one answer you can reach by logic alone. Tap a tile
+to mark it ✕; double-tap to place the animal. A wrong guess costs a heart and stays marked in red.
 
 Every puzzle you solve builds a sanctuary: the Farm first (a sheep, a piglet, a calf, a goat kid, a chick, a pony),
 then the Pet Garden's bunny, cats and dogs, then the Outback, Savanna, Arctic and Amazon as the Journey opens them.
@@ -30,7 +30,7 @@ puzzle engine, its tests and every v1 board are preserved, and v1 saves migrate 
 | **Sanctuaries** | The Farm and the Pet Garden from the start, four regions later. Each grows with every puzzle you solve, with its own animals, treats and decorations; animals ride the tire swing, the tractor, the balloon. 3D soft toys. |
 | **Animals** | 27 original animals with personalities that shape their expressions, collected sanctuary by sanctuary in the Animal album. |
 | **Meta** | Free Paw Coins on an idempotent ledger, 3 daily missions + 1 weekly, 12 badges, a Journal of stats. |
-| **Comfort** | One-tap controls (animal, ✕ and Erase tools), or tap / double-tap, or the tap cycle; left-handed layout, reduced motion, high contrast, region patterns, large board mode, VoiceOver labels, offline play, no sign-in. |
+| **Comfort** | Tap ✕ / double-tap to place (or the timing-free tap cycle); Erase takes ✕ marks back; dots on impossible tiles on Easy boards; left-handed layout, reduced motion, high contrast, region patterns, large board mode, VoiceOver labels, offline play, no sign-in. |
 
 ## Run it
 

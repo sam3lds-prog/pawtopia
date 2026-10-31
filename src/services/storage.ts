@@ -45,12 +45,11 @@ export interface ProgressV1 {
 
 export type ReducedMotionPref = 'system' | 'reduce' | 'full';
 /**
- * 'place' (default since D36): one tap places the picked animal; a ✕ tool marks. 'tap' (D35's default): tap marks ✕,
- * double-tap places. 'classic': tap cycle (empty → ✕ → animal → empty), no timing at all.
+ * 'tap' (default; D35, again from D37): a tap marks ✕, a double tap places the picked animal. 'classic': the tap cycle,
+ * with no timing (for VoiceOver and Switch Control). D36's one-tap 'place' scheme was retired in D37; saves that had it
+ * (or the older 'tools' spelling) play with 'tap'.
  */
-export type ControlScheme = 'place' | 'tap' | 'classic';
-/** Control schemes a save may name, including retired spellings that map onto a current one. */
-const CONTROL_SCHEMES = ['place', 'tap', 'classic'] as const;
+export type ControlScheme = 'tap' | 'classic';
 
 export interface Settings {
   autoMark: boolean;
@@ -62,8 +61,6 @@ export interface Settings {
   regionPatterns: boolean;
   leftHanded: boolean;
   controls: ControlScheme;
-  /** 2: `controls` was set under D36's choices ('place' default). 1 (or missing): under D35's, where 'tap' was the default. */
-  controlsVersion: 1 | 2;
   showTimer: boolean;
   largeBoard: boolean;
   /** Sanctuary animals as 3D toys (D34); off draws them flat, like before. */
@@ -225,8 +222,6 @@ export interface SaveV2 {
     pairLessonDone: boolean;
     /** The save's levels just moved up for D35 and the player hasn't been told yet. */
     ladderNotice: boolean;
-    /** The default controls changed under this player (D36: one tap places) and they haven't been told yet. */
-    controlsNotice: boolean;
     /** The World's one-line explanation (one home grows at a time) has been dismissed. */
     worldTipSeen: boolean;
     /** The sanctuary's "try tapping an animal" cue has been acted on or dismissed. */
@@ -270,8 +265,7 @@ export function defaultSettings(): Settings {
     highContrast: false,
     regionPatterns: false,
     leftHanded: false,
-    controls: 'place',
-    controlsVersion: 2,
+    controls: 'tap',
     showTimer: true,
     largeBoard: false,
     toys3d: true,
@@ -374,7 +368,6 @@ export function defaultSave(now = new Date()): SaveV2 {
       pairRulesSeen: false,
       pairLessonDone: false,
       ladderNotice: false,
-      controlsNotice: false,
       worldTipSeen: false,
       sceneTapTipSeen: false,
       decorTipSeen: false,
@@ -420,9 +413,8 @@ function normSettings(x: unknown): Settings {
     highContrast: bool(x.highContrast, d.highContrast),
     regionPatterns: bool(x.regionPatterns, d.regionPatterns),
     leftHanded: bool(x.leftHanded, d.leftHanded),
-    // D35 folded the first pick-a-tool scheme ('tools') into 'tap'; D36 brings it back as 'place', so 'tools' maps there.
-    controls: x.controls === 'tools' ? 'place' : oneOf(x.controls, CONTROL_SCHEMES, d.controls),
-    controlsVersion: x.controlsVersion === 2 ? 2 : 1,
+    // The tap cycle is kept as chosen; anything else ('tap', D36's 'place', the older 'tools') plays tap / double-tap.
+    controls: x.controls === 'classic' ? 'classic' : 'tap',
     showTimer: bool(x.showTimer, d.showTimer),
     largeBoard: bool(x.largeBoard, d.largeBoard),
     toys3d: bool(x.toys3d, d.toys3d),
@@ -522,17 +514,6 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
   const d = defaultSave(now);
   if (!isObj(x)) return d;
   const settings = normSettings(x.settings);
-  // D36: one tap places became the default. A player who was on D35's default ('tap', never a choice they made under
-  // the new options) moves with the default and is told once; 'classic' was chosen on purpose and stays. A save that
-  // never played has nothing to be told about.
-  let controlsMoved = false;
-  if (settings.controlsVersion !== 2) {
-    if (settings.controls === 'tap') {
-      settings.controls = 'place';
-      controlsMoved = true;
-    }
-    settings.controlsVersion = 2;
-  }
   const j = isObj(x.journey) ? x.journey : {};
   const dl = isObj(x.daily) ? x.daily : {};
   const z = isObj(x.zen) ? x.zen : {};
@@ -666,7 +647,6 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       pairRulesSeen: bool(ob.pairRulesSeen, ob.seenRules === true && ob.tutorialDone === true),
       pairLessonDone: bool(ob.pairLessonDone, isObj(x.journey) && int(x.journey.nextLevel, 1) > 21),
       ladderNotice: bool(ob.ladderNotice, false),
-      controlsNotice: bool(ob.controlsNotice, controlsMoved && (ob.tutorialDone === true || int(ob.sessions, 0) > 0)),
       worldTipSeen: bool(ob.worldTipSeen, false),
       sceneTapTipSeen: bool(ob.sceneTapTipSeen, false),
       decorTipSeen: bool(ob.decorTipSeen, false),

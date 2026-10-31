@@ -645,3 +645,33 @@ every Journey, Daily and Zen solve counts (replays too); the Paw Cup never does.
 - Hardening tests from the independent review: Large board mode pans without marking or placing; a ✕ drag changes
   exactly the tiles under the finger; tool buttons and cells carry screen-reader labels; reduced motion skips the color
   glow; with no video network the loss sheet offers no video and the Journey loop still runs.
+
+## 2026-10-31 · D37 — One gesture: tap marks, double-tap places; mistakes stay marked (revises D36's controls)
+Owner decisions (2026-10-31, after play-testing D36): a single action for marking and placing. One tap marks a tile
+✕; a double tap places the animal if it belongs there. A wrong animal costs a heart and leaves an error mark. Two-animal
+boards keep an animal button for each animal below the board and no separate ✕ button: pick the animal, tap to mark,
+double-tap to place. Erase takes back ✕ marks only, never placed animals or mistakes. The Hint button shows how many
+hints the player has. The dots on tiles no animal can reach show on Easy boards only.
+
+- **One scheme, plus the tap cycle** (`storage.ControlScheme = 'tap' | 'classic'`): D36's one-tap tool bar (`place`)
+  is retired, with its one-time notice (`components/notices.ts`, `onboarding.controlsNotice`, `settings.controlsVersion`
+  all removed). Every save plays tap / double-tap (`place` and the older `tools` map to `tap`), except a save that chose
+  the tap cycle, which stays: it needs no quick double tap, for VoiceOver and Switch Control.
+- **Mistakes stay on the board** (`Session.errorsAt`, `hasError`; `SessionSnapshot.errors`; `Board` `ErrorMark`): a wrong
+  animal is remembered on its tile. On a one-animal board, or when both animals were tried on a two-animal board, the
+  mark is a red ✕ (no animal lives there). When only one animal was tried on a two-animal board, the mark is that
+  animal, faded and struck through in red: it says "no cat here", not "empty", because the other animal may live there
+  (the reason D36 stopped writing a plain ✕ for wrong guesses), and the other animal can still be placed on it. The
+  mark replaces the player's own ✕ on that tile. It is a record of a paid mistake, not a board change: Undo, Erase and
+  drag-marking never touch it, and restoring a save keeps only marks that are true. Trying the same wrong animal on the
+  same tile again does nothing and costs nothing. The move log is unchanged (a wrong guess is still one `place`
+  event), so the server's replay check and Paw Cup scoring are untouched.
+- **Erase is ✕-only** (`game.ts::eraseAt`): with Erase on, a tap (or a drag) takes ✕ marks back; on an animal or a
+  mistake it says why it stays. Placed animals are always right (a wrong one never settles), so nothing is lost; Undo
+  in the pause sheet still takes back the last move.
+- **Hint count** (`game.ts::paint`): the badge on Hint is always the player's hints. When the next look costs nothing
+  (each board's first look, Zen, the guided boards), the button says "Free hint".
+- **Dots on Easy boards only** (`showDots`): the "Dot impossible tiles" setting now applies to boards measured Easy;
+  on Medium and harder boards, marking is the player's to do.
+- Copy follows: the coach line, the guided boards ("double-tap it"), How to play and the level-21 bridge ("Tap a tile
+  to mark it ✕. Double-tap to place… A wrong guess costs a heart and is marked in red"), Settings.

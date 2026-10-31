@@ -1,10 +1,11 @@
 /**
- * The play screen: top bar, the board (hero), one coach line, and the controls. Three schemes (Settings → Controls):
- *  - 'place' (default, D36): a tool bar below the board, one tool pressed at a time: the board's animal(s), ✕ (mark
- *    empty, finger-drag marks a run of tiles) and Erase. One tap on a tile applies the tool; a wrong animal costs a
- *    heart and leaves the tile as it was. Tapping a placed animal does nothing but say so (Erase takes it back).
- *  - 'tap' (D35): tap marks ✕, double-tap places the picked animal; Erase is a toggle.
- *  - 'classic': each tap cycles empty → ✕ → animal → empty; no timing at all.
+ * The play screen: top bar, the board (hero), one coach line, and the controls (D37). One gesture does both jobs:
+ *  - 'tap' (default): a tap marks a tile ✕ (a finger drag marks a run); a double tap places the animal. On two-animal
+ *    boards the two animal buttons below the board pick which one a double tap places; there is no separate ✕ button.
+ *    A wrong animal costs a heart and leaves a mistake mark on the tile (red ✕, or the struck animal on a two-animal
+ *    board). Erase takes back ✕ marks only: placed animals and mistakes stay.
+ *  - 'classic': no timing at all (for VoiceOver and Switch Control): a tap marks ✕, a second tap places.
+ * Hint shows how many hints you have. Dots on tiles no animal can reach appear on Easy boards only.
  * The board shows the animal you're bringing home to the sanctuary the board is for (meta/cast.ts).
  */
 
@@ -41,7 +42,7 @@ import { FaceDirector, lookToward, type Clock } from '../animation/faceDirector'
 import type { ReactionMood } from '../animation/faceMachine';
 import { isPairLesson, isTutorial, levelTip, TUTORIAL_STEPS } from '../../meta/onboarding';
 import { EMPTY } from '../../engine/types';
-import { Board } from '../components/board';
+import { Board, type ErrorMark } from '../components/board';
 import { openSheet, toast, type SheetHandle } from '../components/sheet';
 import { actionOf, capitalize, esc, h, plural, qs } from '../dom';
 import { ICON } from '../icons';
@@ -89,13 +90,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   const settings = app.settings;
   const scheme = settings.controls;
   const classic = scheme === 'classic';
-  /** One tap applies the pressed tool (D36). The other schemes mark with a tap and place with a double tap or a cycle. */
-  const placeScheme = scheme === 'place';
-  // Which animal a tap (or a double tap) places: always the one animal on a one-animal board; on two-animal boards the
-  // one the player picked last. In the place scheme the ✕ and Erase tools live here too, one tool pressed at a time.
+  // Which animal a double tap (or the tap cycle) places: always the one animal on a one-animal board; on two-animal
+  // boards the one the player picked last.
   let tool: Tool = solo ? 'cat' : settings.lastSpecies;
-  /** Erase is a mode: while it's on, taps take things back. In the place scheme it is simply the Erase tool. */
+  /** Erase is a mode: while it's on, taps take ✕ marks back (never animals or mistakes). */
   let erasing = false;
+  /** Dots on tiles no animal can reach: a help for Easy boards only (D37); harder boards are the player's to mark. */
+  const showDots = settings.autoMark && profile.tier === 'easy';
   let lastTap: { r: number; c: number; t: number; marked: boolean } | null = null;
   let hint: { info: HintInfo; tier: 1 | 2 } | null = null;
   let finished = false;
@@ -138,13 +139,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         </div>
       </div>
       <div class="controls controls--${solo ? 'solo' : 'pair'} controls--${scheme}">
-        ${
-          placeScheme
-            ? `<div class="tools tools--place" role="radiogroup" aria-label="Tool: what a tap does">${animalButton(CAT)}${solo ? '' : animalButton(DOG)}<button class="tool tool--mark" role="radio" data-tool="mark" aria-label="Mark empty: a tap marks a tile ✕, a drag marks a run of tiles"><span class="tool__art tool__art--icon">${ICON.mark}</span><span class="tool__label">Mark</span></button><button class="tool tool--erase" role="radio" data-tool="erase" aria-label="Erase: a tap takes an animal or a ✕ back"><span class="tool__art tool__art--icon">${ICON.erase}</span><span class="tool__label">Erase</span></button></div>`
-            : `${solo ? '' : `<div class="tools" role="radiogroup" aria-label="Animal a double tap places">${animalButton(CAT)}${animalButton(DOG)}</div>`}
-        <button class="act act--erase" data-act="erase" aria-pressed="false">${ICON.erase}<span>Erase</span></button>`
-        }
-        <button class="act" data-act="hint" ${rules.hints ? '' : 'disabled aria-describedby="no-hints"'}>${rules.hints ? ICON.bulb : ICON.hint}<span data-hint-label>Hint</span>${rules.hints && !freeHints ? '<span class="act__badge" data-hint-badge></span>' : ''}</button>
+        ${solo ? '' : `<div class="tools" role="radiogroup" aria-label="Animal a ${classic ? 'second tap' : 'double tap'} places">${animalButton(CAT)}${animalButton(DOG)}</div>`}
+        <button class="act act--erase" data-act="erase" aria-pressed="false">${ICON.erase}<span>Erase</span></button>
+        <button class="act" data-act="hint" ${rules.hints ? '' : 'disabled aria-describedby="no-hints"'}>${rules.hints ? ICON.bulb : ICON.hint}<span data-hint-label>Hint</span>${rules.hints ? '<span class="act__badge" data-hint-badge></span>' : ''}</button>
       </div>
       ${rules.hints ? '' : '<p id="no-hints" class="sr-only">Hints are off in Paw Cup so every player has the same rules.</p>'}
     </div>`);
@@ -152,7 +149,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   function animalButton(sp: Species): string {
     const word = wordOf(sp);
-    const does = placeScheme ? `a tap places ${withArticle(word)}` : `double tap places ${withArticle(word)}`;
+    const does = classic ? `a second tap places ${withArticle(word)}` : `a double tap places ${withArticle(word)}`;
     return `<button class="tool" role="radio" data-tool="${sp === CAT ? 'cat' : 'dog'}" aria-label="${esc(capitalize(word))}: ${esc(does)}"><span class="tool__art">${animalSvg(animalOf(sp))}</span><span class="tool__label">${esc(capitalize(word))}</span></button>`;
   }
 
@@ -191,6 +188,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         return id ? animalInfo(id).name : null;
       },
       speciesName: (sp) => wordOf(sp),
+      triedArt: (sp) => animalSvg(animalOf(sp)),
     },
   );
   stage.appendChild(board.el);
@@ -206,8 +204,23 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   // ---------------------------------------------------------------- rendering
 
+  /**
+   * Mistake marks for the board (D37). One animal tried and wrong on a one-animal board, or both on a two-animal board,
+   * means no animal lives there: a red ✕. One animal tried on a two-animal board only rules out that animal, so the
+   * mark is that animal, struck through (a red ✕ there would wrongly say the tile is empty).
+   */
+  function errorView(): ErrorMark[][] {
+    return s.cells.map((row, r) =>
+      row.map((_, c) => {
+        const tried = s.errorsAt(r, c);
+        if (!tried.length) return 0;
+        return solo || tried.length > 1 ? 'x' : tried[0];
+      }),
+    );
+  }
+
   function paint(): void {
-    board.render({ cells: s.cells, givenMask: s.givenMask, dead: settings.autoMark ? s.deadCells() : null });
+    board.render({ cells: s.cells, givenMask: s.givenMask, dead: showDots ? s.deadCells() : null, errors: errorView() });
     progressEl.innerHTML = `${s.placedCount()} of ${total} <span class="status-word">${total === 1 ? 'animal' : 'animals'}</span> placed`;
     if (heartsEl) {
       heartsEl.dataset.max = String(s.maxHearts);
@@ -217,25 +230,19 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         pantryOn ? `${plural(s.hearts, 'heart')} left. Extra lives: ${lives()}. Tap to use one.` : `${plural(s.hearts, 'heart')} left`,
       );
     }
-    for (const b of el.querySelectorAll<HTMLButtonElement>('[data-tool]')) {
-      b.setAttribute('aria-checked', String(placeScheme ? b.dataset.tool === tool : b.dataset.tool === tool && !erasing));
-      if (placeScheme) b.disabled = finished;
-    }
+    for (const b of el.querySelectorAll<HTMLButtonElement>('[data-tool]')) b.setAttribute('aria-checked', String(b.dataset.tool === tool && !erasing));
     const eb = el.querySelector('[data-act="erase"]') as HTMLButtonElement | null;
     if (eb) {
       eb.setAttribute('aria-pressed', String(erasing));
       eb.disabled = finished;
     }
     el.classList.toggle('is-erasing', erasing);
-    el.classList.toggle('is-marking', placeScheme && tool === 'mark');
     const hintLabel = el.querySelector('[data-hint-label]');
-    // Three steps, named for what they do: a look, the reason, the placement.
-    if (hintLabel) hintLabel.textContent = !hint ? 'Hint' : hint.tier === 1 ? 'Explain' : 'Place it';
     const badge = el.querySelector('[data-hint-badge]') as HTMLElement | null;
-    if (badge) {
-      // What the next tap costs: the board's first look is free; otherwise one ticket per hint target.
-      // With no hint open, ask what the next look would cost for the cell it would point at (it may already be paid
-      // for, or be the free look's cell).
+    if (badge && hintLabel) {
+      // What the next tap costs: the board's first look is free; otherwise one hint per hint target. With no hint
+      // open, ask what the next look would cost for the cell it would point at (it may already be paid for, or be the
+      // free look's cell).
       let nextIsFree: boolean;
       if (hint) nextIsFree = s.hintCost(hint.info, (hint.tier + 1) as 2 | 3, freeHints) === 0;
       else if (s.freeNudgeAvailable) nextIsFree = true;
@@ -243,14 +250,14 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         const next = finished ? null : s.peekHint();
         nextIsFree = !!next && s.hintCost(next, 1, freeHints) === 0;
       }
-      badge.innerHTML = nextIsFree ? 'Free' : `<span class="num">${tickets()}</span>`;
+      // Three steps, named for what they do: a look, the reason, the placement. A free first look says so.
+      hintLabel.textContent = !hint ? (nextIsFree && !freeHints ? 'Free hint' : 'Hint') : hint.tier === 1 ? 'Explain' : 'Place it';
+      // The badge is always the player's hints, so they can see what they've saved up (D37).
+      badge.innerHTML = `<span class="num">${tickets()}</span>`;
       badge.classList.toggle('is-free', nextIsFree);
-      const hb = badge.closest('button')!;
-      hb.setAttribute(
+      badge.closest('button')!.setAttribute(
         'aria-label',
-        nextIsFree
-          ? `${hintLabel?.textContent ?? 'Hint'}, free`
-          : `${hintLabel?.textContent ?? 'Hint'}, uses one of your hints. ${plural(tickets(), 'hint')} left`,
+        `${hintLabel.textContent}, ${nextIsFree ? 'free this time' : 'uses one hint'}. You have ${plural(tickets(), 'hint')}.`,
       );
     }
     tick();
@@ -272,8 +279,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     const word = wordOf(info.species);
     const name = animalInfo(animalOf(info.species)).name;
     // How the player places an animal under their controls.
-    const tapIt = placeScheme ? 'tap it' : classic ? 'tap it twice (once marks ✕, again places)' : 'double-tap it';
-    const tapGlow = placeScheme ? 'Tap the glowing tile.' : classic ? 'Tap the glowing tile twice.' : 'Double-tap the glowing tile.';
+    const tapIt = classic ? 'tap it twice (once marks ✕, again places)' : 'double-tap it';
+    const tapGlow = classic ? 'Tap the glowing tile twice.' : 'Double-tap the glowing tile.';
     let text: string;
     if (solo)
       text =
@@ -370,12 +377,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     if (tip) return tip;
     if (mode.kind === 'zen') return 'No clock, no hearts. Take all the time you like.';
     if (classic) return solo ? `Tap once to mark a tile ✕, again to place ${aWord(CAT)}.` : `Tap once to mark a tile ✕, again to place the animal you picked.`;
-    if (placeScheme) {
-      if (solo) return `One ${wordOf(CAT)} in every row, column and color, never touching. Tap a tile to place ${aWord(CAT)}; the ✕ tool marks empty tiles.`;
-      return `One ${wordOf(CAT)} and one ${wordOf(DOG)} in every row, column and color. Pick an animal below, then tap a tile.`;
-    }
     if (solo) return `One ${wordOf(CAT)} in every row, column and color, never touching. Tap to mark ✕, double-tap to place.`;
-    return `One ${wordOf(CAT)} and one ${wordOf(DOG)} in every row, column and color. Double-tap places the one you picked.`;
+    return `One ${wordOf(CAT)} and one ${wordOf(DOG)} in every row, column and color. Pick one below: tap marks ✕, double-tap places it.`;
   }
 
   // ---------------------------------------------------------------- input
@@ -387,43 +390,37 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     faces.activity();
     if (erasing) {
       lastTap = null;
-      handle(s.apply(r, c, 'erase'), r, c);
-      return null;
+      // Erase takes back ✕ marks only; the finger can keep going to clear a run of them.
+      return eraseAt(r, c) ? 'unmark' : null;
     }
-    if (placeScheme) {
-      if (tool === 'mark') {
-        // The ✕ tool: a tap toggles ✕; the finger can keep going to mark (or clear) a run of tiles.
-        const res = s.toggleMark(r, c);
-        handle(res, r, c);
-        if (res.marked) return 'mark';
-        if (res.unmarked) return 'unmark';
-        return null;
-      }
-      const v = s.cells[r][c];
-      // A placed animal is never taken away by an accidental tap: the coach says how (Erase).
-      if (v === CAT || v === DOG) handle({ ignored: true }, r, c);
-      else placeAt(r, c);
+    const v = s.cells[r][c];
+    if (v === CAT || v === DOG) {
+      lastTap = null;
+      handle({ ignored: true }, r, c);
       return null;
     }
     if (classic) {
-      handle(s.tap(r, c, species()), r, c);
+      // No timing: an empty tile takes a ✕; a ✕ (or a tile with a mistake for the other animal) takes the animal.
+      if (v === MARK || s.errorsAt(r, c).length) tryPlace(r, c, species());
+      else handle(s.toggleMark(r, c), r, c);
       return null;
     }
     const now = performance.now();
-    const v = s.cells[r][c];
     // A second tap on the same tile, quickly: place the animal. The first tap's ✕ is taken back with a logged undo,
     // so one Undo afterwards empties the tile (and the server's replay sees exactly the same moves).
-    if (lastTap && lastTap.r === r && lastTap.c === c && now - lastTap.t < DOUBLE_TAP_MS && v !== CAT && v !== DOG) {
+    if (lastTap && lastTap.r === r && lastTap.c === c && now - lastTap.t < DOUBLE_TAP_MS) {
       const ownMark = lastTap.marked;
       lastTap = null;
       const last = s.lastChange();
       if (ownMark && v === MARK && last && last.r === r && last.c === c && last.before === EMPTY && last.after === MARK) s.undo();
-      placeAt(r, c);
+      tryPlace(r, c, species());
       return null;
     }
-    if (v === CAT || v === DOG) {
-      lastTap = null;
-      handle({ ignored: true }, r, c);
+    // A tile with a mistake mark keeps it: a single tap only starts a possible double tap (the other animal may live
+    // there on a two-animal board).
+    if (s.errorsAt(r, c).length) {
+      lastTap = { r, c, t: now, marked: false };
+      coach(mistakeLine(r, c));
       return null;
     }
     const res = s.toggleMark(r, c);
@@ -436,16 +433,47 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   }
 
   /**
-   * Places the picked animal. A wrong guess costs a heart and nothing else: the tile keeps whatever it held (empty, or
-   * the player's own ✕). It is never marked for them: on a two-animal board the tile may hold the other animal, and a
-   * ✕ the player didn't make would mislead them (or give the answer away).
+   * Tries an animal on a tile. Right: it settles there. Wrong: a heart is lost and the tile keeps a mistake mark (D37):
+   * a red ✕ when no animal can live there, or the struck animal on a two-animal board. Trying the same wrong animal on
+   * the same tile again does nothing and costs nothing: a double-fired tap is never charged twice.
    */
-  function placeAt(r: number, c: number): void {
-    handle(s.place(r, c, species()), r, c);
+  function tryPlace(r: number, c: number, sp: Species): void {
+    if (s.hasError(r, c, sp)) {
+      coach(`You already tried ${withArticle(wordOf(sp))} here. ${s.errorsAt(r, c).length > 1 || solo ? 'No animal lives on this tile.' : 'Try somewhere else.'}`);
+      return;
+    }
+    const res = s.place(r, c, sp);
+    // The mistake mark replaces the player's ✕ on that tile (one mark per tile, and this one is earned).
+    if (res.wrong && s.cells[r][c] === MARK) s.unmarkIfMarked(r, c);
+    handle(res, r, c);
+  }
+
+  /** Erase: a ✕ comes back off; animals and mistakes stay. Returns whether a ✕ was taken back. */
+  function eraseAt(r: number, c: number): boolean {
+    if (s.unmarkIfMarked(r, c)) {
+      haptic('tap');
+      afterChange();
+      return true;
+    }
+    const v = s.cells[r][c];
+    if (s.givenMask[r][c]) handle({ ignored: true }, r, c);
+    else if (v === CAT || v === DOG) coach(`Erase only takes back ✕ marks. The ${wordOf(v)} stays; Undo (in Pause) takes back your last move.`);
+    else if (s.errorsAt(r, c).length) coach('Mistakes stay marked: they show where an animal was tried and didn’t belong.');
+    return false;
+  }
+
+  /** What a mistake mark means, in one line. */
+  function mistakeLine(r: number, c: number): string {
+    const tried = s.errorsAt(r, c);
+    if (solo || tried.length > 1) return 'A mistake was marked here: no animal lives on this tile.';
+    const other = tried[0] === CAT ? DOG : CAT;
+    return `No ${wordOf(tried[0])} here. If ${aWord(other)} lives here, pick it below and double-tap.`;
   }
 
   function onDrag(r: number, c: number, m: 'mark' | 'unmark'): void {
     if (finished) return;
+    // Drag-marking passes over mistake marks and animals; drag-erasing only lifts ✕ marks.
+    if (m === 'mark' && s.errorsAt(r, c).length) return;
     const changed = m === 'mark' ? s.markIfEmpty(r, c) : s.unmarkIfMarked(r, c);
     if (changed) {
       haptic('select');
@@ -455,15 +483,16 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   function onKey(r: number, c: number, key: string): boolean {
     const k = key.toLowerCase();
-    // Enter applies the pressed tool (the picked animal; in the place scheme also ✕ or Erase); Space (or X) marks ✕;
-    // 1 and 2 place the first or second animal directly.
-    if (k === 'enter') return keyApply(r, c, placeScheme && (tool === 'mark' || tool === 'erase') ? tool : species() === DOG ? 'dog' : 'cat');
+    // Enter places the picked animal; Space (or X) marks ✕; 1 and 2 place the first or second animal directly;
+    // Delete takes a ✕ back.
+    if (k === 'enter') return keyApply(r, c, species() === DOG ? 'dog' : 'cat');
     if (k === '1' || k === 'a') return keyApply(r, c, 'cat');
     if (!solo && (k === '2' || k === 'b')) return keyApply(r, c, 'dog');
     if (k === ' ' || k === 'x' || k === '.') {
       if (finished || s.paused) return true;
       faces.activity();
-      handle(s.toggleMark(r, c), r, c);
+      if (s.errorsAt(r, c).length) coach(mistakeLine(r, c));
+      else handle(s.toggleMark(r, c), r, c);
       return true;
     }
     if (k === 'backspace' || k === 'delete' || k === '0' || k === 'e') return keyApply(r, c, 'erase');
@@ -488,14 +517,15 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     if (t === 'cat' || t === 'dog') {
       const v = s.cells[r][c];
       if (v === CAT || v === DOG) handle({ ignored: true }, r, c);
-      else handle(s.place(r, c, t === 'dog' ? DOG : CAT), r, c); // a wrong guess leaves the tile as it was (see placeAt)
+      else tryPlace(r, c, t === 'dog' ? DOG : CAT);
       return true;
     }
     if (t === 'mark') {
-      handle(s.toggleMark(r, c), r, c);
+      if (s.errorsAt(r, c).length) coach(mistakeLine(r, c));
+      else handle(s.toggleMark(r, c), r, c);
       return true;
     }
-    handle(s.apply(r, c, t), r, c);
+    eraseAt(r, c);
     return true;
   }
 
@@ -503,7 +533,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     if (res.ignored) {
       const v = s.cells[r][c];
       if (s.givenMask[r][c]) coach(`This ${wordOf(v === DOG ? DOG : CAT)} is already home. Its spot is locked.`);
-      else if (v === CAT || v === DOG) coach(`That ${wordOf(v)} is settled. Pick Erase to take it back.`);
+      else if (v === CAT || v === DOG) coach(`That ${wordOf(v)} is home to stay.`);
       return;
     }
     let react: (() => void) | undefined;
@@ -557,8 +587,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       coach(`Not quite. That tile can't hold ${withArticle(word)}.`);
       const g = guide;
       scope.timeout(() => guide === g && coachGuide(g.text), 1800);
-    } else if (!rules.hearts) coach(`Not ${withArticle(word)} spot. No rush: try another row, column or color.`);
-    else if (s.hearts > 0) coach(`Not ${withArticle(word)} spot. Try another row, column or color. ${plural(s.hearts, 'heart')} left.`);
+    } else if (!rules.hearts) coach(`Not ${withArticle(word)} spot, so it's marked. No rush: try another row, column or color.`);
+    else if (s.hearts > 0) coach(`Not ${withArticle(word)} spot, so it's marked. ${plural(s.hearts, 'heart')} left.`);
   }
 
   function onUnits(units: UnitRef[]): void {
@@ -810,10 +840,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     const t = (e.target as HTMLElement).closest('[data-tool]') as HTMLElement | null;
     if (t) {
       if (finished) return;
-      const picked = t.dataset.tool as Tool;
-      // In the place scheme, pressing the ✕ or Erase tool again goes back to the animal.
-      if (placeScheme && (picked === 'mark' || picked === 'erase') && tool === picked) selectTool(solo ? 'cat' : settings.lastSpecies);
-      else selectTool(picked);
+      selectTool(t.dataset.tool as Tool);
       haptic('select');
       faces.activity();
       if (tool === 'cat' || tool === 'dog') faces.curiousOne(tool, [0, 1.3]);
@@ -840,7 +867,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         erasing = !erasing;
         lastTap = null;
         haptic('select');
-        coach(erasing ? 'Erase is on: tap a ✕ or an animal to take it back. Tap Erase again when you are done.' : defaultCoach());
+        coach(toolCoach());
         paint();
         break;
       case 'hint':
@@ -863,12 +890,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       selectTool(k === '1' || k === 'a' ? 'cat' : 'dog');
       paint();
     } else if (k === 'e') {
-      if (placeScheme) selectTool(tool === 'erase' ? (solo ? 'cat' : settings.lastSpecies) : 'erase');
-      else erasing = !erasing;
-      coach(toolCoach());
-      paint();
-    } else if (placeScheme && k === 'x') {
-      selectTool(tool === 'mark' ? (solo ? 'cat' : settings.lastSpecies) : 'mark');
+      erasing = !erasing;
       coach(toolCoach());
       paint();
     } else if (k === 'z') doUndo();
@@ -877,20 +899,18 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     else if (k === 'p' || k === 'escape') openPause();
   });
 
-  /** Picks the tool a tap applies (an animal, or in the place scheme ✕ or Erase). The animal is remembered for the next two-animal board. */
+  /** Picks which animal a double tap places (and leaves Erase). Remembered for the next two-animal board. */
   function selectTool(t: Tool): void {
     tool = t;
-    erasing = placeScheme ? t === 'erase' : false;
+    erasing = false;
     lastTap = null;
     if ((t === 'cat' || t === 'dog') && !solo) settings.lastSpecies = t;
   }
 
-  /** What the pressed tool does, in one line (the place scheme). */
+  /** What a tap does right now, in one line. */
   function toolCoach(): string {
-    if (!placeScheme) return erasing ? 'Erase is on: tap a ✕ or an animal to take it back. Tap Erase again when you are done.' : defaultCoach();
-    if (tool === 'mark') return 'Mark is on: tap a tile to mark it ✕, or drag across a few. Tap Mark again to go back to placing.';
-    if (tool === 'erase') return 'Erase is on: tap a ✕ or an animal to take it back. Tap Erase again when you are done.';
-    return solo ? defaultCoach() : `Tap a tile to place ${aWord(species())}.`;
+    if (erasing) return 'Erase is on: tap a ✕ (or drag across a few) to take it back. Animals and mistakes stay. Tap Erase again when you are done.';
+    return solo ? defaultCoach() : `${capitalize(wordOf(species()))} picked: tap marks ✕, double-tap places ${aWord(species())}.`;
   }
 
   function resumeIfOnScreen(): void {

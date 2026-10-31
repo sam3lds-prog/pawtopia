@@ -10,10 +10,18 @@ import { ICON } from '../icons';
 import { Scope } from '../router';
 import { PALETTE_NAMES, assignRegionColors } from './regionColors';
 
+/**
+ * A mistake left on a tile (D37): `'x'` when the tile is known to hold no animal (every animal the board has was tried
+ * there, or the board has one animal), or the one animal tried there on a two-animal board ("no cat here" says nothing
+ * about the other animal). 0 when there is none.
+ */
+export type ErrorMark = 0 | 'x' | Species;
+
 export interface BoardView {
   cells: CellState[][];
   givenMask: boolean[][];
   dead: boolean[][] | null;
+  errors?: ErrorMark[][];
 }
 
 export interface BoardHandlers {
@@ -34,6 +42,8 @@ export interface BoardOptions {
   petName?: (r: number, c: number) => string | null;
   /** What each of the board's animals is called ("sheep"); defaults to cat and dog. */
   speciesName?: (species: Species) => string;
+  /** Still art of an animal, for the "tried here, wrong" mark on two-animal boards. */
+  triedArt?: (species: Species) => string;
 }
 
 const SPECIES_NAME: Record<number, string> = { [CAT]: 'cat', [DOG]: 'dog' };
@@ -161,8 +171,9 @@ export class Board {
       for (let c = 0; c < n; c++) {
         const val = v.cells[r][c];
         const given = v.givenMask[r][c];
-        const dead = !!v.dead && v.dead[r][c] && val === EMPTY;
-        const key = `${val}|${given ? 1 : 0}|${dead ? 1 : 0}`;
+        const err: ErrorMark = val === CAT || val === DOG ? 0 : (v.errors?.[r][c] ?? 0);
+        const dead = !!v.dead && v.dead[r][c] && val === EMPTY && !err;
+        const key = `${val}|${given ? 1 : 0}|${dead ? 1 : 0}|${err}`;
         if (this.shown[r][c] === key) continue;
         const prevVal = this.shown[r][c].split('|')[0];
         this.shown[r][c] = key;
@@ -184,6 +195,11 @@ export class Board {
             pet.classList.add('cell__pet');
             this.petEls.set(petKey, pet);
             el.appendChild(pet);
+          } else if (err === 'x') {
+            // A paid mistake: a red ✕, never erased (the player's own ✕ is grey).
+            el.insertAdjacentHTML('beforeend', `<span class="cell__err">${ICON.mark}</span>`);
+          } else if (err) {
+            el.insertAdjacentHTML('beforeend', `<span class="cell__tried">${this.opts.triedArt?.(err) ?? ''}<span class="cell__tried-strike"></span></span>`);
           } else if (val === MARK) {
             el.insertAdjacentHTML('beforeend', `<span class="cell__mark">${ICON.mark}</span>`);
           } else if (dead) {
@@ -191,12 +207,14 @@ export class Board {
           }
           if (given) el.insertAdjacentHTML('beforeend', `<span class="cell__lock">${ICON.lock}</span>`);
         }
-        el.setAttribute('aria-label', this.label(r, c, val, given, dead));
+        el.setAttribute('aria-label', this.label(r, c, val, given, dead, err));
       }
   }
 
-  private label(r: number, c: number, val: CellState, given: boolean, dead: boolean): string {
+  private label(r: number, c: number, val: CellState, given: boolean, dead: boolean, err: ErrorMark = 0): string {
     const where = `Row ${r + 1}, column ${c + 1}, ${this.regionName(this.puzzle.regions[r][c])}`;
+    if (err === 'x') return `${where}: a mistake, no animal here`;
+    if (err) return `${where}: not a ${this.opts.speciesName?.(err) ?? SPECIES_NAME[err]}, a mistake`;
     if (val === CAT || val === DOG) {
       const name = this.opts.petName?.(r, c);
       const kind = this.opts.speciesName?.(val as Species) ?? SPECIES_NAME[val];

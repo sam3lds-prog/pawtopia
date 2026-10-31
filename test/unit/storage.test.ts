@@ -114,38 +114,22 @@ describe('v2 normalization', () => {
     const s = normalizeSave({ progressVersion: 2, journey: { nextLevel: 9 } }, NOW);
     expect(s.journey.nextLevel).toBe(9);
     expect(s.inventory.ledger).toEqual([]);
-    expect(s.settings.controls).toBe('place');
+    expect(s.settings.controls).toBe('tap');
   });
 
-  describe('controls move to "one tap places" (D36)', () => {
-    const played = { tutorialDone: true, sessions: 12 };
-    it('a player on D35\'s default moves with the default and is told once', () => {
-      const s = normalizeSave({ progressVersion: 2, journey: { nextLevel: 9 }, settings: { controls: 'tap' }, onboarding: played }, NOW);
-      expect(s.settings.controls).toBe('place');
-      expect(s.settings.controlsVersion).toBe(2);
-      expect(s.onboarding.controlsNotice).toBe(true);
-      // Once saved, the same save loads as it is: no second move, and the notice flag is theirs to clear.
-      const again = normalizeSave(JSON.parse(JSON.stringify({ ...s, onboarding: { ...s.onboarding, controlsNotice: false } })), NOW);
-      expect(again.settings.controls).toBe('place');
-      expect(again.onboarding.controlsNotice).toBe(false);
+  describe('controls: tap marks, double-tap places (D37)', () => {
+    it('everyone plays tap / double-tap, whatever an earlier build stored, except a chosen tap cycle', () => {
+      expect(normalizeSave({ progressVersion: 2, settings: { controls: 'tap' } }, NOW).settings.controls).toBe('tap');
+      // D36's one-tap scheme and the older pick-a-tool spelling are retired.
+      expect(normalizeSave({ progressVersion: 2, settings: { controls: 'place', controlsVersion: 2 } }, NOW).settings.controls).toBe('tap');
+      expect(normalizeSave({ progressVersion: 2, settings: { controls: 'tools' } }, NOW).settings.controls).toBe('tap');
+      expect(normalizeSave({ progressVersion: 2, settings: { controls: 'classic' } }, NOW).settings.controls).toBe('classic');
+      expect(defaultSave(NOW).settings.controls).toBe('tap');
     });
-    it('a player who chose the tap cycle keeps it, with no notice', () => {
-      const s = normalizeSave({ progressVersion: 2, settings: { controls: 'classic' }, onboarding: played }, NOW);
-      expect(s.settings.controls).toBe('classic');
-      expect(s.onboarding.controlsNotice).toBe(false);
-    });
-    it('tap and double-tap chosen under the new options stays chosen', () => {
-      const s = normalizeSave({ progressVersion: 2, settings: { controls: 'tap', controlsVersion: 2 }, onboarding: played }, NOW);
-      expect(s.settings.controls).toBe('tap');
-      expect(s.onboarding.controlsNotice).toBe(false);
-    });
-    it('a save that never played, and a fresh install, get the new default without a notice', () => {
-      expect(normalizeSave({ progressVersion: 2, settings: { controls: 'tap' } }, NOW).onboarding.controlsNotice).toBe(false);
-      expect(defaultSave(NOW).settings.controls).toBe('place');
-      expect(defaultSave(NOW).onboarding.controlsNotice).toBe(false);
-    });
-    it('the retired "tools" spelling is the place scheme', () => {
-      expect(normalizeSave({ progressVersion: 2, settings: { controls: 'tools' }, onboarding: played }, NOW).settings.controls).toBe('place');
+    it('the D36 bookkeeping is dropped, not carried forward', () => {
+      const s = normalizeSave({ progressVersion: 2, settings: { controls: 'place', controlsVersion: 2 }, onboarding: { controlsNotice: true } }, NOW);
+      expect('controlsVersion' in s.settings).toBe(false);
+      expect('controlsNotice' in s.onboarding).toBe(false);
     });
   });
 
