@@ -82,7 +82,7 @@ Defects confirmed in source and fixed in Sprint 0:
 - [ ] Game Center and online Paw Cup leagues — not started
 - [ ] D36 device checklist (`docs/release-checklist.md`) and the five-player usability script — need a phone and people
 
-Test count: 405 unit tests + 139 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
+Test count: 407 unit tests + 139 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.

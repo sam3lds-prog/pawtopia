@@ -155,7 +155,10 @@ export class Router {
   private current: CanonicalRoute | null = null;
   private registry: Registry | null = null;
   private readonly listeners = new Set<(r: CanonicalRoute, def: ScreenDef) => void>();
-  /** Screens behind the current one, oldest first. A board (`game`) is never kept: there is nothing to come back to. */
+  /**
+   * Screens behind the current one, oldest first. A board (`game`) is never kept: there is nothing to come back to.
+   * Neither is the first-run welcome: once the first board has started, Back must never land a new player on the splash.
+   */
   private history: HistoryEntry[] = [];
 
   constructor(private readonly root: HTMLElement) {}
@@ -180,7 +183,7 @@ export class Router {
 
   /** Opens a screen, remembering the one being left (and its scroll position) so `back()` can return to it. */
   go(route: Route): void {
-    if (this.current && this.current.screen !== 'game') {
+    if (this.current && this.current.screen !== 'game' && this.current.screen !== 'welcome') {
       this.history.push({ route: this.current, scroll: window.scrollY });
       if (this.history.length > HISTORY_MAX) this.history.splice(0, this.history.length - HISTORY_MAX);
     }

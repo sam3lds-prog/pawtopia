@@ -127,6 +127,25 @@ describe('back', () => {
     expect(router.previous?.screen).toBe('world');
   });
 
+  it('a brand-new player never comes Back to the welcome splash (regression, PR 3)', () => {
+    // A fresh install: Welcome → "Meet Cotton" starts the guided board → the player leaves it (or wins and visits).
+    app.replaceSave(defaultSave(new Date(2026, 9, 31, 12)));
+    mountAll();
+    router.reset({ screen: 'welcome' });
+    (el('.welcome [data-act="start"]') as HTMLButtonElement).click();
+    expect(router.route?.screen).toBe('game');
+    expect(router.previous).toBeNull();
+    el('.game [data-act="leave"]')!.click();
+    expect(router.route).toEqual({ screen: 'journey' });
+    // The same from a sanctuary visited straight after that first board.
+    router.reset({ screen: 'welcome' });
+    (el('.welcome [data-act="start"]') as HTMLButtonElement).click();
+    router.go({ screen: 'region', id: 'farm' });
+    el('.region [data-act="back"]')!.click();
+    expect(router.route?.screen).not.toBe('welcome');
+    expect(router.route).toEqual({ screen: 'world' });
+  });
+
   it('the level path goes back to the hub', () => {
     router.reset({ screen: 'journey' });
     el('.journey [data-act="path"]')!.click();
@@ -166,6 +185,24 @@ describe('the Journey hub', () => {
     expect(text('.continue__go')).toBe('Resume level 3');
     expect(text('.continue [data-act="journey"]')).toBe('Play level 8 instead');
     expect(document.querySelector('.resume-other')).toBeNull();
+  });
+
+  it('"Play level N instead" never throws the saved board away without asking (regression, PR 3)', () => {
+    saveBoard({ kind: 'level', level: 3 });
+    const before = JSON.stringify(app.save.lastSession);
+    router.reset({ screen: 'journey' });
+    el('.continue [data-act="journey"]')!.click();
+    // A question first, and "Keep" leaves everything as it was.
+    expect(text('.sheet')).toMatch(/Start level 8\?/);
+    expect(text('.sheet')).toMatch(/level 3 board \(1 move so far\) will be cleared/);
+    (el('.sheet [data-act="keep"]') as HTMLButtonElement).click();
+    expect(router.route).toEqual({ screen: 'journey' });
+    expect(JSON.stringify(app.save.lastSession)).toBe(before);
+    // Choosing to start is the player's call.
+    el('.continue [data-act="journey"]')!.click();
+    (el('.sheet [data-act="go"]') as HTMLButtonElement).click();
+    expect(router.route?.screen).toBe('game');
+    expect(app.active?.mode).toEqual({ kind: 'level', level: 8 });
   });
 
   it('Visit on the goal card opens the sanctuary being built; Back returns to the hub', () => {
