@@ -642,3 +642,6 @@ every Journey, Daily and Zen solve counts (replays too); the Paw Cup never does.
   that is honest about what is really available) and the five-player usability session, which needs people. The
   device checklist for everything in D36 is in `docs/release-checklist.md`.
 - Docs: README (tabs, controls, first run), package description, architecture (crediting, navigation), roadmap.
+- Hardening tests from the independent review: Large board mode pans without marking or placing; a ✕ drag changes
+  exactly the tiles under the finger; tool buttons and cells carry screen-reader labels; reduced motion skips the color
+  glow; with no video network the loss sheet offers no video and the Journey loop still runs.
