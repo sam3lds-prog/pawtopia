@@ -7,11 +7,18 @@ import {
   V2_KEY,
   defaultSave,
   loadSave,
+  newestSession,
   normalizeSave,
   resetProgress,
   saveSave,
+  setSavedSession,
   type ProgressV1,
+  type SavedSession,
 } from '../../src/services/storage';
+import { captureSession } from '../../src/game/sessionPersistence';
+import { puzzleFor } from '../../src/game/puzzles';
+import { Session } from '../../src/game/session';
+import type { ModeRef } from '../../src/game/modes';
 
 const NOW = new Date('2026-10-25T15:00:00Z');
 
@@ -150,6 +157,61 @@ describe('v2 normalization', () => {
     );
     expect(s.inventory.ledger).toHaveLength(1);
     expect(s.inventory.ledger[0].id).toBe('clear:L1');
+  });
+
+  describe('one saved board per mode (D38)', () => {
+    /** A saved board for `mode`, as a build saves it, stamped `savedAt`. */
+    const board = (mode: ModeRef, savedAt: string): SavedSession => ({ ...captureSession(mode, new Session(puzzleFor(mode, 4)), new Date(savedAt), 4)!, savedAt });
+    const L3 = board({ kind: 'level', level: 3 }, '2026-10-30T10:00:00.000Z');
+    const D = board({ kind: 'daily', dateKey: '2026-10-31', rule: 'solo' }, '2026-10-31T09:00:00.000Z');
+    const Z = board({ kind: 'zen', size: 5, seed: 7_000_102, rule: 'solo' }, '2026-10-31T11:00:00.000Z');
+
+    it('a save from before D38 moves its one board into that mode\'s slot, once', () => {
+      const s = normalizeSave({ progressVersion: 2, lastSession: D }, NOW);
+      expect(s.sessions).toEqual({ level: null, daily: D, zen: null });
+      // Running it again changes nothing (the mirror now equals the slot).
+      expect(normalizeSave(JSON.parse(JSON.stringify(s)), NOW).sessions).toEqual(s.sessions);
+      expect(normalizeSave({ progressVersion: 2 }, NOW).sessions).toEqual({ level: null, daily: null, zen: null });
+    });
+
+    it('keeps one board per mode and mirrors the newest into lastSession for older builds', () => {
+      const s = defaultSave(NOW);
+      setSavedSession(s, L3.mode, L3);
+      setSavedSession(s, D.mode, D);
+      setSavedSession(s, Z.mode, Z);
+      expect(s.sessions).toEqual({ level: L3, daily: D, zen: Z });
+      expect(s.lastSession).toEqual(Z);
+      // Finishing the newest moves the mirror to the next newest; nothing else changes.
+      setSavedSession(s, Z.mode, null);
+      expect(s.sessions.zen).toBeNull();
+      expect(s.lastSession).toEqual(D);
+      expect(newestSession(s)).toEqual(D);
+      // A round trip through storage keeps all of it.
+      const kv = new MemoryKV();
+      saveSave(s, kv);
+      expect(loadSave(kv, NOW).save.sessions).toEqual({ level: L3, daily: D, zen: null });
+    });
+
+    it('a slot only ever holds a board of its own mode', () => {
+      const s = normalizeSave({ progressVersion: 2, sessions: { level: D, daily: L3, zen: Z }, lastSession: Z }, NOW);
+      expect(s.sessions).toEqual({ level: null, daily: null, zen: Z });
+    });
+
+    it('a rollback round trip: a board an older build saved wins, a board it finished is not offered again', () => {
+      // This build saved L3 and D (D newest). An older build then played: it only knows `lastSession`.
+      const stored = { progressVersion: 2, sessions: { level: L3, daily: D, zen: null }, lastSession: D };
+      // (a) it saved a newer Journey board there: that board replaces the stale level slot; the Daily is kept.
+      const L5 = board({ kind: 'level', level: 5 }, '2026-11-01T08:00:00.000Z');
+      const a = normalizeSave({ ...stored, lastSession: L5 }, NOW);
+      expect(a.sessions).toEqual({ level: L5, daily: D, zen: null });
+      // (b) it finished the board it knew (the newest, D) and set lastSession to null: D is not brought back.
+      const b = normalizeSave({ ...stored, lastSession: null }, NOW);
+      expect(b.sessions).toEqual({ level: L3, daily: null, zen: null });
+      expect(b.lastSession).toEqual(L3);
+      // A save that never had the field at all is left alone.
+      const c = normalizeSave({ progressVersion: 2, sessions: { level: L3, daily: D, zen: null } }, NOW);
+      expect(c.sessions).toEqual({ level: L3, daily: D, zen: null });
+    });
   });
 
   it('round-trips through save/load unchanged', () => {

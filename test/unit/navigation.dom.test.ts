@@ -19,7 +19,7 @@ import { Session } from '../../src/game/session';
 import { puzzleFor } from '../../src/game/puzzles';
 import { captureSession } from '../../src/game/sessionPersistence';
 import { CAT, EMPTY, type Species } from '../../src/engine/types';
-import { defaultSave } from '../../src/services/storage';
+import { defaultSave, setSavedSession } from '../../src/services/storage';
 
 const blank: ScreenDef = { tab: null, title: 'x', mount: () => {} };
 let router: Router;
@@ -47,7 +47,7 @@ function saveBoard(mode: { kind: 'level'; level: number } | { kind: 'daily'; dat
         s.place(r, c, p.solution[r][c] as Species);
         break outer;
       }
-  app.save.lastSession = captureSession(mode, s, new Date(), 4, { a: 'cotton', sanctuary: 'farm' }, 'test:board');
+  setSavedSession(app.save, mode, captureSession(mode, s, new Date(), 4, { a: 'cotton', sanctuary: 'farm' }, 'test:board'));
 }
 
 beforeEach(() => {
@@ -189,15 +189,15 @@ describe('the Journey hub', () => {
 
   it('"Play level N instead" never throws the saved board away without asking (regression, PR 3)', () => {
     saveBoard({ kind: 'level', level: 3 });
-    const before = JSON.stringify(app.save.lastSession);
+    const before = JSON.stringify(app.save.sessions);
     router.reset({ screen: 'journey' });
     el('.continue [data-act="journey"]')!.click();
-    // A question first, and "Keep" leaves everything as it was.
+    // A question first, and "Not now" leaves everything as it was.
     expect(text('.sheet')).toMatch(/Start level 8\?/);
     expect(text('.sheet')).toMatch(/level 3 board \(1 move so far\) will be cleared/);
     (el('.sheet [data-act="keep"]') as HTMLButtonElement).click();
     expect(router.route).toEqual({ screen: 'journey' });
-    expect(JSON.stringify(app.save.lastSession)).toBe(before);
+    expect(JSON.stringify(app.save.sessions)).toBe(before);
     // Choosing to start is the player's call.
     el('.continue [data-act="journey"]')!.click();
     (el('.sheet [data-act="go"]') as HTMLButtonElement).click();

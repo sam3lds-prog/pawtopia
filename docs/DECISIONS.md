@@ -675,3 +675,34 @@ hints the player has. The dots on tiles no animal can reach show on Easy boards 
   on Medium and harder boards, marking is the player's to do.
 - Copy follows: the coach line, the guided boards ("double-tap it"), How to play and the level-21 bridge ("Tap a tile
   to mark it ✕. Double-tap to place… A wrong guess costs a heart and is marked in red"), Settings.
+
+## 2026-10-31 · D38 — Premium UX pass: saved boards per mode, gesture clarity, hierarchy, fair growth, polish
+From `PAWTOPIA_D37_UX_PREMIUM_REVIEW_REVISED_NO_UNDO.md` (the independent audit of `main` @ `c5d5783`). Five small PRs
+(A–E), each reviewable on its own; nothing here rebuilds what D36/D37 delivered.
+
+### PR A — one saved board per mode (P0)
+The audit's one verified code-level issue: `lastSession` was a single slot for Journey, Daily and Zen, `playMode` only
+looked for a save of the requested mode, and `saveActive` replaced the slot, so an unfinished Journey board was silently
+displaced by playing a Daily (and vice versa). Confirmed with a failing test against `main` before the fix.
+
+- **Slots** (`storage.SaveV2.sessions`: `level` | `daily` | `zen`, each `SavedSession | null`): a Journey board, the
+  Daily and the latest Zen board are kept independently. Paw Cup attempts stay in `cup.open`, one per board, as before.
+  `setSavedSession` / `savedSession` / `clearSessions` are the only writers; `app.saveActive` and `app.clearSaved` use
+  them.
+- **Mirror for older builds** (`lastSession`): still written, as the newest of the slots (`syncSessionMirror`), so a
+  build from before D38 finds the latest board. `normalizeSave` folds a legacy `lastSession` into its mode's slot (the
+  one-time migration; idempotent), and handles a rollback round trip: a board an older build saved there replaces its
+  stale slot, and a `lastSession` an older build set to `null` empties the newest slot (it finished that board) rather
+  than offering a finished board again. `upgradeLadder` (D35) moves the Journey slot, not the mirror.
+- **The guard at the boundary** (`gameFlow.playMode` → `heldBoardFor` → `askAboutHeldBoard`): within a mode there is
+  still one slot, so before a *different* board of the same mode would take it from one with real progress
+  (`hasMeaningfulProgress`), one sheet asks: *Resume* the saved board, *Start* the new one, or *Not now*. Every "play
+  this" button goes through `playMode` — the Journey hub, "Play level N instead", the level path, the World, the Farm and
+  the Pet Garden, the Daily card, the Zen sizes — so the hub's own confirm (PR 3) is gone and no screen can throw a board
+  away on its own. The Zen seed is consumed in `startGame` (`nextZenMode` / `zenSeed`), so a Zen tap that is answered
+  with *Resume* or *Not now* spends nothing.
+- **The hub lists every saved board**: the Journey board is Continue; a saved Daily and a saved Zen each get their own
+  "in progress" line (`resumableSessions`). `buildHereMessage` is honest about several held boards.
+- Tests: `test/unit/sessions.dom.test.ts` (cross-mode preservation both ways, after a reload, the guard from the World, a
+  sanctuary, the level path, the Daily card and the Zen sizes; a board with no progress is simply replaced; Paw Cup slots
+  never collide), `storage.test.ts` (slots, mirror, migration, rollback), `navigation.dom.test.ts` updated.

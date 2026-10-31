@@ -1,7 +1,7 @@
 /** Settings sheet: play, comfort & accessibility, purchases, data. */
 
 import { app } from '../../app/app';
-import { resetProgress, type Settings } from '../../services/storage';
+import { clearSessions, resetProgress, type Settings } from '../../services/storage';
 import { ITEM_CAP, grantStarterItems } from '../../meta/items';
 import { growActive, setPantry, skipToLevel } from '../../app/qaTools';
 import { iap } from '../../services/iap';
@@ -139,7 +139,7 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
       const [what, arg] = (qa.dataset.qa ?? '').split(':');
       if (what === 'skip') {
         skipToLevel(app.save, Number(arg));
-        app.save.lastSession = null;
+        clearSessions(app.save);
         app.persist();
         // Reload so the normal startup catch-up hands out the skipped levels' gifts and points, once.
         location.reload();

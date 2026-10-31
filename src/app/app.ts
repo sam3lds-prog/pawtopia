@@ -3,7 +3,7 @@
  * Screens import `app` instead of reaching into globals.
  */
 
-import { loadSave, saveSave, type SaveV2, type Settings } from '../services/storage';
+import { loadSave, saveSave, savedSession, setSavedSession, type SaveV2, type Settings } from '../services/storage';
 import { entitlementCounts } from '../services/iap';
 import { setHapticsEnabled } from '../services/haptics';
 import { setSoundEnabled } from '../services/audio';
@@ -132,23 +132,23 @@ class App {
     setSoundEnabled(s.sound);
   }
 
-  /** Saves the in-progress board (called on every move and when the app is backgrounded). */
+  /**
+   * Saves the in-progress board into its mode's slot (called on every move and when the app is backgrounded). A
+   * Journey, Daily or Zen board never displaces a saved board of another mode (D38); a Paw Cup attempt has its own slot
+   * per board.
+   */
   saveActive(): void {
     if (!this.active) return;
     const { mode, session, spec, cast, boardId } = this.active;
     const snap = captureSession(mode, session, new Date(), spec, cast, boardId);
-    if (mode.kind === 'cup') {
-      const k = modeKey(mode);
-      if (snap) this.save.cup.open[k] = snap;
-      else delete this.save.cup.open[k];
-    } else this.save.lastSession = snap;
+    setSavedSession(this.save, mode, snap);
     saveSave(this.save);
   }
 
-  /** Forgets the saved board for `mode` (finished, lost, or abandoned), leaving other saved boards alone. */
+  /** Forgets the saved board for `mode` (finished, lost, or abandoned), leaving every other saved board alone. */
   clearSaved(mode: ModeRef): void {
     if (mode.kind === 'cup') delete this.save.cup.open[modeKey(mode)];
-    else if (this.save.lastSession && modeKey(this.save.lastSession.mode) === modeKey(mode)) this.save.lastSession = null;
+    else if (savedSession(this.save, mode)) setSavedSession(this.save, mode, null);
   }
 }
 
