@@ -4,7 +4,10 @@
  *    boards the two animal buttons below the board pick which one a double tap places; there is no separate ✕ button.
  *    A wrong animal costs a heart and leaves a mistake mark on the tile (red ✕, or the struck animal on a two-animal
  *    board). Erase takes back ✕ marks only: placed animals and mistakes stay.
- *  - 'classic': no timing at all (for VoiceOver and Switch Control): a tap marks ✕, a second tap places.
+ *  - 'classic' ("Two-step tap"): no timing at all (for VoiceOver and Switch Control): a tap marks ✕, a second tap places.
+ *    An activation that arrives without a pointer (a screen reader's double-tap, a switch) is always two-step, under
+ *    either scheme (D38), so assistive tech never has to beat a 380 ms window.
+ * After the first placement on an ordinary board, one line explains the controls once and points at Settings (D38).
  * Hint shows how many hints you have. Dots on tiles no animal can reach appear on Easy boards only.
  * The board shows the animal you're bringing home to the sanctuary the board is for (meta/cast.ts).
  */
@@ -385,7 +388,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   const species = (): Species => (tool === 'dog' ? DOG : CAT);
 
-  function onPress(r: number, c: number): 'mark' | 'unmark' | null {
+  function onPress(r: number, c: number, activate = false): 'mark' | 'unmark' | null {
     if (finished || s.paused) return null;
     faces.activity();
     if (erasing) {
@@ -399,7 +402,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       handle({ ignored: true }, r, c);
       return null;
     }
-    if (classic) {
+    // Two-step for the tap cycle, and for any activation without a pointer (a screen reader, a switch): no timing.
+    if (classic || activate) {
       // No timing: an empty tile takes a ✕; a ✕ (or a tile with a mistake for the other animal) takes the animal.
       if (v === MARK || s.errorsAt(r, c).length) tryPlace(r, c, species());
       else handle(s.toggleMark(r, c), r, c);
@@ -543,6 +547,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       sfx('place');
       haptic('place');
       board.flash([[r, c]], 'is-fresh', 720);
+      maybeControlsTip();
       // One-animal boards: the color this animal settles is done; its tiles glow for a beat (overlay only).
       if (solo && !app.reducedMotion) board.flash(s.unitCells({ kind: 'region', index: s.puzzle.regions[r][c] }), 'is-glow', 700);
       const key = keyOf(r, c);
@@ -876,6 +881,14 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       case 'hearts':
         openHearts();
         break;
+      case 'tip-close':
+        el.querySelector('[data-controls-tip]')?.remove();
+        break;
+      case 'tip-controls':
+        el.querySelector('[data-controls-tip]')?.remove();
+        pauseBoard();
+        showSettings(scope, { inGame: true, onClose: () => app.router.refresh() });
+        break;
     }
   });
 
@@ -913,6 +926,34 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     return solo ? defaultCoach() : `${capitalize(wordOf(species()))} picked: tap marks ✕, double-tap places ${aWord(species())}.`;
   }
 
+  /**
+   * Once, after the first animal a player places on an ordinary board (D38): the two gestures in one line, and where to
+   * change them. An overlay over the coach line (nothing shifts, no input waits on it); it leaves on its ✕, when the
+   * board does, or after a while. The guided boards teach as they go and skip it.
+   */
+  function maybeControlsTip(): void {
+    const ob = app.save.onboarding;
+    if (guided || ob.controlsTipSeen || el.querySelector('[data-controls-tip]')) return;
+    ob.controlsTipSeen = true;
+    app.persist();
+    track('onboarding_step', { step: 'controls_tip' });
+    const text = classic
+      ? 'Two-step tap: <b>tap</b> marks ✕, <b>tap again</b> places. Prefer a quick double-tap?'
+      : '<b>Tap</b> marks ✕ · <b>double-tap</b> places. Prefer single taps with no timing?';
+    const tip = h(`<div class="control-tip" data-controls-tip role="note">
+      <span class="control-tip__icon" aria-hidden="true">${ICON.info}</span>
+      <p class="control-tip__text">${text} <button class="control-tip__link" data-act="tip-controls">Controls in Settings</button></p>
+      <button class="icon-btn icon-btn--bare control-tip__close" data-act="tip-close" aria-label="Got it">${ICON.close}</button>
+    </div>`);
+    foot.prepend(tip);
+    scope.timeout(() => tip.remove(), 12_000);
+  }
+
+  /** What a tap does under the player's controls, for the pause sheet. */
+  function controlsSummary(): string {
+    return classic ? 'Two-step tap: tap marks ✕, tap again places. No timing.' : 'Tap marks ✕, double-tap places. Erase takes ✕ back.';
+  }
+
   function resumeIfOnScreen(): void {
     if (!scope.alive || finished || sheet) return;
     unveil();
@@ -942,8 +983,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
             <button class="btn btn--quiet" data-act="undo" ${s.canUndo() ? '' : 'disabled'}>${ICON.undo}Undo</button>
             <button class="btn btn--quiet" data-act="redo" ${s.canRedo() ? '' : 'disabled'}>${ICON.redo}Redo</button>
           </div>
+          <p class="pause-controls" data-pause-controls>${ICON.mark}<span><b>Controls.</b> ${esc(controlsSummary())}</span></p>
           <button class="btn btn--quiet" data-act="rules">${ICON.help}How to play</button>
-          <button class="btn btn--quiet" data-act="settings">Settings</button>
+          <button class="btn btn--quiet" data-act="settings">${ICON.gear}Settings and controls</button>
           <button class="btn btn--quiet" data-act="leave">${mode.kind === 'cup' ? 'Leave (this attempt stays open)' : 'Leave and keep progress'}</button>
         </div>`,
       onClose: () => {

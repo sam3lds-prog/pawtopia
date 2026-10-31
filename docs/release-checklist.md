@@ -56,6 +56,16 @@
 - [ ] Install the previous build over this one (rollback): the newest saved board is still offered; come back to this
       build: nothing finished is offered again
 
+### D38 PR B — gesture clarity
+- [ ] First placement on an ordinary board shows the controls note once, over the coach line; nothing moves; ✕ and the
+      link work; never again after (also after a relaunch)
+- [ ] VoiceOver on the board: "activate" on an empty tile marks ✕, activate again places — no double-tap window to
+      beat; Switch Control the same
+- [ ] Settings → Controls: *Fast double-tap* / *Two-step tap*; the little picture loops; under Reduce Motion it is a
+      still of the last frame; the picture follows the choice
+- [ ] Pause: the Controls line reads right for both schemes; "Settings and controls" opens Settings with the board paused
+- [ ] 320 and 375 widths: the note fits in two or three lines without covering the board
+
 ## Store integration (only when ready; see roadmap)
 - [ ] StoreKit products created (remove_ads, starter_decor, cozy_theme, pet_portraits, supporter); verified entitlement
       + restore via a maintained bridge (e.g. RevenueCat Capacitor SDK); sandbox buy, restore, refund, reinstall

@@ -607,42 +607,235 @@ body[data-nav='off'] .toast-host {
   font-size: var(--t-sm);
 }
 
-/* Settings: what one tap does under the chosen controls. */
+/* Settings: a tiny live picture of the chosen controls (D38). Three tiles; keyframes loop every 4 s. */
 .controls-preview {
   margin: 0;
   padding: 2px var(--s3) var(--s3);
 }
-.cp-steps {
+.cp-demo {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 4px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 10px;
   border-radius: 12px;
   background: var(--canvas-deep);
   color: var(--ink);
 }
-.cp-step {
+.cp-tile {
+  --d: 4s;
+  position: relative;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
+  gap: 6px;
   text-align: center;
 }
-.cp-step .ico {
-  width: 20px;
-  height: 20px;
-  color: var(--brand-dark);
+.cp-tile::before {
+  content: '';
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--r1);
+  border: 1.5px solid var(--board-frame);
 }
-.cp-step small {
-  font-size: 11px;
+.cp-tile--place::before {
+  background: var(--r3);
+}
+.cp-tile--erase::before {
+  background: var(--r5);
+}
+.cp-tile small {
+  font-size: var(--t-xs);
   font-weight: 700;
   color: var(--muted-ink);
   line-height: 1.2;
 }
-.cp-arrow {
+.cp-x,
+.cp-pet,
+.cp-eraser {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  margin-left: -14px;
+  display: grid;
+  place-items: center;
+}
+.cp-x .ico {
+  width: 18px;
+  height: 18px;
   color: var(--faint-ink);
-  font-weight: 800;
+}
+.cp-pet svg {
+  width: 30px;
+  height: 30px;
+}
+.cp-eraser .ico {
+  width: 18px;
+  height: 18px;
+  color: var(--brand-dark);
+}
+.cp-finger {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  border-radius: 50%;
+  background: var(--brand);
+  opacity: 0;
+  box-shadow: 0 0 0 4px rgba(40, 123, 112, 0.25);
+  z-index: 1;
+}
+/* One 4 s timeline, no delays, so the three tiles stay in step and the reduced-motion rules collapse each element to
+   its base style — the final frame: ✕ on tile 1, the animal on tile 2, tile 3 empty. */
+.cp-tile--mark .cp-finger {
+  animation: cp-tap1 var(--d) infinite;
+}
+.cp-tile--mark .cp-x {
+  animation: cp-x1 var(--d) infinite;
+}
+.cp-x--before {
+  opacity: 0;
+  animation: cp-x2 var(--d) infinite;
+}
+.cp-finger--double {
+  animation: cp-double var(--d) infinite;
+}
+.cp-finger--again {
+  animation: cp-again var(--d) infinite;
+}
+.cp-tile--place .cp-pet {
+  animation: cp-pet var(--d) infinite;
+}
+.cp-x--erased {
+  opacity: 0;
+  animation: cp-x3 var(--d) infinite;
+}
+.cp-eraser {
+  opacity: 0;
+  animation: cp-swipe var(--d) infinite;
+}
+@keyframes cp-tap1 {
+  0% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+  3% {
+    opacity: 1;
+    transform: scale(0.9);
+  }
+  7%,
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+@keyframes cp-x1 {
+  0%,
+  7% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  11%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes cp-x2 {
+  0%,
+  34% {
+    opacity: 1;
+  }
+  37%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes cp-double {
+  0%,
+  24% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+  26% {
+    opacity: 1;
+    transform: scale(0.9);
+  }
+  28% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(0.9);
+  }
+  33%,
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+@keyframes cp-again {
+  0%,
+  27% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(0.9);
+  }
+  34%,
+  100% {
+    opacity: 0;
+    transform: scale(1.2);
+  }
+}
+@keyframes cp-pet {
+  0%,
+  36% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  41%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes cp-x3 {
+  0%,
+  66% {
+    opacity: 1;
+  }
+  69%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes cp-swipe {
+  0%,
+  59% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  62% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(10px);
+  }
+  74%,
+  100% {
+    opacity: 0;
+    transform: translateX(10px);
+  }
 }

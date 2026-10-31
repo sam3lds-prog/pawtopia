@@ -13,7 +13,8 @@ import { openSheet, toast } from '../components/sheet';
 import { actionOf, esc, plural } from '../dom';
 import type { Scope } from '../router';
 import { featureFlags } from '../../config/featureFlags';
-import { showRules } from './rules';
+import { currentRules, showRules } from './rules';
+import { animalSvg } from '../art/animals';
 import { ICON } from '../icons';
 
 type BoolKey = 'autoMark' | 'showTimer' | 'largeBoard' | 'sound' | 'haptics' | 'highContrast' | 'regionPatterns' | 'leftHanded' | 'toys3d';
@@ -35,14 +36,23 @@ function choice<K extends keyof Settings>(key: K, label: string, opts: Array<[Se
     </div>`;
 }
 
-/** A short picture of what one tap does under each control scheme. */
+/**
+ * A tiny live picture of the chosen controls (D38): a finger taps a tile and a ✕ appears; it double-taps (or, two-step,
+ * taps a ✕ again) and the animal appears; Erase lifts a ✕. CSS keyframes on a loop, drawn with this player's animal; the
+ * reduced-motion rules collapse it to its final frame.
+ */
 function controlsPreview(c: Settings['controls']): string {
-  const step = (icon: string, label: string) => `<span class="cp-step">${icon}<small>${esc(label)}</small></span>`;
-  const arrow = `<span class="cp-arrow" aria-hidden="true">→</span>`;
-  const dot = `<span class="cp-arrow" aria-hidden="true">·</span>`;
-  if (c === 'classic')
-    return `<span class="cp-steps" aria-label="Tap cycle: each tap goes empty, then cross, then the animal, then empty">${step(ICON.mark, '1st tap: ✕')}${arrow}${step(ICON.paw, '2nd: animal')}${arrow}${step(ICON.erase, '3rd: clear')}</span>`;
-  return `<span class="cp-steps" aria-label="Tap marks a cross, double-tap places the animal, Erase takes crosses back">${step(ICON.mark, 'Tap: ✕')}${dot}${step(ICON.paw, 'Double-tap: animal')}${dot}${step(ICON.erase, 'Erase: ✕ only')}</span>`;
+  const pet = animalSvg(currentRules().cast.a);
+  const two = c === 'classic';
+  return `<div class="cp-demo" data-scheme="${c}" role="img" aria-label="${
+    two
+      ? 'Two-step tap: a tap marks a tile with a cross, tapping the cross places the animal. Erase takes crosses back.'
+      : 'Fast double-tap: a tap marks a tile with a cross, a double-tap places the animal. Erase takes crosses back.'
+  }">
+      <span class="cp-tile cp-tile--mark"><span class="cp-finger"></span><span class="cp-x">${ICON.mark}</span><small>Tap: ✕</small></span>
+      <span class="cp-tile cp-tile--place"><span class="cp-x cp-x--before">${ICON.mark}</span><span class="cp-finger cp-finger--${two ? 'again' : 'double'}"></span><span class="cp-pet">${pet}</span><small>${two ? 'Tap again: animal' : 'Double-tap: animal'}</small></span>
+      <span class="cp-tile cp-tile--erase"><span class="cp-x cp-x--erased">${ICON.mark}</span><span class="cp-eraser">${ICON.erase}</span><small>Erase: ✕ only</small></span>
+    </div>`;
 }
 
 export interface SettingsOptions {
@@ -70,10 +80,10 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
           'controls',
           'Controls',
           [
-            ['tap', 'Tap ✕, double-tap'],
-            ['classic', 'Tap cycle'],
+            ['tap', 'Fast double-tap'],
+            ['classic', 'Two-step tap (no timing)'],
           ],
-          'Tap cycle needs no quick double tap: easier with VoiceOver or Switch Control',
+          'Two-step tap needs no quick double tap: tap once for ✕, tap again to place. Easier with VoiceOver or Switch Control.',
         )}
         <p class="controls-preview" data-controls-preview aria-live="polite">${controlsPreview(app.settings.controls)}</p>
         ${sw('autoMark', 'Dot impossible tiles', 'On Easy boards, a small dot shows where no animal can go')}

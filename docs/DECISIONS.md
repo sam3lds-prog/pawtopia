@@ -706,3 +706,24 @@ displaced by playing a Daily (and vice versa). Confirmed with a failing test aga
 - Tests: `test/unit/sessions.dom.test.ts` (cross-mode preservation both ways, after a reload, the guard from the World, a
   sanctuary, the level path, the Daily card and the Zen sizes; a board with no progress is simply replaced; Paw Cup slots
   never collide), `storage.test.ts` (slots, mirror, migration, rollback), `navigation.dom.test.ts` updated.
+
+### PR B — gesture clarity and accessibility (P1)
+D37's gesture stays the default (owner decision); this makes it quicker to learn and gives assistive tech a path with no
+timing to beat.
+
+- **One line, once** (`game.ts::maybeControlsTip`, `onboarding.controlsTipSeen`): after the first animal a player places
+  on an ordinary board — not a ✕, not on the guided boards — a small note over the coach line: *Tap marks ✕ ·
+  double-tap places. Prefer single taps with no timing? Controls in Settings* (worded for the two-step scheme when that is
+  set). It is an overlay (`.control-tip`, absolute over `.board-foot`), so the board never moves under a finger and no
+  input waits on it; ✕ or its link (which opens Settings, pausing the board) or twelve seconds remove it.
+- **Activation without a pointer is two-step** (`Board` click with `detail === 0` → `onPress(r, c, activate = true)`):
+  a screen reader's or a switch's "activate" marks ✕, and a second activation places — under either scheme. A finger
+  still gets the fast double-tap. Keyboard keys are unchanged (Enter places, Space/X marks).
+- **Discoverable from Pause**: a read-only *Controls* line saying what a tap does right now, and the Settings button
+  renamed *Settings and controls*. *How to play* ends with where the other scheme lives.
+- **Settings in player language**: *Fast double-tap* / *Two-step tap (no timing)*, with one help line, and a tiny live
+  picture (`settings.ts::controlsPreview`, `.cp-demo`): a finger taps a tile and a ✕ appears, double-taps (or taps a ✕
+  again) and this player's animal appears, Erase lifts a ✕. CSS keyframes on one 4 s timeline with no delays, so the
+  reduced-motion rules collapse it to its last frame. No new engine.
+- Device checks still to do (release checklist, D38 PR B): the 380 ms window on a real finger at 320 and 375, VoiceOver
+  through the board (activation = two-step), Switch Control, Dynamic Type on the note.
