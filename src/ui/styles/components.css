@@ -293,7 +293,7 @@ body[data-nav='on'] .nav {
   max-width: var(--content-max);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
 }
 .nav__item {
   min-height: 52px;
