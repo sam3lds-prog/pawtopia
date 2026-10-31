@@ -4,114 +4,148 @@
   flex-direction: column;
   gap: var(--s3);
 }
-/* The goal card: the sanctuary being built, the animal on its way, a picture of the place. Also sits above the World map. */
-.goal-card {
-  display: grid;
-  grid-template-columns: 96px 1fr;
-  grid-template-areas:
-    'scene body'
-    'actions actions';
-  gap: var(--s2) var(--s3);
-  align-items: center;
-  padding: var(--s3);
+/* The hero (D38): the goal row (sanctuary being built, the animal on its way, a small picture), then the level with
+   its thumbnail, one big button and two quiet links. Compact on purpose: the button must sit on the first screen of a
+   320×568 phone with the tab bar. */
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4) var(--s3);
   border-left: 4px solid var(--accent, var(--brand));
 }
-.goal-card__scene {
-  grid-area: scene;
-  width: 96px;
-  aspect-ratio: 5 / 4;
-  border-radius: 14px;
+.hero__goal {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--line);
+}
+.hero__scene {
+  flex: none;
+  width: 64px;
+  height: 56px;
+  border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--line);
   background: var(--brand-tint);
   display: block;
+  padding: 0;
 }
-.goal-card__scene svg {
+.hero__scene svg {
   display: block;
   width: 100%;
   height: 100%;
 }
-.goal-card__body {
-  grid-area: body;
+.hero__goal-body {
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
-.goal-card__eyebrow {
-  display: inline-flex;
+.hero__eyebrow {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 5px;
-  font-size: var(--t-xs);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--accent, var(--brand-dark));
   margin: 0;
+  font-size: var(--t-xs);
+  font-weight: 700;
+  color: var(--muted-ink);
 }
-.goal-card__eyebrow .ico {
+.hero__eyebrow b {
+  color: var(--accent, var(--brand-dark));
+  font-weight: 800;
+}
+.hero__eyebrow .ico {
   width: 14px;
   height: 14px;
+  color: var(--accent, var(--brand-dark));
 }
-.goal-card h2 {
-  font-size: 20px;
-  margin: 0;
-  line-height: 1.15;
+.hero__eyebrow .chip--news {
+  margin: 0 0 0 2px;
 }
-.goal-card__next {
+.hero__next {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 2px 0 0;
+  margin: 0;
   font-size: var(--t-sm);
+  line-height: 1.25;
   color: var(--ink);
 }
-.goal-card .goal-card__friend {
-  width: 36px;
-  height: 36px;
+.hero .hero__friend {
+  flex: none;
+  width: 30px;
+  height: 30px;
 }
-.goal-card .goal-card__friend > .pet {
+.hero .hero__friend > .pet {
   width: 82%;
   height: 82%;
 }
-.goal-card__bar {
+.hero__bar {
   height: 6px;
-  margin-top: 4px;
+  margin-top: 2px;
 }
-.goal-card__bar > span {
+.hero__bar > span {
   background: var(--accent, var(--brand));
 }
-.goal-card__body small {
+.hero__play {
+  display: grid;
+  grid-template-columns: 1fr 76px;
+  gap: var(--s3);
+  align-items: center;
+}
+.hero__info {
+  min-width: 0;
+}
+.hero__kicker {
+  margin: 0 0 1px;
+  color: var(--brand-dark);
+  font-weight: 800;
   font-size: var(--t-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.goal-card__actions {
-  grid-area: actions;
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--s2);
+.hero h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.1;
 }
-.goal-card__actions .btn {
-  flex: 0 1 auto;
-  min-width: 120px;
+.hero__desc {
+  margin: 2px 0 0;
+  font-size: var(--t-sm);
 }
-.goal-card__actions .btn + .btn {
-  flex: 1;
+.hero__thumb {
+  width: 76px;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: var(--canvas-deep);
 }
-.goal-card:not(:has(.goal-card__scene)) {
-  grid-template-columns: 1fr;
-  grid-template-areas:
-    'body'
-    'actions';
-}
-.continue__links {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: var(--s2);
+.hero .continue__go {
   margin-top: calc(-1 * var(--s1));
 }
-.continue__links .btn {
+.hero .btn--quiet {
+  min-height: 40px;
+}
+.hero__links {
+  display: flex;
+  gap: var(--s2);
+  margin-top: calc(-1 * var(--s2));
+}
+.hero__links .btn {
   flex: 1;
   min-height: 40px;
+  padding: 6px 4px;
+  font-size: 14px;
+  line-height: 1.15;
+  gap: 5px;
+}
+.hero__links .btn .ico {
+  width: 18px;
+  height: 18px;
 }
 .resume-other .card__icon {
   color: var(--brand-dark);
@@ -165,36 +199,6 @@
   font-size: 15px;
   color: var(--brand-dark);
   box-shadow: 0 2px 6px rgba(40, 52, 52, 0.12);
-}
-
-.continue {
-  display: grid;
-  grid-template-columns: 1fr 84px;
-  gap: var(--s3) var(--s4);
-  align-items: center;
-  padding: var(--s4) var(--s4) var(--s4);
-}
-.continue__info {
-  min-width: 0;
-}
-.continue__eyebrow {
-  color: var(--brand-dark);
-  font-weight: 800;
-  font-size: var(--t-sm);
-  margin-bottom: 2px;
-}
-.continue h2 {
-  font-size: 30px;
-}
-.continue__thumb {
-  width: 84px;
-  aspect-ratio: 1;
-  border-radius: 12px;
-  background: var(--canvas-deep);
-}
-.continue__go,
-.continue .btn--quiet {
-  grid-column: 1 / -1;
 }
 
 .daily-card .card__body {

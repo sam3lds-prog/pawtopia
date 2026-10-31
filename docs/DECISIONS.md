@@ -727,3 +727,20 @@ timing to beat.
   reduced-motion rules collapse it to its last frame. No new engine.
 - Device checks still to do (release checklist, D38 PR B): the 380 ms window on a real finger at 320 and 375, VoiceOver
   through the board (activation = two-step), Switch Control, Dynamic Type on the note.
+
+### PR C — Journey and World hierarchy (P1)
+- **One hero on the Journey hub** (`journey.ts::heroGoalMarkup`, `.hero`): the goal row (a small picture of the
+  sanctuary being built, *Building the Meadow Farm*, the animal on its way and its bar), then the level with its
+  thumbnail, one big *Play level N* / *Resume level N*, and two quiet links, *View path* and *Visit Farm*. The goal card
+  and the Continue card are gone (D36 had one above the other, which pushed Play below the fold on an SE); the hub no
+  longer offers a World-map link next to the Visit link (the World tab is the map). When every open sanctuary is
+  finished the goal row names the next home to open and the second link is *World*. The button sits on the first
+  screen at 320×568 with the tab bar (e2e checks it) and at 375×667. Presentation only: ids, achievements, onboarding,
+  Back and the saved-board rules are untouched.
+- **World**: the focus card keeps the story but has one big button (*Play level N* full width); *Visit Farm* and *Build
+  elsewhere* are quiet links, so nothing wraps at 320. Under it, one row of pills for what else is going on
+  (`.world-now`): news waiting in a sanctuary (coral, *Truffle came home · Farm*) and the next home to open (*Next to
+  open: Outback · after level 10*); each pill opens its sanctuary. The map stays the delightful overview, not the only
+  way in: pin labels 10 → 12 px, the home being built has a soft breathing halo (a still under reduced motion), locked
+  homes step back (smaller, paler, quieter names), and *Expand map* doubles its width to pan around, starting on the
+  home being built. The home cards below are the reliable touch targets, as before.

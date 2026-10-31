@@ -1,6 +1,8 @@
 /**
- * World: what the puzzles build (D35, D36). First the goal: the sanctuary being built, who is on the way, and the next
- * puzzle one tap away. Then the map of every sanctuary (the Farm and the Pet Garden open from the start; each exotic
+ * World: what the puzzles build (D35, D36, D38). First the goal: the sanctuary being built, who is on the way, and the
+ * next puzzle one tap away; then one row of what else is going on (news waiting to be seen, the next home to open). The
+ * map is a delightful overview (bigger labels, a halo on the home being built, locked homes kept quiet; it can be
+ * expanded), never the only way in: the home cards below are the reliable touch targets. Then the map of every sanctuary (the Farm and the Pet Garden open from the start; each exotic
  * region opens at a Journey level) and the list with each one's state: building here, build here, locked until a level,
  * complete. Whichever one you build grows with the puzzles you solve, and its animals come home one by one (the one on
  * its way is the animal on your boards). Nothing here is for sale: puzzles are what grow a sanctuary.
@@ -109,10 +111,12 @@ export const worldScreen: ScreenDef = {
         <h2 id="focus-title">${esc(def.name)}</h2>
         ${body}
         <div class="world-focus__actions">
-          <button class="btn" data-act="play">Play level ${level}</button>
-          <button class="btn btn--secondary" data-go="${building}">Visit</button>
+          <button class="btn btn--block" data-act="play">Play level ${level}</button>
         </div>
-        ${others ? `<button class="world-focus__switch" data-act="others">${ICON.globe}Build somewhere else instead</button>` : ''}
+        <div class="world-focus__links">
+          <button class="btn btn--quiet" data-go="${building}">${ICON.home}Visit ${esc(def.short)}</button>
+          ${others ? `<button class="btn btn--quiet" data-act="others">${ICON.globe}Build elsewhere</button>` : ''}
+        </div>
       </section>`;
     } else if (!openCount && upcoming) {
       const pct = Math.round(((level - 1) / upcoming.def.opensAfterLevel) * 100);
@@ -134,6 +138,17 @@ export const worldScreen: ScreenDef = {
     } else {
       focus = `<section class="card world-focus" aria-labelledby="focus-title"><p class="world-focus__eyebrow">${ICON.sparkle}All done</p><h2 id="focus-title">Every sanctuary is thriving</h2><p class="muted">Thank you for building homes all around the world.</p></section>`;
     }
+
+    // What else is going on, in one row (D38): news waiting in a sanctuary, and the next home to open. Each pill opens
+    // its sanctuary; the row is left out when there is nothing to say.
+    const newsPills = SANCTUARIES.filter((d) => unseenIn(save, d.id))
+      .map((d) => `<button class="now-pill now-pill--news" data-go="${d.id}" style="--accent:${d.accent}">${ICON.sparkle}<span>${esc(newsLine(d.id).replace(/^New: /, ''))} · ${esc(short(d))}</span></button>`)
+      .join('');
+    const nextPill =
+      upcoming && !unseenIn(save, upcoming.id)
+        ? `<button class="now-pill now-pill--next" data-go="${upcoming.id}" style="--accent:${upcoming.def.accent}">${ICON.lock}<span>Next to open: ${esc(short(upcoming.def))} · after level ${upcoming.def.opensAfterLevel}</span></button>`
+        : '';
+    const now = newsPills || nextPill ? `<div class="world-now" aria-label="What's new on the map">${newsPills}${nextPill}</div>` : '';
 
     const cards = SANCTUARIES.map((d) => {
       const st = statusOf(d.id);
@@ -170,9 +185,13 @@ export const worldScreen: ScreenDef = {
         </header>
         ${tip}
         ${focus}
-        <div class="world-map card">
-          ${worldMapSvg(SANCTUARY_BY_ID.harmony)}
-          ${pins}
+        ${now}
+        <div class="world-map-wrap" data-map-wrap>
+          <div class="world-map card">
+            ${worldMapSvg(SANCTUARY_BY_ID.harmony)}
+            ${pins}
+          </div>
+          <button class="world-map__expand" data-act="expand" aria-pressed="false" aria-label="Expand the map">${ICON.globe}<span>Expand map</span></button>
         </div>
         <section aria-labelledby="sanct-title">
           <div class="section-head"><h2 id="sanct-title">Homes</h2><span class="muted num">${openCount} of ${SANCTUARIES.length} open</span></div>
@@ -196,6 +215,18 @@ export const worldScreen: ScreenDef = {
       if (a.dataset.act === 'play') playMode({ kind: 'level', level: app.save.journey.nextLevel });
       else if (a.dataset.act === 'album') app.router.go({ screen: 'pets' });
       else if (a.dataset.act === 'others') el.querySelector('#sanct-title')?.scrollIntoView({ block: 'start', behavior: app.reducedMotion ? 'auto' : 'smooth' });
+      else if (a.dataset.act === 'expand') {
+        // A bigger map to pan around (twice the width, scrolled from the home being built); nothing else moves.
+        const wrap = el.querySelector('[data-map-wrap]') as HTMLElement;
+        const on = wrap.classList.toggle('is-large');
+        a.setAttribute('aria-pressed', String(on));
+        a.querySelector('span')!.textContent = on ? 'Shrink map' : 'Expand map';
+        if (on) {
+          const map = wrap.querySelector('.world-map') as HTMLElement;
+          const pin = (map.querySelector('.world-pin.is-building') ?? map.querySelector('.world-pin.is-open')) as HTMLElement | null;
+          if (pin) wrap.scrollLeft = Math.max(0, pin.offsetLeft - wrap.clientWidth / 2);
+        }
+      }
       else if (a.dataset.act === 'tip-ok') {
         app.save.onboarding.worldTipSeen = true;
         app.persist();

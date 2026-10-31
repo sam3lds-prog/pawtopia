@@ -157,18 +157,40 @@ describe('back', () => {
 });
 
 describe('the Journey hub', () => {
-  it('shows the goal, the next level and one big Continue, in that order, above the Daily', () => {
+  it('one hero: the goal, then the next level and one big Play, above the Daily; the path and the sanctuary a quiet tap away (D38)', () => {
     router.reset({ screen: 'journey' });
-    const order = [...document.querySelectorAll('.goal-card, .continue, .daily-card')].map((e) => e.className);
-    expect(order[0]).toContain('goal-card');
-    expect(order[1]).toContain('continue');
-    expect(order[2]).toContain('daily-card');
-    expect(text('.goal-card h2')).toBe('Meadow Farm');
-    expect(text('.goal-card__next')).toMatch(/Truffle the piglet/);
+    const order = [...document.querySelectorAll('.hero, .daily-card')].map((e) => e.className);
+    expect(order[0]).toContain('hero');
+    expect(order[1]).toContain('daily-card');
+    // Inside the hero: the goal row first, then the level.
+    const goal = el('.hero__goal')!;
+    const play = el('.hero__play')!;
+    expect(goal.compareDocumentPosition(play) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(text('.hero__eyebrow')).toMatch(/Building the Meadow Farm/);
+    expect(text('.hero__next')).toMatch(/Truffle the piglet/);
+    expect(el('.hero__bar')?.getAttribute('aria-valuenow')).toBe('2');
     expect(text('#continue-title')).toBe('Level 8');
     expect(text('[data-board-desc]')).toMatch(/One animal/);
     expect(text('.continue__go')).toBe('Play level 8');
     expect(document.querySelectorAll('.journey .btn--block')).toHaveLength(1);
+    // The quiet links: the path and the sanctuary being built. The World tab is the map; the hub does not repeat it.
+    expect(text('.hero__links [data-act="path"]')).toMatch(/View path/);
+    expect(text('.hero__links [data-act="visit"]')).toBe('Visit Farm');
+    expect(el('.hero [data-act="world"]')).toBeNull();
+    expect(el('.goal-card')).toBeNull();
+  });
+
+  it('with every open sanctuary finished, the hero points at the next home to open and offers the World instead of a Visit', () => {
+    app.save.world.growth.farm = 26;
+    app.save.world.growth.harmony = 60;
+    // The Farm's animals and the Garden's woodland visitors are companions; its cats and dogs are pets.
+    for (const id of ['cotton', 'truffle', 'buttercup', 'pepper', 'marigold', 'hazel', 'juniper', 'ember', 'maple']) app.save.inventory.companions[id as 'cotton'] = { unlockedAt: '2026-10-30T00:00:00.000Z' };
+    for (const id of ['biscuit', 'mochi', 'pip', 'nori', 'clover', 'peanut']) app.save.inventory.pets[id] = { unlockedAt: '2026-10-30T00:00:00.000Z' };
+    router.reset({ screen: 'journey' });
+    expect(text('.hero__next')).toMatch(/Outback.* opens after level 10/);
+    expect(el('.hero [data-act="visit"]')).toBeNull();
+    expect(text('.hero__links [data-act="world"]')).toBe('World');
+    expect(text('.continue__go')).toBe('Play level 8');
   });
 
   it('Continue is the Journey\'s: a saved Daily is offered on its own line, not as Continue', () => {
@@ -183,7 +205,7 @@ describe('the Journey hub', () => {
     saveBoard({ kind: 'level', level: 3 });
     router.reset({ screen: 'journey' });
     expect(text('.continue__go')).toBe('Resume level 3');
-    expect(text('.continue [data-act="journey"]')).toBe('Play level 8 instead');
+    expect(text('.hero [data-act="journey"]')).toBe('Play level 8 instead');
     expect(document.querySelector('.resume-other')).toBeNull();
   });
 
@@ -191,7 +213,7 @@ describe('the Journey hub', () => {
     saveBoard({ kind: 'level', level: 3 });
     const before = JSON.stringify(app.save.sessions);
     router.reset({ screen: 'journey' });
-    el('.continue [data-act="journey"]')!.click();
+    el('.hero [data-act="journey"]')!.click();
     // A question first, and "Not now" leaves everything as it was.
     expect(text('.sheet')).toMatch(/Start level 8\?/);
     expect(text('.sheet')).toMatch(/level 3 board \(1 move so far\) will be cleared/);
@@ -199,18 +221,20 @@ describe('the Journey hub', () => {
     expect(router.route).toEqual({ screen: 'journey' });
     expect(JSON.stringify(app.save.sessions)).toBe(before);
     // Choosing to start is the player's call.
-    el('.continue [data-act="journey"]')!.click();
+    el('.hero [data-act="journey"]')!.click();
     (el('.sheet [data-act="go"]') as HTMLButtonElement).click();
     expect(router.route?.screen).toBe('game');
     expect(app.active?.mode).toEqual({ kind: 'level', level: 8 });
   });
 
-  it('Visit on the goal card opens the sanctuary being built; Back returns to the hub', () => {
+  it('Visit on the hero (the picture or the link) opens the sanctuary being built; Back returns to the hub', () => {
     router.reset({ screen: 'journey' });
-    el('.goal-card [data-act="visit"]')!.click();
+    el('.hero__scene[data-act="visit"]')!.click();
     expect(router.route).toEqual({ screen: 'region', id: 'farm' });
     el('.region [data-act="back"]')!.click();
     expect(router.route).toEqual({ screen: 'journey' });
+    el('.hero__links [data-act="visit"]')!.click();
+    expect(router.route).toEqual({ screen: 'region', id: 'farm' });
   });
 });
 
@@ -223,6 +247,20 @@ describe('the World', () => {
     expect(focus.compareDocumentPosition(map) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(text('.world-focus h2')).toBe('Meadow Farm');
     expect(text('.world-focus [data-act="play"]')).toBe('Play level 8');
+    // One big button; Visit and Build elsewhere are quiet links (D38).
+    expect(document.querySelectorAll('.world-focus .btn--block')).toHaveLength(1);
+    expect(text('.world-focus__links [data-go="farm"]')).toBe('Visit Farm');
+    // What else is going on: the next home to open, as a pill that opens it.
+    expect(text('.world-now .now-pill--next')).toMatch(/Next to open: Outback · after level 10/);
+    // The map can be expanded and shrunk; the pins and cards stay.
+    const wrap = el('[data-map-wrap]')!;
+    el('[data-act="expand"]')!.click();
+    expect(wrap.classList.contains('is-large')).toBe(true);
+    expect(el('[data-act="expand"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(text('[data-act="expand"]')).toMatch(/Shrink map/);
+    el('[data-act="expand"]')!.click();
+    expect(wrap.classList.contains('is-large')).toBe(false);
+    expect(document.querySelectorAll('.world-pin')).toHaveLength(6);
     expect(text('.world-card[data-go="farm"] .world-card__status')).toMatch(/Building here/);
     expect(text('.world-card[data-go="harmony"] .world-card__status')).toMatch(/^Build here/);
     expect(text('.world-card[data-go="harmony"] .world-card__status')).not.toMatch(/Paused/);
@@ -240,11 +278,13 @@ describe('the World', () => {
     app.save.world.unseen = { farm: { animals: ['truffle'], stage: null, opened: false, at: '2026-10-31T00:00:00.000Z' } };
     app.save.inventory.companions.truffle = { unlockedAt: '2026-10-31T00:00:00.000Z' };
     router.reset({ screen: 'journey' });
-    expect(text('.goal-card .chip--news')).toBe('New');
+    expect(text('.hero .chip--news')).toBe('New');
     expect(el('.nav [data-tab="world"]')?.classList.contains('has-news')).toBe(true);
     router.reset({ screen: 'world' });
     expect(text('.world-card[data-go="farm"] .chip--news')).toMatch(/New: Truffle came home/);
     expect(el('.world-pin[data-go="farm"] .news-dot')).not.toBeNull();
+    // And at the top, a pill that goes straight there.
+    expect(text('.world-now .now-pill--news')).toMatch(/Truffle came home · Farm/);
     router.go({ screen: 'region', id: 'farm' });
     expect(app.save.world.unseen.farm).toBeUndefined();
     router.back({ screen: 'world' });
