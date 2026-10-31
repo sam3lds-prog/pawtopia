@@ -603,3 +603,7 @@ every Journey, Daily and Zen solve counts (replays too); the Paw Cup never does.
   Back to that sanctuary. A tab tap is a fresh start (the history is cleared). A board is never kept in the history, so
   Back never reopens a finished board; leaving a board returns to wherever it was opened from.
 - The win sheet's "Back home" is "Back to Journey" (`modes.nextAfterWin` says `journey`).
+- Two things the independent review of the stack caught: the welcome splash is never kept in the Back history (a new
+  player who leaves the first board or visits the Farm after it comes back to the Journey, not to "Meet Cotton"), and
+  "Play level N instead" while a Journey board with progress is saved asks first, naming the board and its moves,
+  since the game keeps one board at a time.
