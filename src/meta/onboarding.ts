@@ -34,7 +34,8 @@ const TIPS: Record<number, string> = {
   12: 'Eight by eight. Start with the smallest colors and the shortest lines.',
   14: 'Two colors squeezed into the same two rows use up both rows: nothing else in them can hold {a}.',
   17: 'Nine by nine, the biggest boards. One color at a time.',
-  20: 'The last one-animal board! At level 21 a second animal joins in.',
+  19: 'Two more of these. Then a second animal joins: one of each in every row, column and color.',
+  20: 'The last one-animal board! At level 21 a second animal joins in, and you pick which one you place.',
   // Two animals
   22: 'Every row and every column holds exactly one {a} and one {b}.',
   24: 'Colors count too: each color gets one {a} and one {b}.',

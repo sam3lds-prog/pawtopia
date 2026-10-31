@@ -483,6 +483,8 @@ body[data-nav='on'] .nav {
   background: var(--surface-2);
   border: 1px solid var(--line);
   flex: none;
+  /* Never wider than the row: three options share the width and wrap their words instead of overflowing. */
+  max-width: 100%;
 }
 .choice button {
   min-height: 34px;
@@ -491,6 +493,9 @@ body[data-nav='on'] .nav {
   font-size: 13px;
   font-weight: 800;
   color: var(--muted-ink);
+  flex: 1 1 0;
+  min-width: 0;
+  line-height: 1.15;
 }
 .choice button[aria-pressed='true'] {
   background: var(--surface);

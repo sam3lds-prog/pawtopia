@@ -22,6 +22,7 @@ import { actionOf, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { ScreenDef } from '../router';
 import { showSettings } from './settings';
+import { controlsNoticeMarkup, handleControlsNotice } from '../components/notices';
 import { SANCTUARY_BY_ID, isRegionId, type RegionId, type SanctuaryId } from '../../meta/catalogs/sanctuaries';
 import { activeSanctuary, arrivalProgress, nextStage, nextToOpen, stageOf } from '../../meta/world';
 import { animalInfo, homeAnimals } from '../../meta/animals';
@@ -167,6 +168,7 @@ export const homeScreen: ScreenDef = {
         </section>
 
         ${worldStrip()}
+        ${controlsNoticeMarkup()}
 
         <div class="daily-block">
         <button class="card card--tap daily-card ${dailyDone ? 'is-done' : ''}" data-act="daily">
@@ -330,6 +332,7 @@ export const homeScreen: ScreenDef = {
       }
       const a = actionOf(e);
       if (!a) return;
+      if (handleControlsNotice(a.act, el, scope)) return;
       switch (a.act) {
         case 'pantry-ok':
           app.save.onboarding.seenPantryIntro = true;

@@ -70,9 +70,11 @@ Defects confirmed in source and fixed in Sprint 0:
   undo and rules in pause; Paw Cup after level 21; album by sanctuary
 - [x] **Sprint U** (D36, PR 1) — correctness: a wrong guess never marks the tile; a board's solve credits the sanctuary
   it started for (once, by board id); a region that opens is the win's visit target; the board names its sanctuary
+- [x] **Sprint V** (D36, PR 2) — one tap places (tool bar: animal(s), ✕, Erase), the D35 scheme and the tap cycle kept
+  as options, existing players told once; level 21 bridge; coaching and How to play per scheme
 - [ ] Game Center and online Paw Cup leagues — not started
 
-Test count: 369 unit tests + 104 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
+Test count: 380 unit tests + 120 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.

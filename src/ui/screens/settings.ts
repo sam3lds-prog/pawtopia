@@ -39,9 +39,12 @@ function choice<K extends keyof Settings>(key: K, label: string, opts: Array<[Se
 function controlsPreview(c: Settings['controls']): string {
   const step = (icon: string, label: string) => `<span class="cp-step">${icon}<small>${esc(label)}</small></span>`;
   const arrow = `<span class="cp-arrow" aria-hidden="true">→</span>`;
+  const dot = `<span class="cp-arrow" aria-hidden="true">·</span>`;
   if (c === 'classic')
     return `<span class="cp-steps" aria-label="Tap cycle: each tap goes empty, then cross, then the animal, then empty">${step(ICON.mark, '1st tap: ✕')}${arrow}${step(ICON.paw, '2nd: animal')}${arrow}${step(ICON.erase, '3rd: clear')}</span>`;
-  return `<span class="cp-steps" aria-label="Tap marks a cross, double-tap places the animal, Erase takes things back">${step(ICON.mark, 'Tap: ✕')}${arrow}${step(ICON.paw, 'Double-tap: animal')}${arrow}${step(ICON.erase, 'Erase: undo a tile')}</span>`;
+  if (c === 'tap')
+    return `<span class="cp-steps" aria-label="Tap marks a cross, double-tap places the animal, Erase takes things back">${step(ICON.mark, 'Tap: ✕')}${arrow}${step(ICON.paw, 'Double-tap: animal')}${arrow}${step(ICON.erase, 'Erase: undo a tile')}</span>`;
+  return `<span class="cp-steps" aria-label="Pick a tool below the board, then tap a tile: the animal places it, the cross marks it empty, Erase takes it back">${step(ICON.paw, 'Animal: tap places')}${dot}${step(ICON.mark, '✕: tap marks')}${dot}${step(ICON.erase, 'Erase: tap clears')}</span>`;
 }
 
 export interface SettingsOptions {
@@ -69,10 +72,11 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
           'controls',
           'Controls',
           [
-            ['tap', 'Tap and double-tap'],
+            ['place', 'One tap places'],
+            ['tap', 'Tap ✕, double-tap'],
             ['classic', 'Tap cycle'],
           ],
-          'Tap cycle needs no quick double tap: easier with VoiceOver or Switch Control',
+          'One tap places and Tap cycle need no quick double tap: easier with VoiceOver or Switch Control',
         )}
         <p class="controls-preview" data-controls-preview aria-live="polite">${controlsPreview(app.settings.controls)}</p>
         ${sw('autoMark', 'Dot impossible tiles', 'A small dot shows where no animal can go')}

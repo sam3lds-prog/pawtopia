@@ -1,17 +1,17 @@
 // @vitest-environment happy-dom
 /**
- * The play screen's input rules, mounted for real in a DOM: what a wrong placement leaves behind, and what a solve
- * credits. These are the two P0 invariants of the Journey/World review (2026-10-31).
+ * The play screen's input rules, mounted for real in a DOM: what one tap does under each control scheme, what a wrong
+ * placement leaves behind, and what a solve credits. These cover the P0 items of the Journey/World review (D36).
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../../src/app/app';
 import { Router, type Route } from '../../src/ui/router';
 import { gameScreen } from '../../src/ui/screens/game';
 import { startGame } from '../../src/app/gameFlow';
-import { CAT, DOG, EMPTY, type Species } from '../../src/engine/types';
+import { CAT, DOG, EMPTY } from '../../src/engine/types';
 import { MARK } from '../../src/game/session';
 import { setActive } from '../../src/meta/world';
-import { defaultSave } from '../../src/services/storage';
+import { defaultSave, type ControlScheme } from '../../src/services/storage';
 
 /** A stand-in screen for every route the game can leave to. */
 const blank = { tab: null, title: 'x', mount: () => {} };
@@ -27,6 +27,8 @@ function mountRouter(): Router {
 }
 
 const cell = (r: number, c: number) => document.querySelector<HTMLButtonElement>(`.cell[data-r="${r}"][data-c="${c}"]`)!;
+const toolBtn = (t: string) => document.querySelector<HTMLButtonElement>(`[data-tool="${t}"]`);
+const coach = () => document.querySelector('[data-coach]')?.textContent ?? '';
 
 /** A pointer tap on a cell, the way the board listens for it. */
 function tap(r: number, c: number): void {
@@ -37,9 +39,18 @@ function tap(r: number, c: number): void {
   el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerId: 1, clientX: box.x, clientY: box.y }));
 }
 
-function dblTap(r: number, c: number): void {
-  tap(r, c);
-  tap(r, c);
+/** Finger down on one cell, moved across others, lifted. */
+function drag(cells: Array<[number, number]>): void {
+  const [first, ...rest] = cells;
+  const el0 = cell(first[0], first[1]);
+  document.elementFromPoint = () => el0;
+  el0.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 2, clientX: 5, clientY: 5 }));
+  for (const [r, c] of rest) {
+    const el = cell(r, c);
+    document.elementFromPoint = () => el;
+    el0.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 2, clientX: 5 + c, clientY: 5 + r }));
+  }
+  el0.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerId: 2 }));
 }
 
 function find(pred: (r: number, c: number) => boolean): [number, number] {
@@ -47,6 +58,14 @@ function find(pred: (r: number, c: number) => boolean): [number, number] {
   for (let r = 0; r < s.size; r++) for (let c = 0; c < s.size; c++) if (!s.givenMask[r][c] && s.cells[r][c] === EMPTY && pred(r, c)) return [r, c];
   throw new Error('no such cell');
 }
+
+function start(level: number, controls: ControlScheme = 'place'): void {
+  app.settings.controls = controls;
+  if (level > 20) app.save.journey.nextLevel = Math.max(app.save.journey.nextLevel, level);
+  startGame({ kind: 'level', level });
+}
+
+const placeEvents = () => app.active!.session.events.filter((e) => e.type === 'place');
 
 beforeEach(() => {
   localStorage.clear();
@@ -60,44 +79,141 @@ afterEach(() => {
   app.active = null;
 });
 
-describe('a wrong placement (P0)', () => {
-  it('on a one-animal board costs a heart and leaves the tile empty, never a ✕', () => {
-    startGame({ kind: 'level', level: 4 });
+describe('one tap places (the default scheme, D36)', () => {
+  it('a one-animal board: the animal is the pressed tool; one tap places it with one event', () => {
+    start(5); // no level tip, so the coach line is the scheme's
     const s = app.active!.session;
-    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
-    dblTap(r, c);
+    expect(toolBtn('cat')?.getAttribute('aria-checked')).toBe('true');
+    expect(toolBtn('mark')).not.toBeNull();
+    expect(toolBtn('erase')).not.toBeNull();
+    expect(document.querySelector('[data-act="erase"]')).toBeNull();
+    expect(coach()).toMatch(/Tap a tile to place/);
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    tap(r, c);
+    expect(s.cells[r][c]).toBe(CAT);
+    expect(placeEvents()).toHaveLength(1);
+    expect(s.mistakes).toBe(0);
+  });
+
+  it('a tap on a placed animal does nothing but say how to take it back', () => {
+    start(4);
+    const s = app.active!.session;
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    tap(r, c);
+    tap(r, c);
+    expect(s.cells[r][c]).toBe(CAT);
+    expect(coach()).toMatch(/Erase/);
+    // Erase takes it back, and Erase stays pressed until it is tapped again.
+    toolBtn('erase')!.click();
+    expect(toolBtn('erase')?.getAttribute('aria-checked')).toBe('true');
+    tap(r, c);
+    expect(s.cells[r][c]).toBe(EMPTY);
+    expect(toolBtn('erase')?.getAttribute('aria-checked')).toBe('true');
+    toolBtn('erase')!.click();
+    expect(toolBtn('cat')?.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('the ✕ tool marks with a tap, marks a run with a drag, and gives the animal back on a second press', () => {
+    start(4);
+    const s = app.active!.session;
+    toolBtn('mark')!.click();
+    expect(toolBtn('mark')?.getAttribute('aria-checked')).toBe('true');
+    expect(document.querySelector('.game')?.classList.contains('is-marking')).toBe(true);
+    const a = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    tap(a[0], a[1]);
+    expect(s.cells[a[0]][a[1]]).toBe(MARK);
+    tap(a[0], a[1]);
+    expect(s.cells[a[0]][a[1]]).toBe(EMPTY);
+    // A drag across row 0's free tiles marks exactly those.
+    const row = [...Array(s.size).keys()].filter((c) => !s.givenMask[0][c] && s.cells[0][c] === EMPTY).map((c) => [0, c] as [number, number]);
+    drag(row);
+    for (const [r, c] of row) expect(s.cells[r][c]).toBe(MARK);
+    expect(placeEvents()).toHaveLength(0);
+    toolBtn('mark')!.click();
+    expect(toolBtn('cat')?.getAttribute('aria-checked')).toBe('true');
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    tap(r, c);
+    expect(s.cells[r][c]).toBe(CAT);
+  });
+
+  it('a two-animal board: pick an animal, then one tap places it; the pick is remembered', () => {
+    start(30);
+    const s = app.active!.session;
+    expect(s.rule).toBe('pair');
+    expect(document.querySelectorAll('[data-tool]')).toHaveLength(4);
+    toolBtn('dog')!.click();
+    expect(toolBtn('dog')?.getAttribute('aria-checked')).toBe('true');
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === DOG);
+    tap(r, c);
+    expect(s.cells[r][c]).toBe(DOG);
+    expect(placeEvents()).toHaveLength(1);
+    expect(app.settings.lastSpecies).toBe('dog');
+  });
+
+  it('a wrong tap costs one heart and leaves the tile as it was (empty, or the player\'s own ✕)', () => {
+    start(30);
+    const s = app.active!.session;
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === DOG);
+    toolBtn('cat')!.click();
+    tap(r, c);
     expect(s.hearts).toBe(s.maxHearts - 1);
-    expect(s.mistakes).toBe(1);
     expect(s.cells[r][c]).toBe(EMPTY);
     expect(cell(r, c).querySelector('.cell__mark')).toBeNull();
     expect(cell(r, c).querySelector('.cell__ghost')).not.toBeNull();
-  });
-
-  it('on a two-animal board leaves the other animal\'s tile empty (a ✕ there would be a lie)', () => {
-    app.save.journey.nextLevel = 30;
-    startGame({ kind: 'level', level: 30 });
-    const s = app.active!.session;
-    expect(s.rule).toBe('pair');
-    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === DOG);
-    document.querySelector<HTMLButtonElement>('[data-tool="cat"]')!.click();
-    dblTap(r, c);
-    expect(s.hearts).toBe(s.maxHearts - 1);
-    expect(s.cells[r][c]).toBe(EMPTY);
-    // The last thing logged is the wrong placement itself: nothing marks the tile afterwards.
     expect(s.events[s.events.length - 1]).toMatchObject({ type: 'place', r, c, s: CAT });
-    expect(cell(r, c).querySelector('.cell__mark')).toBeNull();
+    // On a tile the player marked ✕ themselves, a wrong keyboard placement keeps their ✕.
+    const [r2, c2] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    cell(r2, c2).dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true }));
+    expect(s.cells[r2][c2]).toBe(MARK);
+    cell(r2, c2).dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true }));
+    expect(s.hearts).toBe(s.maxHearts - 2);
+    expect(s.cells[r2][c2]).toBe(MARK);
   });
 
-  it('keeps the player\'s own ✕ when the keyboard places a wrong animal on it', () => {
-    startGame({ kind: 'level', level: 4 });
+  it('keyboard: Enter applies the pressed tool; 1 and 2 place directly; x marks', () => {
+    start(30);
     const s = app.active!.session;
-    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
-    const el = cell(r, c);
-    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true }));
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    cell(r, c).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(s.cells[r][c]).toBe(CAT);
+    const [r2, c2] = find((r, c) => s.puzzle.solution[r][c] === DOG);
+    cell(r2, c2).dispatchEvent(new KeyboardEvent('keydown', { key: '2', bubbles: true }));
+    expect(s.cells[r2][c2]).toBe(DOG);
+    toolBtn('mark')!.click();
+    const [r3, c3] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    cell(r3, c3).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(s.cells[r3][c3]).toBe(MARK);
+  });
+});
+
+describe('the other schemes still work', () => {
+  it('tap and double-tap (D35): a tap marks ✕, a quick second tap places, a wrong one leaves the tile empty', () => {
+    start(5, 'tap');
+    const s = app.active!.session;
+    expect(document.querySelector('[data-act="erase"]')).not.toBeNull();
+    expect(toolBtn('mark')).toBeNull();
+    expect(coach()).toMatch(/double-tap/);
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    tap(r, c);
     expect(s.cells[r][c]).toBe(MARK);
-    el.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true }));
+    tap(r, c);
+    expect(s.cells[r][c]).toBe(CAT);
+    const [wr, wc] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    tap(wr, wc);
+    tap(wr, wc);
     expect(s.hearts).toBe(s.maxHearts - 1);
+    expect(s.cells[wr][wc]).toBe(EMPTY);
+  });
+
+  it('tap cycle: empty → ✕ → animal, no timing', () => {
+    start(5, 'classic');
+    const s = app.active!.session;
+    expect(coach()).toMatch(/Tap once to mark/);
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    tap(r, c);
     expect(s.cells[r][c]).toBe(MARK);
+    tap(r, c);
+    expect(s.cells[r][c]).toBe(CAT);
   });
 });
 
@@ -109,15 +225,14 @@ describe('a solve credits the sanctuary the board started for (P0)', () => {
         const want = s.puzzle.solution[r][c];
         if (want === EMPTY || s.givenMask[r][c] || s.cells[r][c] === want) continue;
         if (!document.querySelector('.cell')) return;
-        const tool = document.querySelector<HTMLButtonElement>(`[data-tool="${want === CAT ? 'cat' : 'dog'}"]`);
-        tool?.click();
-        dblTap(r, c);
+        toolBtn(want === CAT ? 'cat' : 'dog')?.click();
+        tap(r, c);
         if (s.outcome === 'won') return;
       }
   }
 
   it('Farm board, then Pet Garden chosen, then the Farm board is finished: the Farm grows, the Garden does not', () => {
-    startGame({ kind: 'level', level: 4 });
+    start(4);
     expect(app.active!.cast!.sanctuary).toBe('farm');
     const board = app.active!.boardId;
     expect(board).toBeTruthy();
@@ -131,19 +246,35 @@ describe('a solve credits the sanctuary the board started for (P0)', () => {
     expect(app.save.world.active).toBe('harmony');
     expect(app.save.world.credits[board!]).toBe('farm');
     // The next board is for the Pet Garden, as chosen.
-    startGame({ kind: 'level', level: 5 });
+    start(5);
     expect(app.active!.cast!.sanctuary).toBe('harmony');
     expect(app.active!.boardId).not.toBe(board);
   });
 
-  it('the header says which sanctuary the board is for', () => {
-    startGame({ kind: 'level', level: 4 });
+  it('the status line says which sanctuary the board is for, even after a re-mount', () => {
+    start(4);
     expect(document.querySelector('[data-for="farm"]')?.textContent).toContain('Farm');
     setActive(app.save, 'harmony');
     app.router.refresh();
-    // The same board, re-mounted: still the Farm's.
     expect(document.querySelector('[data-for="farm"]')).not.toBeNull();
   });
 });
 
-export type { Species };
+describe('level 21: the bridge, then the lesson', () => {
+  it('shows the two-animal rules once, with this board\'s animals, before the guided first pair', () => {
+    app.save.onboarding.pairRulesSeen = false;
+    app.save.onboarding.pairLessonDone = false;
+    app.save.journey.nextLevel = 21;
+    startGame({ kind: 'level', level: 21 });
+    const sheet = document.querySelector('.rules-bridge');
+    expect(sheet).not.toBeNull();
+    expect(sheet?.textContent).toMatch(/A second animal joins/);
+    expect(sheet?.textContent).toMatch(/Tap a tile to place the animal you picked/);
+    expect(document.querySelector('.cell.is-guide')).toBeNull();
+    (sheet!.querySelector('[data-act="ok"]') as HTMLButtonElement).click();
+    expect(document.querySelector('.rules-bridge')).toBeNull();
+    expect(document.querySelector('.cell.is-guide')).not.toBeNull();
+    expect(coach()).toMatch(/Now two animals/);
+    expect(app.save.onboarding.pairRulesSeen).toBe(true);
+  });
+});

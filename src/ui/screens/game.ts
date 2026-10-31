@@ -1,8 +1,11 @@
 /**
- * The play screen: top bar, the board (hero), one coach line, and the controls (D35): tap a tile to mark it ✕,
- * double-tap to place the board's animal (a wrong one costs a heart). One-animal boards have just Erase and Hint;
- * two-animal boards add two animal buttons that choose which animal a double-tap places. The board shows the animal
- * you're bringing home to the sanctuary you're building (meta/cast.ts).
+ * The play screen: top bar, the board (hero), one coach line, and the controls. Three schemes (Settings → Controls):
+ *  - 'place' (default, D36): a tool bar below the board, one tool pressed at a time: the board's animal(s), ✕ (mark
+ *    empty, finger-drag marks a run of tiles) and Erase. One tap on a tile applies the tool; a wrong animal costs a
+ *    heart and leaves the tile as it was. Tapping a placed animal does nothing but say so (Erase takes it back).
+ *  - 'tap' (D35): tap marks ✕, double-tap places the picked animal; Erase is a toggle.
+ *  - 'classic': each tap cycles empty → ✕ → animal → empty; no timing at all.
+ * The board shows the animal you're bringing home to the sanctuary the board is for (meta/cast.ts).
  */
 
 import { app } from '../../app/app';
@@ -83,11 +86,14 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   const profile = profileOf(s.puzzle);
   const tierName = capitalize(profile.tier);
   const settings = app.settings;
-  const classic = settings.controls === 'classic';
-  // Which animal a double tap places: always the one animal on a one-animal board; on two-animal boards the one the
-  // player picked last.
+  const scheme = settings.controls;
+  const classic = scheme === 'classic';
+  /** One tap applies the pressed tool (D36). The other schemes mark with a tap and place with a double tap or a cycle. */
+  const placeScheme = scheme === 'place';
+  // Which animal a tap (or a double tap) places: always the one animal on a one-animal board; on two-animal boards the
+  // one the player picked last. In the place scheme the ✕ and Erase tools live here too, one tool pressed at a time.
   let tool: Tool = solo ? 'cat' : settings.lastSpecies;
-  /** Erase is a mode: while it's on, taps take things back. */
+  /** Erase is a mode: while it's on, taps take things back. In the place scheme it is simply the Erase tool. */
   let erasing = false;
   let lastTap: { r: number; c: number; t: number; marked: boolean } | null = null;
   let hint: { info: HintInfo; tier: 1 | 2 } | null = null;
@@ -130,9 +136,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
           </div>
         </div>
       </div>
-      <div class="controls controls--${solo ? 'solo' : 'pair'}">
-        ${solo ? '' : `<div class="tools" role="radiogroup" aria-label="Animal a double tap places">${animalButton(CAT)}${animalButton(DOG)}</div>`}
-        <button class="act act--erase" data-act="erase" aria-pressed="false">${ICON.erase}<span>Erase</span></button>
+      <div class="controls controls--${solo ? 'solo' : 'pair'} controls--${scheme}">
+        ${
+          placeScheme
+            ? `<div class="tools tools--place" role="radiogroup" aria-label="Tool: what a tap does">${animalButton(CAT)}${solo ? '' : animalButton(DOG)}<button class="tool tool--mark" role="radio" data-tool="mark" aria-label="Mark empty: a tap marks a tile ✕, a drag marks a run of tiles"><span class="tool__art tool__art--icon">${ICON.mark}</span><span class="tool__label">Mark</span></button><button class="tool tool--erase" role="radio" data-tool="erase" aria-label="Erase: a tap takes an animal or a ✕ back"><span class="tool__art tool__art--icon">${ICON.erase}</span><span class="tool__label">Erase</span></button></div>`
+            : `${solo ? '' : `<div class="tools" role="radiogroup" aria-label="Animal a double tap places">${animalButton(CAT)}${animalButton(DOG)}</div>`}
+        <button class="act act--erase" data-act="erase" aria-pressed="false">${ICON.erase}<span>Erase</span></button>`
+        }
         <button class="act" data-act="hint" ${rules.hints ? '' : 'disabled aria-describedby="no-hints"'}>${rules.hints ? ICON.bulb : ICON.hint}<span data-hint-label>Hint</span>${rules.hints && !freeHints ? '<span class="act__badge" data-hint-badge></span>' : ''}</button>
       </div>
       ${rules.hints ? '' : '<p id="no-hints" class="sr-only">Hints are off in Paw Cup so every player has the same rules.</p>'}
@@ -141,7 +151,8 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   function animalButton(sp: Species): string {
     const word = wordOf(sp);
-    return `<button class="tool" role="radio" data-tool="${sp === CAT ? 'cat' : 'dog'}" aria-label="${esc(capitalize(word))}: double tap places ${esc(withArticle(word))}"><span class="tool__art">${animalSvg(animalOf(sp))}</span><span class="tool__label">${esc(capitalize(word))}</span></button>`;
+    const does = placeScheme ? `a tap places ${withArticle(word)}` : `double tap places ${withArticle(word)}`;
+    return `<button class="tool" role="radio" data-tool="${sp === CAT ? 'cat' : 'dog'}" aria-label="${esc(capitalize(word))}: ${esc(does)}"><span class="tool__art">${animalSvg(animalOf(sp))}</span><span class="tool__label">${esc(capitalize(word))}</span></button>`;
   }
 
   const stage = qs(el, '[data-stage]');
@@ -205,11 +216,17 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         pantryOn ? `${plural(s.hearts, 'heart')} left. Extra lives: ${lives()}. Tap to use one.` : `${plural(s.hearts, 'heart')} left`,
       );
     }
-    for (const b of el.querySelectorAll<HTMLButtonElement>('[data-tool]')) b.setAttribute('aria-checked', String(b.dataset.tool === tool && !erasing));
-    const eb = qs(el, '[data-act="erase"]') as HTMLButtonElement;
-    eb.setAttribute('aria-pressed', String(erasing));
-    eb.disabled = finished;
+    for (const b of el.querySelectorAll<HTMLButtonElement>('[data-tool]')) {
+      b.setAttribute('aria-checked', String(placeScheme ? b.dataset.tool === tool : b.dataset.tool === tool && !erasing));
+      if (placeScheme) b.disabled = finished;
+    }
+    const eb = el.querySelector('[data-act="erase"]') as HTMLButtonElement | null;
+    if (eb) {
+      eb.setAttribute('aria-pressed', String(erasing));
+      eb.disabled = finished;
+    }
     el.classList.toggle('is-erasing', erasing);
+    el.classList.toggle('is-marking', placeScheme && tool === 'mark');
     const hintLabel = el.querySelector('[data-hint-label]');
     if (hintLabel) hintLabel.textContent = !hint ? 'Hint' : hint.tier === 1 ? 'Closer' : 'Show me';
     const badge = el.querySelector('[data-hint-badge]') as HTMLElement | null;
@@ -252,17 +269,20 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     }
     const word = wordOf(info.species);
     const name = animalInfo(animalOf(info.species)).name;
+    // How the player places an animal under their controls.
+    const tapIt = placeScheme ? 'tap it' : classic ? 'tap it twice (once marks ✕, again places)' : 'double-tap it';
+    const tapGlow = placeScheme ? 'Tap the glowing tile.' : classic ? 'Tap the glowing tile twice.' : 'Double-tap the glowing tile.';
     let text: string;
     if (solo)
       text =
         step === 1
-          ? `One ${word} in every row, column and color, never touching, not even at corners. This color has a single tile, so ${name} goes there: double-tap it.`
-          : `${friendlyReason(info.reason)} Double-tap the glowing tile.`;
+          ? `One ${word} in every row, column and color, never touching, not even at corners. This color has a single tile, so ${name} goes there: ${tapIt}.`
+          : `${friendlyReason(info.reason)} ${tapGlow}`;
     else
       text =
         step === 1
-          ? `Now two animals: one ${wordOf(CAT)} and one ${wordOf(DOG)} in every row, column and color, never side by side. ${friendlyReason(info.reason)} Double-tap the glowing tile.`
-          : `${friendlyReason(info.reason)} The ${word} button is picked for you: double-tap the glowing tile.`;
+          ? `Now two animals: one ${wordOf(CAT)} and one ${wordOf(DOG)} in every row, column and color, never side by side. ${friendlyReason(info.reason)} ${tapGlow}`
+          : `${friendlyReason(info.reason)} The ${word} button is picked for you: ${tapGlow.charAt(0).toLowerCase()}${tapGlow.slice(1)}`;
     guide = { step, r: info.r, c: info.c, species: info.species, unit: info.unit, text };
     tool = info.species === CAT ? 'cat' : 'dog';
     erasing = false;
@@ -335,6 +355,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     if (tip) return tip;
     if (mode.kind === 'zen') return 'No clock, no hearts. Take all the time you like.';
     if (classic) return solo ? `Tap once to mark a tile ✕, again to place ${aWord(CAT)}.` : `Tap once to mark a tile ✕, again to place the animal you picked.`;
+    if (placeScheme) {
+      if (solo) return `One ${wordOf(CAT)} in every row, column and color, never touching. Tap a tile to place ${aWord(CAT)}; the ✕ tool marks empty tiles.`;
+      return `One ${wordOf(CAT)} and one ${wordOf(DOG)} in every row, column and color. Pick an animal below, then tap a tile.`;
+    }
     if (solo) return `One ${wordOf(CAT)} in every row, column and color, never touching. Tap to mark ✕, double-tap to place.`;
     return `One ${wordOf(CAT)} and one ${wordOf(DOG)} in every row, column and color. Double-tap places the one you picked.`;
   }
@@ -349,6 +373,21 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     if (erasing) {
       lastTap = null;
       handle(s.apply(r, c, 'erase'), r, c);
+      return null;
+    }
+    if (placeScheme) {
+      if (tool === 'mark') {
+        // The ✕ tool: a tap toggles ✕; the finger can keep going to mark (or clear) a run of tiles.
+        const res = s.toggleMark(r, c);
+        handle(res, r, c);
+        if (res.marked) return 'mark';
+        if (res.unmarked) return 'unmark';
+        return null;
+      }
+      const v = s.cells[r][c];
+      // A placed animal is never taken away by an accidental tap: the coach says how (Erase).
+      if (v === CAT || v === DOG) handle({ ignored: true }, r, c);
+      else placeAt(r, c);
       return null;
     }
     if (classic) {
@@ -401,8 +440,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   function onKey(r: number, c: number, key: string): boolean {
     const k = key.toLowerCase();
-    // Enter places the picked animal; Space (or X) marks ✕; 1 and 2 place the first or second animal directly.
-    if (k === 'enter') return keyApply(r, c, species() === DOG ? 'dog' : 'cat');
+    // Enter applies the pressed tool (the picked animal; in the place scheme also ✕ or Erase); Space (or X) marks ✕;
+    // 1 and 2 place the first or second animal directly.
+    if (k === 'enter') return keyApply(r, c, placeScheme && (tool === 'mark' || tool === 'erase') ? tool : species() === DOG ? 'dog' : 'cat');
     if (k === '1' || k === 'a') return keyApply(r, c, 'cat');
     if (!solo && (k === '2' || k === 'b')) return keyApply(r, c, 'dog');
     if (k === ' ' || k === 'x' || k === '.') {
@@ -434,6 +474,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       const v = s.cells[r][c];
       if (v === CAT || v === DOG) handle({ ignored: true }, r, c);
       else handle(s.place(r, c, t === 'dog' ? DOG : CAT), r, c); // a wrong guess leaves the tile as it was (see placeAt)
+      return true;
+    }
+    if (t === 'mark') {
+      handle(s.toggleMark(r, c), r, c);
       return true;
     }
     handle(s.apply(r, c, t), r, c);
@@ -748,10 +792,15 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   scope.on(el, 'click', (e) => {
     const t = (e.target as HTMLElement).closest('[data-tool]') as HTMLElement | null;
     if (t) {
-      selectTool(t.dataset.tool as Tool);
+      if (finished) return;
+      const picked = t.dataset.tool as Tool;
+      // In the place scheme, pressing the ✕ or Erase tool again goes back to the animal.
+      if (placeScheme && (picked === 'mark' || picked === 'erase') && tool === picked) selectTool(solo ? 'cat' : settings.lastSpecies);
+      else selectTool(picked);
       haptic('select');
       faces.activity();
       if (tool === 'cat' || tool === 'dog') faces.curiousOne(tool, [0, 1.3]);
+      coach(toolCoach());
       paint();
       return;
     }
@@ -792,7 +841,13 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       selectTool(k === '1' || k === 'a' ? 'cat' : 'dog');
       paint();
     } else if (k === 'e') {
-      erasing = !erasing;
+      if (placeScheme) selectTool(tool === 'erase' ? (solo ? 'cat' : settings.lastSpecies) : 'erase');
+      else erasing = !erasing;
+      coach(toolCoach());
+      paint();
+    } else if (placeScheme && k === 'x') {
+      selectTool(tool === 'mark' ? (solo ? 'cat' : settings.lastSpecies) : 'mark');
+      coach(toolCoach());
       paint();
     } else if (k === 'z') doUndo();
     else if (k === 'y') doRedo();
@@ -800,12 +855,20 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     else if (k === 'p' || k === 'escape') openPause();
   });
 
-  /** Picks which animal a double tap places (and leaves Erase). Remembered for the next two-animal board. */
+  /** Picks the tool a tap applies (an animal, or in the place scheme ✕ or Erase). The animal is remembered for the next two-animal board. */
   function selectTool(t: Tool): void {
     tool = t;
-    erasing = false;
+    erasing = placeScheme ? t === 'erase' : false;
     lastTap = null;
-    if (t === 'cat' || t === 'dog') settings.lastSpecies = t;
+    if ((t === 'cat' || t === 'dog') && !solo) settings.lastSpecies = t;
+  }
+
+  /** What the pressed tool does, in one line (the place scheme). */
+  function toolCoach(): string {
+    if (!placeScheme) return erasing ? 'Erase is on: tap a ✕ or an animal to take it back. Tap Erase again when you are done.' : defaultCoach();
+    if (tool === 'mark') return 'Mark is on: tap a tile to mark it ✕, or drag across a few. Tap Mark again to go back to placing.';
+    if (tool === 'erase') return 'Erase is on: tap a ✕ or an animal to take it back. Tap Erase again when you are done.';
+    return solo ? defaultCoach() : `Tap a tile to place ${aWord(species())}.`;
   }
 
   function resumeIfOnScreen(): void {
@@ -1325,7 +1388,24 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   });
   s.resume();
   const ob = app.save.onboarding;
-  if (guided) {
+  if (pairLesson && !ob.pairRulesSeen) {
+    // Level 21's bridge: one short sheet with the two-animal rules drawn with this board's animals, then the guided
+    // lesson places the first two. Shown once.
+    ob.seenRules = true;
+    ob.pairRulesSeen = true;
+    app.persist();
+    pauseBoard();
+    track('onboarding_step', { step: 'pair_bridge' });
+    showRules(
+      scope,
+      () => {
+        resumeIfOnScreen();
+        startGuide(1);
+        paint();
+      },
+      { rule: s.rule, cast, bridge: true },
+    );
+  } else if (guided) {
     // The guided boards teach their rule as they go.
     ob.seenRules = true;
     if (solo) ob.soloRulesSeen = true;
