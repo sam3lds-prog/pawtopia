@@ -101,6 +101,13 @@
 - [ ] Five-player usability script (D36 §10): (a) how to place an animal, (b) what a mistake means, (c) why solving helps
       the World, (d) what they want to unlock next — all five answer without coaching
 
+### D38 PR F — native save storage
+- [ ] Install over the previous build on a device with progress: everything is still there (the first launch copies
+      localStorage into Preferences); play a level; kill the app; relaunch: the move is there
+- [ ] Settings → Erase progress, then relaunch: still erased (both copies cleared)
+- [ ] Simulate storage pressure (Xcode → Device → Storage, or clear website data in Safari settings is *not* this
+      app's WebView; use a dev build that clears localStorage on launch): progress survives from Preferences
+
 ## Store integration (only when ready; see roadmap)
 - [ ] StoreKit products created (remove_ads, starter_decor, cozy_theme, pet_portraits, supporter); verified entitlement
       + restore via a maintained bridge (e.g. RevenueCat Capacitor SDK); sandbox buy, restore, refund, reinstall

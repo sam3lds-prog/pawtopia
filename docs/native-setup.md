@@ -22,6 +22,10 @@ npx cap open ios
 
 Set your Team in Xcode, keep the bundle id `com.sam3lds.catsvsdogs` (D9), and run on a device.
 
+Progress is kept in the app's own storage on a device (`@capacitor/preferences` → UserDefaults, D38 PR F), not only
+in the WebView's localStorage, so iOS can't evict it and it rides along in device backups. `npx cap sync ios` adds
+the plugin; nothing else to configure. The first launch of this build copies an existing player's save over.
+
 ## 1. Reward videos — Google AdMob (`@capacitor-community/admob`)
 
 Pawtopia only shows **reward videos the player asks for** (an extra life, a hint, a video token). No banners, no
