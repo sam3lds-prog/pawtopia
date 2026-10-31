@@ -788,3 +788,21 @@ Code-side craft from the audit; the device checks are listed in `docs/release-ch
   (`base.css`); placed animals carry no lock, givens do.
 - Deferred, as the audit allowed: a player-triggered *mark direct impossibilities* comfort command, and a two-animal
   teaser at levels 8–12 (user-test first; frozen boards are not renumbered).
+
+### PR F — the save lives in the app's own storage on a device
+A WebView's localStorage can be evicted by iOS under storage pressure; the game's whole progress lived there. Cheap fix,
+still free: `@capacitor/preferences` (the app's UserDefaults on iOS, which rides along in device backups) behind the
+existing synchronous `KV` interface.
+
+- `services/kv.ts::NativeKV`: reads come from memory after one hydration (`hydrate()` reads every key before the save
+  is loaded); writes go to memory, to the WebView's localStorage (so a rollback build still finds the save) and, in
+  order, to the store (a write-behind queue). The first run on a device copies the game's own keys (`pawtopia.*`,
+  `cvd.*`) from localStorage into the store, so every existing player carries their progress over; the store's copy
+  wins afterwards. A store that fails leaves the game on localStorage, as before.
+- `hydratePlatformKV()` swaps the platform store on a native platform only; `main.ts` awaits it and then imports the
+  app (`boot.ts`), so nothing reads a save before the store is ready. Browsers and the single-file artifact are
+  unchanged (localStorage).
+- `npx cap sync ios` adds the plugin to the iOS project (docs/native-setup.md). A true cross-device cloud save
+  (iCloud key-value store or Firebase) is a bigger step and not needed for v1.
+- Tests: `test/unit/nativeKv.test.ts` (hydration, write order and removes, the first-run copy and precedence, a store
+  that is down, the real save round trip).
