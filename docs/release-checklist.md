@@ -84,6 +84,23 @@
 - [ ] Arrival from the win sheet: the newcomer drops into place once, then greets; opening the sanctuary any other way
       shows no drop
 
+### D38 PR E — polish and device hardening
+- [ ] Real iPhones: SE (320×568), SE2/8 (375×667), a standard 390 and a Pro Max 430: the board's status row is one
+      line; nothing a player reads is below 12 px; every tap presses the same way (buttons, cards, pins, Zen sizes)
+- [ ] 8×8 and 9×9 (old saves, Paw Cup Grand Hall) at 320: region seams discoverable; pets clear of the seams; a struck
+      animal and a red ✕ unmistakable; placed animals vs givens (lock) obvious; High contrast and Region patterns on
+- [ ] Hint ladder: each step's coach line previews the next step and its cost; the badge count matches
+- [ ] Win sheet: the skill line on Medium+; "What made it hard?" opens the reason without closing the sheet
+- [ ] Sound on: placement, completed line/color and win tones distinct; silent switch respected
+- [ ] Reduce Motion (device and in-app): no celebratory transforms anywhere (win sheet, halo, +1, arrivals, Settings
+      picture still)
+- [ ] 3D sanctuary on an older iPhone (8 / SE2): steady frame rate for two minutes, no heat, background → resume brings
+      the scene back (WebGL context restored or the 2D fallback shows), memory steady
+- [ ] Older battery device: 15 minutes of play, no noticeable drain; "3D animals" off saves battery as promised
+- [ ] VoiceOver through the whole first ten minutes (welcome → first board → win → Farm → World)
+- [ ] Five-player usability script (D36 §10): (a) how to place an animal, (b) what a mistake means, (c) why solving helps
+      the World, (d) what they want to unlock next — all five answer without coaching
+
 ## Store integration (only when ready; see roadmap)
 - [ ] StoreKit products created (remove_ads, starter_decor, cozy_theme, pet_portraits, supporter); verified entitlement
       + restore via a maintained bridge (e.g. RevenueCat Capacitor SDK); sandbox buy, restore, refund, reinstall

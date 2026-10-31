@@ -284,9 +284,6 @@
 .now-pill--next {
   color: var(--muted-ink);
 }
-.now-pill:active {
-  transform: scale(0.98);
-}
 
 /* One line about how the World works, the first time, with its own close. */
 .world-tip {
@@ -411,7 +408,7 @@
 .world-card__status .chip {
   min-height: 22px;
   padding: 0 7px;
-  font-size: 11px;
+  font-size: var(--t-xs);
 }
 .world-card__bar {
   height: 6px;
@@ -489,7 +486,7 @@
   align-items: center;
   gap: 3px;
   text-align: center;
-  font-size: 11px;
+  font-size: var(--t-xs);
   font-weight: 800;
   color: var(--faint-ink);
   line-height: 1.15;
@@ -730,7 +727,7 @@
   height: 56px;
 }
 .album__group .pet-card__trait {
-  font-size: 11px;
+  font-size: var(--t-xs);
 }
 .album__group h3 {
   margin: 0;
@@ -936,7 +933,7 @@
   border-color: #a9dfeb;
 }
 .trick-chip__price {
-  font-size: 11px;
+  font-size: var(--t-xs);
   font-weight: 800;
   color: var(--muted-ink);
 }

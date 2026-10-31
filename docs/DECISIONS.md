@@ -766,3 +766,25 @@ Policy A in D36, so **this one is only to be merged if that decision changes**.
   next animal's standing and no *+1*; the stars and best time are what a replay is for.
 - **A true arrival settles in** (`region.ts`, `.is-arriving`): coming straight from the win that brought them, the
   newcomer drops into place once (≤0.9 s, never under reduced motion), then says hello as before.
+
+### PR E — visual polish and device hardening (P2)
+Code-side craft from the audit; the device checks are listed in `docs/release-checklist.md` (D38 PR E) and still to run.
+
+- **Text floor**: every piece of text a player reads is at least 12 px (`--t-xs`): the tab labels, tier ladder, week
+  strip, mission chips, world card chips, region steps, album traits, trick prices, the feed counter. Fredoka for titles
+  and Nunito Sans for content, as before.
+- **One press language** (`components.css`): every tappable surface presses in the same `--dur-press` (100 ms) and
+  springs back the same way — buttons sink 2 px with their edge, map pins shrink, cards, tools, Zen sizes, chapter
+  tabs, residents, pet cards, pills and the hero's picture dip 1 px. Haptics unchanged; nothing bounces.
+- **Quiet status rows**: the World's header shows Paw Coins only (nothing there is for sale in tokens or gems; the Shop
+  keeps all three). On the board, short phones keep *3 of 7* and drop the words (the accessible label carries them), so
+  the status row — progress, size · tier, the sanctuary tag, the clock — is one line at 320.
+- **Hint ladder clarity** (`game.ts::nextHintPreview`): the coach line after each hint step previews the next one and
+  its cost: *Next: Explain says why (free)* · *Next: Place it puts the animal there (uses a hint)*.
+- **Skill shown** (`skillMarkup`): a Medium or harder solve adds *You solved a Medium 7×7* with *What made it medium?*,
+  which opens the grader's own reason (`difficultyReason`) in place. Easy boards say nothing.
+- Already in place and kept: distinct tones for a placement, a completed line/color and a win; the whole-color glow when
+  a color completes (overlay only, 950 ms); reduced motion disables every celebratory transform globally
+  (`base.css`); placed animals carry no lock, givens do.
+- Deferred, as the audit allowed: a player-triggered *mark direct impossibilities* comfort command, and a two-animal
+  teaser at levels 8–12 (user-test first; frozen boards are not renumbered).

@@ -247,6 +247,9 @@ describe('the World', () => {
     expect(focus.compareDocumentPosition(map) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(text('.world-focus h2')).toBe('Meadow Farm');
     expect(text('.world-focus [data-act="play"]')).toBe('Play level 8');
+    // The World's header shows coins only: nothing here is for sale in tokens or gems (D38 PR E).
+    expect(el('.world .screen-head .coin-pill')).not.toBeNull();
+    expect(el('.world .screen-head .wallet')).toBeNull();
     // One big button; Visit and Build elsewhere are quiet links (D38).
     expect(document.querySelectorAll('.world-focus .btn--block')).toHaveLength(1);
     expect(text('.world-focus__links [data-go="farm"]')).toBe('Visit Farm');

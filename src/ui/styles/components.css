@@ -194,6 +194,37 @@
 .card--tap:active {
   transform: translateY(1px);
 }
+/* One tactile language (D38): every tappable surface presses in the same ~100 ms and springs back the same way
+   (buttons sink 2 px with their edge; pins shrink; everything else dips 1 px). Shadows mark actions, not containers. */
+.tool,
+.act,
+.zen-size,
+.chapter-tab,
+.resident,
+.pet-card,
+.now-pill,
+.daily-card,
+.mission .btn,
+.world-card,
+.hero__scene,
+.world-map__expand,
+.control-tip__link {
+  transition:
+    transform var(--dur-press) var(--ease),
+    box-shadow var(--dur-press) var(--ease),
+    background var(--dur-fade) var(--ease);
+}
+.tool:active,
+.act:active:not(:disabled),
+.zen-size:active,
+.chapter-tab:active,
+.resident:active,
+.pet-card:active,
+.now-pill:active,
+.hero__scene:active,
+.world-map__expand:active {
+  transform: translateY(1px);
+}
 .card__title {
   font-family: var(--font-display);
   font-weight: 600;
@@ -303,7 +334,7 @@ body[data-nav='on'] .nav {
   justify-content: center;
   gap: 2px;
   color: var(--faint-ink);
-  font-size: 11px;
+  font-size: var(--t-xs);
   font-weight: 800;
   letter-spacing: 0.01em;
   border-radius: 14px;

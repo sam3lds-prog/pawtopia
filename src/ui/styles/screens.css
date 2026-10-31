@@ -608,6 +608,9 @@
   gap: 8px;
   min-width: 0;
 }
+.status-left [data-progress] {
+  white-space: nowrap;
+}
 /* Short phones hide the header chip; the size and difficulty move down beside the progress count. */
 .status-board {
   display: none;
@@ -828,7 +831,7 @@
   .status-board {
     display: inline-block;
   }
-  /* "3 of 7 placed" keeps the status line on one row beside the size chip. */
+  /* "3 of 7" keeps the status line on one row beside the size chip (the words live in the label). */
   .status-word {
     display: none;
   }
