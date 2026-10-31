@@ -77,9 +77,12 @@ Defects confirmed in source and fixed in Sprint 0:
 - [x] **Sprint X** (D36, PR 4) — the win sheet in two kinds: ordinary (one big button, +1 world line) and milestone
   (the newcomer, region or stage as centerpiece, Meet/Explore first, Next a full second button); "New" markers on the
   World, its pins, the tab and the goal card until a sanctuary is visited
+- [x] **Sprint Y** (D36, PR 5) — the Farm on the welcome with the first board's animal; hint steps named; replay goals;
+  color glow on one-animal boards; one-time sanctuary cues; docs and the D36 device checklist
 - [ ] Game Center and online Paw Cup leagues — not started
+- [ ] D36 device checklist (`docs/release-checklist.md`) and the five-player usability script — need a phone and people
 
-Test count: 398 unit tests + 135 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
+Test count: 405 unit tests + 139 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.

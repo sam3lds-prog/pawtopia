@@ -1016,6 +1016,12 @@
   display: grid;
   place-items: center;
 }
+/* One animal on the first board: one tile, sitting on the Farm. */
+.welcome__pair--one {
+  grid-template-columns: 1fr;
+  width: min(34%, 132px);
+  bottom: 12%;
+}
 
 .welcome__tile .pet {
   width: 82%;

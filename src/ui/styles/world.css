@@ -981,3 +981,30 @@
   background: var(--coral);
   box-shadow: 0 0 0 2px var(--surface);
 }
+
+/* One-time cue under the scene (D36): tap an animal; use a decoration. */
+.scene-cue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 var(--s3);
+  padding: 8px 6px 8px 12px;
+  border-radius: 14px;
+  background: var(--brand-tint);
+  border: 1px solid var(--brand-soft);
+  color: var(--brand-dark);
+  font-size: var(--t-sm);
+  font-weight: 700;
+}
+.scene-cue > .ico {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.scene-cue > span {
+  flex: 1;
+}
+.scene-cue .icon-btn {
+  width: 36px;
+  height: 36px;
+}

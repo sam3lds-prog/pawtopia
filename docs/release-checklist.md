@@ -22,6 +22,27 @@
 - [ ] Haptics feel right; sound off/on; silent switch respected
 - [ ] Upgrade test: install v1 build, play to level ~14, install Pawtopia over it → progress, coins, pets carried over once
 
+### D36 (Journey / World / controls review) — not yet checked on a device
+- [ ] One-tap controls on a real finger: no accidental placements while scrolling the Journey, no marks while panning a
+      Large board; the ✕ drag marks exactly the tiles under the finger; a tap on a placed animal never erases
+- [ ] Two-animal boards: five controls in a row (two animals, ✕, Erase, Hint) legible and tappable at 320 and 375
+- [ ] Existing save on a device: the one-time "one tap places" card shows once; Settings → Controls → *Tap ✕, double-tap*
+      restores the old feel; a save that chose *Tap cycle* is untouched
+- [ ] Journey: goal card, level and Continue visible without scrolling on an SE (375×667) with the tab bar; Daily/Zen
+      a swipe below
+- [ ] World: goal panel and Play above the map on an SE; map pins tappable; "New" dot visible on the tab
+- [ ] Back from the Farm, the Pet Garden, the album, the Journal and a Shop opened from a sanctuary lands where you
+      were, at the same scroll position; a tab tap starts afresh
+- [ ] Win sheet: ordinary win is quick (one button); an arrival/region/stage shows the hero; both scroll under
+      Dynamic Type; reduced motion skips the hero pop
+- [ ] VoiceOver: tool buttons announce "Sheep: a tap places a sheep", "Mark empty…", "Erase…"; the World tab announces
+      "something new to see" when a marker is set; the win sheet's main action is the first thing focused
+- [ ] Level 21 bridge sheet reads well on a small phone; "Show me" lands on the glowing tile
+- [ ] First run: the Farm welcome, Cotton on the tile, "Meet Cotton" → one tap places on the first board
+- [ ] Interrupt mid-gesture (call, notification) during a ✕ drag: no stray marks; background during the win sheet →
+      the credit is recorded once (`world.credits`)
+- [ ] Five-player usability script (docs/DECISIONS.md D36, §10 of the review plan): tasks 1–5 without coaching
+
 ## Store integration (only when ready; see roadmap)
 - [ ] StoreKit products created (remove_ads, starter_decor, cozy_theme, pet_portraits, supporter); verified entitlement
       + restore via a maintained bridge (e.g. RevenueCat Capacitor SDK); sandbox buy, restore, refund, reinstall

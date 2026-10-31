@@ -368,3 +368,45 @@ describe('the win sheet: milestones first, ordinary wins quick (PR 4)', () => {
     expect(app.save.world.growth.farm).toBe(5);
   });
 });
+
+describe('small kindnesses on the board (PR 5)', () => {
+  it('a replay says which stars are still to earn; the difficulty chip explains itself on a tap', () => {
+    app.save.journey.clears.L5 = { firstClearAt: '2026-10-30T00:00:00.000Z', bestSeconds: 83, bestMistakes: 1, clean: false, hintFree: true, stars: 2 };
+    app.save.journey.bestTimes.L5 = 83;
+    start(5);
+    expect(coach()).toBe('Replay. One star to earn: solve it with no mistakes.');
+    (document.querySelector('.chip--board') as HTMLElement).click();
+    expect(coach()).toMatch(/^(Easy|Medium|Hard|Expert): /);
+    expect(coach()).not.toMatch(/row \d|column \d/i); // the reason never names a move
+  });
+
+  it('a fully starred replay offers the best time to beat', () => {
+    app.save.journey.clears.L5 = { firstClearAt: '2026-10-30T00:00:00.000Z', bestSeconds: 61, bestMistakes: 0, clean: true, hintFree: true, stars: 3 };
+    app.save.journey.bestTimes.L5 = 61;
+    start(5);
+    expect(coach()).toBe('Replay. All three stars are yours; your best is 1:01.');
+  });
+
+  it('hint steps are named for what they do: Hint, Explain, Place it', () => {
+    app.save.inventory.items.push({ id: 'test:hints', item: 'hint', delta: 3, at: '2026-10-30T00:00:00.000Z', source: 'gift' });
+    start(5);
+    const label = () => document.querySelector('[data-hint-label]')?.textContent;
+    expect(label()).toBe('Hint');
+    (document.querySelector('[data-act="hint"]') as HTMLButtonElement).click();
+    expect(label()).toBe('Explain');
+    expect(coach()).toMatch(/Look at/);
+    (document.querySelector('[data-act="hint"]') as HTMLButtonElement).click();
+    expect(label()).toBe('Place it');
+  });
+
+  it('on a one-animal board, placing an animal glows its whole color for a beat (overlay only)', () => {
+    start(5);
+    const s = app.active!.session;
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    tap(r, c);
+    const region = s.puzzle.regions[r][c];
+    const glowing = [...document.querySelectorAll<HTMLElement>('.cell.is-glow')].map((e) => Number(e.dataset.r) * 100 + Number(e.dataset.c));
+    const expected = s.unitCells({ kind: 'region', index: region }).map(([rr, cc]) => rr * 100 + cc);
+    expect(glowing.sort()).toEqual(expected.sort());
+  });
+});

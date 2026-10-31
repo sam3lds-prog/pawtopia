@@ -21,22 +21,23 @@ puzzle engine, its tests and every v1 board are preserved, and v1 saves migrate 
 
 | | |
 | --- | --- |
-| **Journey** | Levels 1–20 are verified one-animal boards (5×5 → 9×9); level 21 teaches two animals, and from there the verified two-animal boards follow, then endless generated boards. Stars for clean, hint-free solves; a decoration gift per chapter. |
-| **First run** | A two-sentence welcome, then a forgiving guided board with Cotton the sheep where the deduction engine highlights forced moves one at a time. Level 21 is a guided two-animal lesson. |
+| **Journey** | The play hub (D36): the sanctuary you're building and who is on the way, the next level with one Continue, the level path, the Daily and Zen. Levels 1–20 are verified one-animal boards (5×5 → 9×9); level 21 teaches two animals, and from there the verified two-animal boards follow, then endless generated boards. Stars for clean, hint-free solves; a decoration gift per chapter; replays show the stars still to earn. |
+| **First run** | A welcome with the Farm and Cotton the sheep (the animal on the first board), then a forgiving guided board where the deduction engine highlights forced moves one at a time. Level 21 opens with a short bridge, then a guided two-animal lesson. |
+| **Navigation** | Four tabs: Journey, World, Challenges (Paw Cup and the leaderboard), Shop. Back retraces your steps and keeps your place; a milestone you skip waits as "New" on the World until you visit. |
 | **Daily Cozy Puzzle** | One shared board per day (one animal until you've reached two), with a gentle streak and one free Cozy Day per month. |
 | **Zen Garden** | Any size, no clock, no hearts. |
 | **Paw Cup** | Five fixed two-animal boards per UTC week, two attempts each, no hints, best counts. Opens after level 21. |
 | **Sanctuaries** | The Farm and the Pet Garden from the start, four regions later. Each grows with every puzzle you solve, with its own animals, treats and decorations; animals ride the tire swing, the tractor, the balloon. 3D soft toys. |
 | **Animals** | 27 original animals with personalities that shape their expressions, collected sanctuary by sanctuary in the Animal album. |
 | **Meta** | Free Paw Coins on an idempotent ledger, 3 daily missions + 1 weekly, 12 badges, a Journal of stats. |
-| **Comfort** | Tap / double-tap or classic tap-cycle controls, left-handed layout, reduced motion, high contrast, region patterns, large board mode, VoiceOver labels, offline play, no sign-in. |
+| **Comfort** | One-tap controls (animal, ✕ and Erase tools), or tap / double-tap, or the tap cycle; left-handed layout, reduced motion, high contrast, region patterns, large board mode, VoiceOver labels, offline play, no sign-in. |
 
 ## Run it
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173 (open the LAN URL on your phone)
-npm test           # 357 unit tests: engines, session, storage, faces, economy, world, scoring, verifier
+npm test           # 400+ unit tests: engines, session, storage, faces, economy, world, scoring, verifier, screens
 npm run gen:check  # generates 1,000 puzzles and verifies uniqueness / validity
 npm run pack:check # re-verifies the 60-level launch pack
 npm run build      # typecheck + production build → dist/

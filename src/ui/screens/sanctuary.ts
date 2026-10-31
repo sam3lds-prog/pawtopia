@@ -31,6 +31,7 @@ import { sfx } from '../../services/audio';
 import { decorIcon, sanctuaryScene, SCENE_VIEWBOX } from '../art/sanctuary';
 import { portrait, showPetSheet } from '../components/petSheet';
 import { openSheet, toast } from '../components/sheet';
+import { dismissSceneCue, sceneCue, sceneCueMarkup, type SceneCue } from '../components/sceneCues';
 import { actionOf, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { Route, Scope, ScreenDef } from '../router';
@@ -102,6 +103,8 @@ export const sanctuaryScreen: ScreenDef = {
       const svg = el.querySelector<SVGSVGElement>('.sanctuary__scene svg');
       life = svg ? startSceneLife(svg, 'sanct') : null;
       acts = svg ? startSceneActivities(svg, el.querySelector('[data-chat]'), () => app.reducedMotion, animalName) : null;
+      const slot = el.querySelector('[data-cue-slot]');
+      if (slot) slot.innerHTML = sceneCueMarkup(sceneCue(!!svg?.querySelector('.sanctuary__pet'), !!svg?.querySelector('[data-decor].has-act')));
       s3d.attach(el.querySelector<HTMLElement>('.sanctuary__scene'), svg);
       const btn = tricksBtn();
       if (btn) btn.hidden = !svg?.querySelector('.sanctuary__pet');
@@ -143,6 +146,7 @@ export const sanctuaryScreen: ScreenDef = {
           <p class="sanctuary__chat" data-chat ${chat ? '' : 'hidden'}>${ICON.heart}<span>${esc(chat ?? '')}</span></p>
           <button class="scene-tricks" data-act="tricks" aria-controls="${trayHost.id}" aria-expanded="${tray.isOpen}" hidden>${trickBadge('sparkle')}Tricks</button>
         </div>
+        <div data-cue-slot></div>
         ${gardenProgress()}
         <section aria-labelledby="res-title">
           <div class="section-head"><h2 id="res-title">Animals</h2><span class="muted num">${home.length} of ${animals.length}</span></div>
@@ -221,8 +225,14 @@ export const sanctuaryScreen: ScreenDef = {
         else tray.openFor(undefined, true);
         return;
       }
+      const cueOk = t.closest('[data-act="cue-ok"]') as HTMLElement | null;
+      if (cueOk) {
+        dismissSceneCue(el, (cueOk.closest('[data-scene-cue]') as HTMLElement).dataset.sceneCue as SceneCue);
+        return;
+      }
       const fig = t.closest('.sanctuary__scene .sanctuary__pet') as HTMLElement | null;
       if (fig) {
+        if (!app.save.onboarding.sceneTapTipSeen) dismissSceneCue(el, 'tap');
         life?.tap(fig);
         tray.open(fig as unknown as SVGGElement);
         return;
@@ -230,6 +240,7 @@ export const sanctuaryScreen: ScreenDef = {
       // A tap on a decoration someone can use: they go and use it (ride the balloon, splash in the fountain…).
       const dec = t.closest('.sanctuary__scene [data-decor].has-act') as HTMLElement | null;
       if (dec) {
+        if (!app.save.onboarding.decorTipSeen) dismissSceneCue(el, 'decor');
         if (acts && !acts.busy && !acts.play(dec.dataset.decor!)) {
           const anyone = !!el.querySelector('.sanctuary__scene .sanctuary__pet');
           toast(anyone ? 'Everyone’s busy with a trick. Try again in a moment.' : 'Once someone lives here, they’ll love this.');

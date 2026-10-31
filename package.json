@@ -2,7 +2,7 @@
   "name": "pawtopia",
   "version": "0.2.0",
   "private": true,
-  "description": "Pawtopia — a cozy logic puzzle. One cat and one dog in every row, column and region; a sanctuary that grows as you solve.",
+  "description": "Pawtopia — a cozy logic puzzle. One animal in every row, column and color (two from level 21); sanctuaries that grow with every puzzle you solve.",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

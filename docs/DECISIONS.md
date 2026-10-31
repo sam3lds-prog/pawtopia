@@ -620,3 +620,21 @@ every Journey, Daily and Zen solve counts (replays too); the Paw Cup never does.
   clears the marker and greets the newcomers (the toast and the hello the sanctuary already gave to arrivals from this
   win). Arrivals and stages can only happen once, so a replayed level or a reopened app never re-raises old news; the
   sheet itself is never persisted.
+
+### PR 5 — delight and hardening (P2)
+- **The welcome is the Farm** (`welcome.ts`): the land at its first stage, one tile with the animal of the first board
+  (`castFor` on the fresh save: Cotton), a story about Meadow Farm, and "Meet Cotton". Mochi and Biscuit are gone from
+  the splash; they come home later, in the Pet Garden.
+- **Hint steps say what they do** (`Hint → Explain → Place it`), the same free look and ticket rules as before. A tap
+  on the board's difficulty chip tells why the board is as hard as it is (`difficultyReason`), never what to do next.
+- **Replays have goals** (`game.ts::replayGoal`): the coach line on a solved level says which stars are still to earn
+  ("One star to earn: solve it with no mistakes") or the best time to beat. No new currency, no leaderboard effect.
+- **Color glow on one-animal boards**: placing an animal glows its color's tiles for a beat (overlay only, off under
+  reduced motion), the same acknowledgement two-animal boards give a finished line.
+- **One-time cues in a sanctuary** (`components/sceneCues.ts`): "Try tapping an animal" on the first visit with an
+  animal; later, "Tap a decoration with a sparkle" once a decoration that can be used is out. Each is dismissed by
+  doing the thing or by its close, once (`onboarding.sceneTapTipSeen`, `decorTipSeen`). Never during a puzzle.
+- Not done here, on purpose: a "feature of the day" on sanctuary cards (would need a pat/activity availability model
+  that is honest about what is really available) and the five-player usability session, which needs people. The
+  device checklist for everything in D36 is in `docs/release-checklist.md`.
+- Docs: README (tabs, controls, first run), package description, architecture (crediting, navigation), roadmap.
