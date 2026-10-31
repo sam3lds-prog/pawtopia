@@ -12,6 +12,7 @@ import { startGame } from '../../src/app/gameFlow';
 import { CAT, DOG, EMPTY } from '../../src/engine/types';
 import { MARK } from '../../src/game/session';
 import { setActive } from '../../src/meta/world';
+import { setPantry } from '../../src/app/qaTools';
 import { defaultSave, type ControlScheme } from '../../src/services/storage';
 
 /** A stand-in screen for every route the game can leave to. */
@@ -719,5 +720,55 @@ describe('gesture clarity (D38 PR B)', () => {
     expect(document.querySelector('.sheet [data-act="settings"]')?.textContent).toMatch(/Settings and controls/);
     document.querySelector<HTMLButtonElement>('.sheet [data-act="rules"]')!.click();
     expect(document.querySelector('.sheet')?.textContent).toMatch(/Prefer no timing\? Settings → Controls → Two-step tap/);
+  });
+});
+
+describe('polish (D38 PR E)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('each hint step previews the next one and its cost, so a tap is never an accidental purchase', () => {
+    setPantry(app.save, 'hint', 3);
+    start(5);
+    const hintBtn = document.querySelector<HTMLButtonElement>('[data-act="hint"]')!;
+    hintBtn.click();
+    expect(coach()).toMatch(/Look at .*Next: Explain says why \((free|uses a hint)\)\./);
+    hintBtn.click();
+    expect(coach()).toMatch(/Next: Place it puts the animal there \((free|uses a hint)\)\./);
+  });
+
+  it('a Medium or harder solve says so, and "What made it …?" opens the grader\'s own reason', () => {
+    start(8); // level 8 is measured Medium
+    const s = app.active!.session;
+    for (let r = 0; r < s.size; r++)
+      for (let c = 0; c < s.size; c++) {
+        const want = s.puzzle.solution[r][c];
+        if (want === EMPTY || s.givenMask[r][c] || s.cells[r][c] === want) continue;
+        dblTap(r, c);
+        if (s.outcome === 'won') break;
+      }
+    vi.advanceTimersByTime(700);
+    const sheet = document.querySelector('.win-sheet')!;
+    const skill = sheet.querySelector('[data-skill]')!;
+    expect(skill.textContent).toMatch(/You solved a Medium 7×7\./);
+    (skill.querySelector('[data-act="why"]') as HTMLButtonElement).click();
+    expect(skill.textContent).toMatch(/^Medium: /);
+    expect(skill.querySelector('[data-act="why"]')).toBeNull();
+    // The sheet is still open: the question did not count as a tap to leave.
+    expect(document.querySelector('.win-sheet')).not.toBeNull();
+  });
+
+  it('an Easy solve keeps the sheet quiet: no skill line', () => {
+    start(2); // level 2 is measured Easy
+    const s = app.active!.session;
+    for (let r = 0; r < s.size; r++)
+      for (let c = 0; c < s.size; c++) {
+        const want = s.puzzle.solution[r][c];
+        if (want === EMPTY || s.givenMask[r][c] || s.cells[r][c] === want) continue;
+        dblTap(r, c);
+        if (s.outcome === 'won') break;
+      }
+    vi.advanceTimersByTime(700);
+    expect(document.querySelector('.win-sheet [data-skill]')).toBeNull();
   });
 });

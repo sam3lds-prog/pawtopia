@@ -19,7 +19,7 @@ import { pinPercent, worldMapSvg } from '../art/worldMap';
 import { esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { ScreenDef } from '../router';
-import { walletPills } from '../components/wallet';
+import { coinPill } from '../components/wallet';
 import { sceneMarkup } from './sanctuary';
 
 const short = (d: SanctuaryDef) => d.short;
@@ -181,7 +181,7 @@ export const worldScreen: ScreenDef = {
       <div class="world">
         <header class="screen-head">
           <h1 data-autofocus>World</h1>
-          <div class="screen-head__end">${walletPills()}</div>
+          <div class="screen-head__end">${coinPill()}</div>
         </header>
         ${tip}
         ${focus}

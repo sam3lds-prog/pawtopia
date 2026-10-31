@@ -224,7 +224,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
 
   function paint(): void {
     board.render({ cells: s.cells, givenMask: s.givenMask, dead: showDots ? s.deadCells() : null, errors: errorView() });
-    progressEl.innerHTML = `${s.placedCount()} of ${total} <span class="status-word">${total === 1 ? 'animal' : 'animals'}</span> placed`;
+    // Short phones keep "3 of 7" and drop the words (the label carries them), so the status row stays one line (D38).
+    progressEl.innerHTML = `${s.placedCount()} of ${total} <span class="status-word">${total === 1 ? 'animal' : 'animals'} placed</span>`;
+    progressEl.setAttribute('aria-label', `${s.placedCount()} of ${total} ${total === 1 ? 'animal' : 'animals'} placed`);
     if (heartsEl) {
       heartsEl.dataset.max = String(s.maxHearts);
       heartsEl.innerHTML = Array.from({ length: s.maxHearts }, (_, i) => (i < s.hearts ? ICON.life : ICON.lifeOff)).join('');
@@ -774,10 +776,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       if (info.unit) {
         board.setHint(s.unitCells(info.unit), null);
         focusFaces(s.unitCells(info.unit));
-        coach(`Look at ${unitPhrase(info.unit)}. One spot there is already decided.`);
+        coach(`Look at ${unitPhrase(info.unit)}. One spot there is already decided. ${nextHintPreview(info, 2)}`);
       } else {
         board.setHint([], [info.r, info.c]);
-        coach('Look at the highlighted tile.');
+        coach(`Look at the highlighted tile. ${nextHintPreview(info, 2)}`);
       }
     } else if (hint.tier === 1) {
       if (!payFor(hint.info, 2)) return;
@@ -785,7 +787,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       track('hint_used', { mode: mode.kind, tier: 2 });
       board.setHint(hint.info.unit ? s.unitCells(hint.info.unit) : [], [hint.info.r, hint.info.c]);
       if (hint.info.unit) focusFaces(s.unitCells(hint.info.unit));
-      coach(friendlyReason(hint.info.reason));
+      coach(`${friendlyReason(hint.info.reason)} ${nextHintPreview(hint.info, 3)}`);
     } else {
       if (!payFor(hint.info, 3)) return;
       track('hint_used', { mode: mode.kind, tier: 3 });
@@ -808,6 +810,12 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       return;
     }
     paint();
+  }
+
+  /** One sentence on what the next Hint tap will do and cost (D38), so a tap is never an accidental purchase. */
+  function nextHintPreview(info: HintInfo, tier: 2 | 3): string {
+    const cost = s.hintCost(info, tier, freeHints) === 0 ? 'free' : 'uses a hint';
+    return tier === 2 ? `Next: Explain says why (${cost}).` : `Next: Place it puts the animal there (${cost}).`;
   }
 
   /** Pets already in the hinted line look attentive. They are where the player is already looking. */
@@ -1295,6 +1303,15 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     </div>`;
   }
 
+  /**
+   * One line on the skill shown (D38): the board's measured tier, with "What made it hard?" opening the grader's own
+   * reason on demand (never an invented tip). Easy boards say nothing: the line is for a step up.
+   */
+  function skillMarkup(): string {
+    if (profile.tier === 'easy') return '';
+    return `<p class="win-skill" data-skill>${ICON.target}<span>You solved a <b>${esc(tierName)}</b> ${n}×${n}.</span> <button class="win-skill__why" data-act="why">What made it ${esc(profile.tier)}?</button></p>`;
+  }
+
   /** On a replay: what's still there to improve, instead of rewards that were already paid. */
   function replayMarkup(rec: WinRecord, seconds: number): string {
     if (mode.kind !== 'level' || rec.firstClear) return '';
@@ -1357,6 +1374,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         </div>
         <div class="win-stage win-stage-2">
           ${badges.length ? `<div class="win-badges">${badges.join('')}</div>` : ''}
+          ${skillMarkup()}
           ${cupMarkup(cupScore)}
           ${pointsMarkup(rewards)}
           ${replayMarkup(rec, seconds)}
@@ -1417,6 +1435,11 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       if (!a || leaving) return;
       if (a.act === 'share') {
         void shareResult(seconds);
+        return;
+      }
+      if (a.act === 'why') {
+        const why = ws.el.querySelector('[data-skill]');
+        if (why) why.innerHTML = `${ICON.target}<span>${esc(tierName)}: ${esc(difficultyReason(profile))}</span>`;
         return;
       }
       leaving = true;
