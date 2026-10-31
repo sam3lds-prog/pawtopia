@@ -47,12 +47,19 @@ interstitial *may* be considered by `shouldShowInterstitial` (never in release t
 levels once, `upgradeLadder`, with a backup) → `rewards.reconcileRewards`
 (idempotent catch-up for v1 progress and back-dated Paw Points) → `items.grantStarterItems` (once) →
 `world.reconcileWorld` (regional friends whose stage was reached) → `catchUpAchievements` → gem purchase reconcile and
-leaderboard sync in the background → route to Welcome (fresh install) or Home.
+leaderboard sync in the background → route to Welcome (fresh install) or Journey (the play hub; D36).
 
-**Growing a sanctuary.** On a win (not Paw Cup) `world.growOnSolve` adds one to the sanctuary being built (the Farm,
-the Pet Garden or a region); stages, arrivals (`meta/animals.ts` records who is home) and the completion gift are
-derived from that count, so re-running is safe. The win sheet says who came home and who is next; "Meet" opens the
-sanctuary with the newcomer. D28, D35.
+**Growing a sanctuary.** On a win (not Paw Cup) `world.creditSolve` adds one to the sanctuary the board was started
+for (its saved `cast.sanctuary`; the one being built now only if that one can't grow any more), once per board id;
+stages, arrivals (`meta/animals.ts` records who is home) and the completion gift are derived from that count, so
+re-running is safe. The win sheet says who came home and who is next; "Meet" opens the sanctuary with the newcomer, and
+a region that opened is the visit. D28, D35, D36.
+
+**Navigation.** Four tabs (`ui/components/nav.ts`): Journey (`screens/journey.ts`: the hub and the level path), World,
+Challenges (`screens/league.ts`) and Shop. `Router.go` keeps a history of screens with their scroll positions;
+`Router.back(fallback)` returns to the previous screen where the reader left off, a tab tap (`Router.reset`) starts
+afresh, and a board (`game`) is never kept in the history. The old route names `home`, `play` and `league` still
+resolve (`router.canonical`). D36.
 
 **Leaderboard.** If the player joined, the win also queues `{mode, spec, move log}` (`leaderboard/queue.ts`) and
 `leaderboardSync` sends batches to `lbSubmit`, which rebuilds the board, replays the log (`leaderboard/check.ts` →

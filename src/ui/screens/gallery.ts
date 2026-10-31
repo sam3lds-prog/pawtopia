@@ -21,7 +21,7 @@ export const galleryScreen: ScreenDef = {
   title: 'Expression gallery',
   mount(root, scope) {
     if (!featureFlags.devGallery) {
-      app.router.go({ screen: 'home' });
+      app.router.reset({ screen: 'journey' });
       return;
     }
     const el = h(`
@@ -71,7 +71,7 @@ export const galleryScreen: ScreenDef = {
     scope.on(el, 'click', (e) => {
       const t = e.target as HTMLElement;
       if (t.closest('[data-act="back"]')) {
-        app.router.go({ screen: 'home' });
+        app.router.back({ screen: 'journey' });
         return;
       }
       const b = t.closest('[data-react]') as HTMLElement | null;

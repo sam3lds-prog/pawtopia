@@ -30,7 +30,7 @@ import { esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { Route, ScreenDef } from '../router';
 import { friendPortrait, isEvening, offerStarterGift, showFriendSheet } from './sanctuary';
-import { coinPill } from './home';
+import { coinPill } from '../components/wallet';
 
 export const regionScreen: ScreenDef = {
   tab: 'world',
@@ -130,7 +130,7 @@ export const regionScreen: ScreenDef = {
         ${
           building
             ? `<button class="btn btn--block" data-act="play">Play level ${level}</button><p class="muted region-progress__note">Journey, Daily and Zen puzzles all count.</p>`
-            : `<button class="btn btn--block" data-act="build">${ICON.sprout}Build here</button><p class="muted region-progress__note">You build one sanctuary at a time. Progress elsewhere is kept.</p>`
+            : `<button class="btn btn--block" data-act="build">${ICON.sprout}Build here</button><p class="muted region-progress__note">Your next puzzles will help this sanctuary. Progress in your other homes is safe.</p>`
         }
       </section>`;
     }
@@ -146,7 +146,7 @@ export const regionScreen: ScreenDef = {
       const chat = open ? regionChat(save, id) : null;
       el.innerHTML = `
         <header class="screen-head">
-          <button class="icon-btn" data-act="back" aria-label="Back to the World map">${ICON.back}</button>
+          <button class="icon-btn" data-act="back" aria-label="Back">${ICON.back}</button>
           <h1 data-autofocus>${esc(def.name)}</h1>
           <div class="screen-head__end">${coinPill()}</div>
         </header>
@@ -271,7 +271,7 @@ export const regionScreen: ScreenDef = {
       if (!a) return;
       switch (a.dataset.act) {
         case 'back':
-          app.router.go({ screen: 'world' });
+          app.router.back({ screen: 'world' });
           break;
         case 'play':
           playMode({ kind: 'level', level: app.save.journey.nextLevel });

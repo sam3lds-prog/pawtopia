@@ -220,6 +220,8 @@ export interface SaveV2 {
     ladderNotice: boolean;
     /** The default controls changed under this player (D36: one tap places) and they haven't been told yet. */
     controlsNotice: boolean;
+    /** The World's one-line explanation (one home grows at a time) has been dismissed. */
+    worldTipSeen: boolean;
   };
   lastSession: SavedSession | null;
 }
@@ -354,6 +356,7 @@ export function defaultSave(now = new Date()): SaveV2 {
       pairLessonDone: false,
       ladderNotice: false,
       controlsNotice: false,
+      worldTipSeen: false,
     },
     lastSession: null,
   };
@@ -631,6 +634,7 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       pairLessonDone: bool(ob.pairLessonDone, isObj(x.journey) && int(x.journey.nextLevel, 1) > 21),
       ladderNotice: bool(ob.ladderNotice, false),
       controlsNotice: bool(ob.controlsNotice, controlsMoved && (ob.tutorialDone === true || int(ob.sessions, 0) > 0)),
+      worldTipSeen: bool(ob.worldTipSeen, false),
     },
     lastSession: normSavedSession(x.lastSession),
   };

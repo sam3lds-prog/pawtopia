@@ -4,8 +4,7 @@ import './style.css';
 import { app } from './app/app';
 import { Router } from './ui/router';
 import { mountNav } from './ui/components/nav';
-import { homeScreen } from './ui/screens/home';
-import { playScreen } from './ui/screens/play';
+import { journeyScreen } from './ui/screens/journey';
 import { gameScreen } from './ui/screens/game';
 import { leagueScreen } from './ui/screens/league';
 import { profileScreen } from './ui/screens/profile';
@@ -24,11 +23,10 @@ const root = document.getElementById('app')!;
 const router = new Router(root);
 app.router = router;
 router.register({
-  home: homeScreen,
-  play: playScreen,
+  journey: journeyScreen,
   game: gameScreen,
   pets: petsScreen,
-  league: leagueScreen,
+  challenges: leagueScreen,
   shop: shopScreen,
   sanctuary: sanctuaryScreen,
   gallery: galleryScreen,
@@ -68,4 +66,4 @@ if (import.meta.env.DEV) {
   });
 }
 
-router.go({ screen: needsWelcome() ? 'welcome' : 'home' });
+router.reset({ screen: needsWelcome() ? 'welcome' : 'journey' });

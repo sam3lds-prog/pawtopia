@@ -24,7 +24,7 @@ import { openSheet, toast } from '../components/sheet';
 import { actionOf, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { Scope, ScreenDef } from '../router';
-import { coinPill } from './home';
+import { coinPill } from '../components/wallet';
 import { mountLeaderboard } from './leaderboardTab';
 
 type Tab = 'leaderboard' | 'week' | 'daily';
@@ -46,10 +46,10 @@ export function tierEmblem(tier: LeagueTier, size = 56): string {
 }
 
 export const leagueScreen: ScreenDef = {
-  tab: 'league',
+  tab: 'challenges',
   title: 'League',
   mount(root, scope, route) {
-    if (route.screen === 'league' && route.tab) lastTab = route.tab;
+    if (route.screen === 'challenges' && route.tab) lastTab = route.tab;
     track('league_open', { online: featureFlags.onlineLeagues });
     const el = h(`<div class="league"></div>`);
     root.appendChild(el);
@@ -172,7 +172,7 @@ export const leagueScreen: ScreenDef = {
       lbScope = null;
       el.innerHTML = `
         <header class="screen-head">
-          <h1 data-autofocus>League</h1>
+          <h1 data-autofocus>Challenges</h1>
           <div class="screen-head__end">${coinPill()}</div>
         </header>
         <div class="segmented" role="tablist" aria-label="League views">

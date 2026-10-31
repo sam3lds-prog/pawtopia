@@ -580,3 +580,30 @@ every Journey, Daily and Zen solve counts (replays too); the Paw Cup never does.
   board's own animals and the controls in one line, then the guided lesson places the first two. Shown once
   (`pairRulesSeen`). Level 19 and 20 tips say what is coming.
 - Coaching under each scheme says what the player actually does ("tap it", "double-tap it", "tap it twice").
+
+### PR 3 — one Journey, the World above its map, Back that works (P1)
+- **Four tabs** (`ui/components/nav.ts`, `router.TabId`): **Journey · World · Challenges · Shop**. Home and Play were
+  two places to start a puzzle with overlapping Daily and Zen entries; they are one screen now (`screens/journey.ts`).
+  League is Challenges (the Paw Points leaderboard, the Paw Cup, the Daily history). The old route names still resolve
+  (`router.canonical`), so saved links and tests keep working.
+- **The Journey hub, in order**: the goal card (the sanctuary being built, its picture, who is on the way and how close,
+  Visit), then the next level with one big button, then Level path and World map links, the Daily with its week strip,
+  Zen with its sizes, the one-time notices and the errands. On a 375×667 phone the goal, the level and the button are
+  all on screen without scrolling (checked in e2e at 390×844 and by screenshot at 375×667). The chapter path is the
+  Journey's second view (`view: 'path'`), one tap away and one tap back.
+- **One Continue**: the next unfinished Journey level, or the Journey board already on the table (with "Play level N
+  instead" when they differ). A saved Daily or Zen board is offered on its own line, never as Continue.
+- **World**: the goal panel (with Play and Visit, and "Build somewhere else instead" when there is somewhere else)
+  sits above the map; the list below says **Building here · … / Build here · … while you build here / Locked until
+  level N / Complete** — never "Paused". A one-line explanation of one-home-at-a-time shows on the first visit, with
+  its own close (`onboarding.worldTipSeen`).
+- **Back retraces your steps** (`Router.history`): every screen remembers the one it was opened from and how far down
+  the reader was; Back returns there at that scroll position. The Farm, the Pet Garden, the album and the Journal all
+  use it (the Pet Garden used to go to Home while the Farm went to the World). A Shop opened from a sanctuary shows a
+  Back to that sanctuary. A tab tap is a fresh start (the history is cleared). A board is never kept in the history, so
+  Back never reopens a finished board; leaving a board returns to wherever it was opened from.
+- The win sheet's "Back home" is "Back to Journey" (`modes.nextAfterWin` says `journey`).
+- Two things the independent review of the stack caught: the welcome splash is never kept in the Back history (a new
+  player who leaves the first board or visits the Farm after it comes back to the Journey, not to "Meet Cotton"), and
+  "Play level N instead" while a Journey board with progress is saved asks first, naming the board and its moves,
+  since the game keeps one board at a time.

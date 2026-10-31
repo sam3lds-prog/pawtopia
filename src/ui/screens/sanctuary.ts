@@ -34,7 +34,7 @@ import { openSheet, toast } from '../components/sheet';
 import { actionOf, esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { Route, Scope, ScreenDef } from '../router';
-import { coinPill } from './home';
+import { coinPill } from '../components/wallet';
 
 export function shownDecor(): DecorId[] {
   return shownDecorIds(app.save);
@@ -57,7 +57,7 @@ export function friendPortrait(id: CompanionId, locked = false): string {
 }
 
 export const sanctuaryScreen: ScreenDef = {
-  tab: 'home',
+  tab: 'world',
   title: 'Sanctuary',
   mount(root, scope, route: Route) {
     const welcome = route.screen === 'sanctuary' ? (route.welcome ?? []) : [];
@@ -130,7 +130,7 @@ export const sanctuaryScreen: ScreenDef = {
       const nextId = nextArrivalIn(save, 'harmony')?.id;
       el.innerHTML = `
         <header class="screen-head">
-          <button class="icon-btn" data-act="back" aria-label="Back to Home">${ICON.back}</button>
+          <button class="icon-btn" data-act="back" aria-label="Back">${ICON.back}</button>
           <h1 data-autofocus>Pet Garden</h1>
           <div class="screen-head__end">${coinPill()}</div>
         </header>
@@ -198,7 +198,7 @@ export const sanctuaryScreen: ScreenDef = {
         ${
           building
             ? `<button class="btn btn--block" data-act="play">Play level ${save.journey.nextLevel}</button><p class="muted region-progress__note">Journey, Daily and Zen puzzles all count.</p>`
-            : `<button class="btn btn--block" data-act="build">${ICON.sprout}Build here</button><p class="muted region-progress__note">You build one sanctuary at a time. Progress elsewhere is kept.</p>`
+            : `<button class="btn btn--block" data-act="build">${ICON.sprout}Build here</button><p class="muted region-progress__note">Your next puzzles will help this sanctuary. Progress in your other homes is safe.</p>`
         }
       </section>`;
     }
@@ -258,7 +258,7 @@ export const sanctuaryScreen: ScreenDef = {
       }
       const a = actionOf(e);
       if (!a) return;
-      if (a.act === 'back') app.router.go({ screen: 'home' });
+      if (a.act === 'back') app.router.back({ screen: 'world' });
       else if (a.act === 'shop') app.router.go({ screen: 'shop', sanctuary: 'harmony' });
       else if (a.act === 'play') playMode({ kind: 'level', level: app.save.journey.nextLevel });
       else if (a.act === 'build' && setActive(app.save, 'harmony')) {

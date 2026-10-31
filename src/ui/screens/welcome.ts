@@ -48,7 +48,7 @@ export const welcomeScreen: ScreenDef = {
         track('onboarding_step', { step: 'skipped' });
         app.save.onboarding.seenRules = true;
         app.persist();
-        app.router.go({ screen: 'home' });
+        app.router.reset({ screen: 'journey' });
       }
     });
   },

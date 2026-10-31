@@ -1,14 +1,17 @@
-/** Bottom navigation: Play | Home | World | League | Shop. Hidden during focused play. */
+/**
+ * Bottom navigation (D36): Journey | World | Challenges | Shop. Journey is where you play (the next level, Daily, Zen,
+ * the level path); World is what the puzzles build; Challenges holds the Paw Cup and the leaderboard. Hidden during
+ * focused play. A tab is a fresh start: tapping one forgets the trail Back was retracing.
+ */
 
 import { h } from '../dom';
 import { ICON } from '../icons';
 import type { Router, TabId } from '../router';
 
 const TABS: Array<{ id: TabId; label: string; icon: string }> = [
-  { id: 'play', label: 'Play', icon: ICON.play },
-  { id: 'home', label: 'Home', icon: ICON.home },
+  { id: 'journey', label: 'Journey', icon: ICON.play },
   { id: 'world', label: 'World', icon: ICON.globe },
-  { id: 'league', label: 'League', icon: ICON.trophy },
+  { id: 'challenges', label: 'Challenges', icon: ICON.trophy },
   { id: 'shop', label: 'Shop', icon: ICON.bag },
 ];
 
@@ -24,8 +27,8 @@ export function mountNav(router: Router): void {
     const b = (e.target as HTMLElement).closest('[data-tab]') as HTMLElement | null;
     if (!b) return;
     const tab = b.dataset.tab as TabId;
-    if (router.route?.screen === tab) return;
-    router.go({ screen: tab } as never);
+    // The tab you're on, tapped again: back to its own screen (from a sanctuary to the World map, say), scrolled to the top.
+    router.reset({ screen: tab });
   });
   router.onChange((_route, def) => {
     document.body.dataset.nav = def.tab ? 'on' : 'off';

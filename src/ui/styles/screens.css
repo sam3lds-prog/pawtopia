@@ -1,8 +1,127 @@
-/* ---------- Home ---------- */
-.home {
+/* ---------- Journey hub (D36) ---------- */
+.journey {
   display: flex;
   flex-direction: column;
   gap: var(--s3);
+}
+/* The goal card: the sanctuary being built, the animal on its way, a picture of the place. Also sits above the World map. */
+.goal-card {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  grid-template-areas:
+    'scene body'
+    'actions actions';
+  gap: var(--s2) var(--s3);
+  align-items: center;
+  padding: var(--s3);
+  border-left: 4px solid var(--accent, var(--brand));
+}
+.goal-card__scene {
+  grid-area: scene;
+  width: 96px;
+  aspect-ratio: 5 / 4;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--brand-tint);
+  display: block;
+}
+.goal-card__scene svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.goal-card__body {
+  grid-area: body;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.goal-card__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--t-xs);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent, var(--brand-dark));
+  margin: 0;
+}
+.goal-card__eyebrow .ico {
+  width: 14px;
+  height: 14px;
+}
+.goal-card h2 {
+  font-size: 20px;
+  margin: 0;
+  line-height: 1.15;
+}
+.goal-card__next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 0;
+  font-size: var(--t-sm);
+  color: var(--ink);
+}
+.goal-card .goal-card__friend {
+  width: 36px;
+  height: 36px;
+}
+.goal-card .goal-card__friend > .pet {
+  width: 82%;
+  height: 82%;
+}
+.goal-card__bar {
+  height: 6px;
+  margin-top: 4px;
+}
+.goal-card__bar > span {
+  background: var(--accent, var(--brand));
+}
+.goal-card__body small {
+  font-size: var(--t-xs);
+}
+.goal-card__actions {
+  grid-area: actions;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s2);
+}
+.goal-card__actions .btn {
+  flex: 0 1 auto;
+  min-width: 120px;
+}
+.goal-card__actions .btn + .btn {
+  flex: 1;
+}
+.goal-card:not(:has(.goal-card__scene)) {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    'body'
+    'actions';
+}
+.continue__links {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--s2);
+  margin-top: calc(-1 * var(--s1));
+}
+.continue__links .btn {
+  flex: 1;
+  min-height: 40px;
+}
+.resume-other .card__icon {
+  color: var(--brand-dark);
+}
+.zen-card--wide {
+  width: 100%;
+}
+.zen-card--wide .zen-sizes {
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: var(--s2);
 }
 .home-head {
   display: flex;

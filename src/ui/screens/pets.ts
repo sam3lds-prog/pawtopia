@@ -10,7 +10,7 @@ import { portrait, showPetSheet } from '../components/petSheet';
 import { esc, h, plural } from '../dom';
 import { ICON } from '../icons';
 import type { ScreenDef } from '../router';
-import { coinPill } from './home';
+import { coinPill } from '../components/wallet';
 import type { CompanionId } from '../../meta/catalogs/companions';
 import { SANCTUARIES } from '../../meta/catalogs/sanctuaries';
 import { animalInfo, animalsOf, isHome, nextArrivalIn } from '../../meta/animals';
@@ -70,7 +70,7 @@ export const petsScreen: ScreenDef = {
       }).join('');
       el.innerHTML = `
         <header class="screen-head">
-          <button class="icon-btn" data-act="back" aria-label="Back to the World map">${ICON.back}</button>
+          <button class="icon-btn" data-act="back" aria-label="Back">${ICON.back}</button>
           <h1 data-autofocus>Animal album</h1>
           <div class="screen-head__end">${coinPill()}</div>
         </header>
@@ -108,7 +108,7 @@ export const petsScreen: ScreenDef = {
         return;
       }
       if (t.closest('[data-act="back"]')) {
-        app.router.go({ screen: 'world' });
+        app.router.back({ screen: 'world' });
         return;
       }
       const friend = t.closest('[data-friend]') as HTMLElement | null;

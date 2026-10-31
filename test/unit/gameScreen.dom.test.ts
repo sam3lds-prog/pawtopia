@@ -5,7 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { app } from '../../src/app/app';
-import { Router, type Route } from '../../src/ui/router';
+import { Router, type CanonicalRoute } from '../../src/ui/router';
 import { gameScreen } from '../../src/ui/screens/game';
 import { startGame } from '../../src/app/gameFlow';
 import { CAT, DOG, EMPTY } from '../../src/engine/types';
@@ -19,8 +19,8 @@ const blank = { tab: null, title: 'x', mount: () => {} };
 function mountRouter(): Router {
   document.body.innerHTML = '<div id="app"></div>';
   const router = new Router(document.getElementById('app')!);
-  const reg = {} as Record<Route['screen'], typeof blank>;
-  for (const k of ['home', 'play', 'pets', 'league', 'shop', 'sanctuary', 'world', 'region', 'gallery', 'welcome', 'profile'] as const) reg[k] = blank;
+  const reg = {} as Record<CanonicalRoute["screen"], typeof blank>;
+  for (const k of ['journey', 'pets', 'challenges', 'shop', 'sanctuary', 'world', 'region', 'gallery', 'welcome', 'profile'] as const) reg[k] = blank;
   router.register({ ...reg, game: gameScreen } as never);
   app.router = router;
   return router;

@@ -1,8 +1,12 @@
-/** The player's three currencies as compact pills (Paw Coins, video tokens, gems). */
+/** The player's currencies as compact pills: Paw Coins alone, or all three (Paw Coins, video tokens, gems). */
 
 import { app } from '../../app/app';
 import { itemBalance } from '../../meta/items';
 import { ICON } from '../icons';
+
+export function coinPill(): string {
+  return `<span class="coin-pill" data-coins aria-label="${app.coins()} Paw Coins">${ICON.coin}<span>${app.coins()}</span></span>`;
+}
 
 export function walletPills(): string {
   const coins = app.coins();
