@@ -8,7 +8,7 @@
  */
 
 import type { ModeRef } from '../game/modes';
-import type { SaveV2 } from '../services/storage';
+import type { SaveV2, UnseenNews } from '../services/storage';
 import {
   REGIONS,
   SANCTUARIES,
@@ -193,7 +193,12 @@ export function creditSolve(save: WorldSave, ctx: SolveContext, now = new Date()
   if (alreadyCredited(save, ctx.receipt)) return null;
   const { id, redirectedFrom } = beneficiaryOf(save, ctx.boardSanctuary);
   recordReceipt(save, ctx.receipt, id);
-  if (!id) return opened.length ? { sanctuary: opened[0], growth: 0, stageUp: null, arrived: [], completed: false, coins: 0, opened, redirectedFrom } : null;
+  if (!id) {
+    if (!opened.length) return null;
+    const only: GrowthNews = { sanctuary: opened[0], growth: 0, stageUp: null, arrived: [], completed: false, coins: 0, opened, redirectedFrom };
+    noteUnseen(save, only, now);
+    return only;
+  }
   const def = SANCTUARY_BY_ID[id];
   const before = stageOf(save, id);
   save.world.growth[id] = growthOf(save, id) + 1;
@@ -202,7 +207,7 @@ export function creditSolve(save: WorldSave, ctx: SolveContext, now = new Date()
   const completed = isComplete(save, id);
   let coins = 0;
   if (completed && grant(save, `world:complete:${id}`, def.completeCoins, 'gift', now, `${def.name} complete`)) coins = def.completeCoins;
-  return {
+  const news: GrowthNews = {
     sanctuary: id,
     growth: save.world.growth[id]!,
     stageUp: after > before ? def.stages[after] : null,
@@ -212,6 +217,52 @@ export function creditSolve(save: WorldSave, ctx: SolveContext, now = new Date()
     opened,
     redirectedFrom,
   };
+  noteUnseen(save, news, now);
+  return news;
+}
+
+/** Is this win a milestone worth a visit: someone came home, a stage was reached, a sanctuary opened or finished? */
+export function isMilestone(news: GrowthNews | null): boolean {
+  return !!news && (news.arrived.length > 0 || news.stageUp !== null || news.opened.length > 0 || news.completed);
+}
+
+/**
+ * Keeps the "New" marker: what a win did in a sanctuary the player hasn't looked at since. Arrivals and stages are
+ * recorded once (they can't happen twice), so a replayed level or a reopened app never re-raises old news.
+ */
+function noteUnseen(save: WorldSave, news: GrowthNews, now: Date): void {
+  const unseen = (save.world.unseen ??= {});
+  const at = now.toISOString();
+  for (const r of news.opened) {
+    const u = unseen[r] ?? { animals: [], stage: null, opened: false, at };
+    u.opened = true;
+    u.at = at;
+    unseen[r] = u;
+  }
+  if (news.growth > 0 && (news.arrived.length || news.stageUp)) {
+    const u = unseen[news.sanctuary] ?? { animals: [], stage: null, opened: false, at };
+    for (const a of news.arrived) if (!u.animals.includes(a)) u.animals.push(a);
+    if (news.stageUp) u.stage = stageOf(save, news.sanctuary);
+    u.at = at;
+    unseen[news.sanctuary] = u;
+  }
+}
+
+/** The news waiting in a sanctuary, or null when the player has seen everything there. */
+export function unseenIn(save: Pick<SaveV2, 'world'>, id: SanctuaryId): UnseenNews | null {
+  return save.world.unseen?.[id] ?? null;
+}
+
+/** Sanctuaries with news the player hasn't visited yet. */
+export function unseenSanctuaries(save: Pick<SaveV2, 'world'>): SanctuaryId[] {
+  return SANCTUARIES.map((s) => s.id).filter((id) => !!save.world.unseen?.[id]);
+}
+
+/** A visit clears the sanctuary's "New" marker. Returns what it was, so the screen can say hello to the newcomers. */
+export function markSeen(save: Pick<SaveV2, 'world'>, id: SanctuaryId): UnseenNews | null {
+  const u = save.world.unseen?.[id] ?? null;
+  if (u && save.world.unseen) delete save.world.unseen[id];
+  return u;
 }
 
 /**

@@ -180,7 +180,14 @@ export interface SaveV2 {
    * The world map: which sanctuary you're building, how much each has grown (puzzles solved for it), the last day each
    * was visited, and credit receipts (board id → the sanctuary its solve grew, or `none`) so a board is credited once.
    */
-  world: { active: string | null; growth: Record<string, number>; visited: Record<string, string>; credits: Record<string, string> };
+  world: {
+    active: string | null;
+    growth: Record<string, number>;
+    visited: Record<string, string>;
+    credits: Record<string, string>;
+    /** Per sanctuary, what happened there that the player hasn't visited yet (an arrival, a stage, its opening): the "New" marker. */
+    unseen: Record<string, UnseenNews>;
+  };
   /** The online leaderboard (opt-in). Solved boards wait here until the server has checked them. */
   leaderboard: LeaderboardSave;
   missions: { dayKey: string | null; weekKey: string | null; progress: Record<string, number>; claimed: Record<string, boolean> };
@@ -224,6 +231,14 @@ export interface SaveV2 {
     worldTipSeen: boolean;
   };
   lastSession: SavedSession | null;
+}
+
+/** News a sanctuary holds until it is visited: who came home, the stage reached, whether it just opened. */
+export interface UnseenNews {
+  animals: string[];
+  stage: number | null;
+  opened: boolean;
+  at: string;
 }
 
 export interface SavedSession {
@@ -337,7 +352,7 @@ export function defaultSave(now = new Date()): SaveV2 {
     inventory: { ledger: [], pets: {}, accents: {}, equippedAccent: {}, favorites: {}, decor: {}, items: [], companions: {}, tricks: {} },
     sanctuary: { hidden: {}, visits: 0, affection: {}, patted: {}, fed: {} },
     ads: { day: null, rewarded: 0 },
-    world: { active: null, growth: {}, visited: {}, credits: {} },
+    world: { active: null, growth: {}, visited: {}, credits: {}, unseen: {} },
     leaderboard: defaultLeaderboard(),
     missions: { dayKey: null, weekKey: null, progress: {}, claimed: {} },
     achievements: {},
@@ -592,6 +607,18 @@ export function normalizeSave(x: unknown, now = new Date()): SaveV2 {
       growth: isObj(x.world) ? rec(x.world.growth, numItem) : {},
       visited: isObj(x.world) ? rec(x.world.visited, strItem) : {},
       credits: isObj(x.world) ? rec(x.world.credits, strItem) : {},
+      unseen: isObj(x.world)
+        ? rec(x.world.unseen, (v) =>
+            isObj(v)
+              ? {
+                  animals: Array.isArray(v.animals) ? v.animals.filter((a): a is string => typeof a === 'string').slice(0, 12) : [],
+                  stage: typeof v.stage === 'number' && Number.isFinite(v.stage) ? Math.round(v.stage) : null,
+                  opened: v.opened === true,
+                  at: str(v.at, ''),
+                }
+              : undefined,
+          )
+        : {},
     },
     leaderboard: normLeaderboard(x.leaderboard),
     missions: {

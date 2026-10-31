@@ -16,7 +16,7 @@ import { COMPANION_BY_ID, type CompanionId } from '../../meta/catalogs/companion
 import { SANCTUARY_BY_ID, type SanctuaryId } from '../../meta/catalogs/sanctuaries';
 import { companionSvg } from '../art/companions';
 import { animalInfo, animalsOf, isHome, nextArrivalIn, type AnimalId } from '../../meta/animals';
-import { activeSanctuary, arrivalLine, arrivalProgress, setActive } from '../../meta/world';
+import { activeSanctuary, arrivalLine, arrivalProgress, markSeen, setActive } from '../../meta/world';
 import { isPetId } from '../../meta/catalogs/pets';
 import { animalPortrait } from '../art/animals';
 import { greetAll, startSceneLife, type SceneLife } from '../components/sceneLife';
@@ -60,7 +60,9 @@ export const sanctuaryScreen: ScreenDef = {
   tab: 'world',
   title: 'Sanctuary',
   mount(root, scope, route: Route) {
-    const welcome = route.screen === 'sanctuary' ? (route.welcome ?? []) : [];
+    // Newcomers to introduce: from this win, or who came home while the player was elsewhere (the "New" marker).
+    const unseen = markSeen(app.save, 'harmony');
+    const welcome = [...new Set([...(route.screen === 'sanctuary' ? (route.welcome ?? []) : []), ...((unseen?.animals ?? []) as AnimalId[])])];
     track('sanctuary_open', { pets: unlockedPets(app.save).length, decor: shownDecor().length });
     app.save.sanctuary.visits++;
     const news = afterSanctuaryVisit();

@@ -3,7 +3,7 @@
  * The play screen's input rules, mounted for real in a DOM: what one tap does under each control scheme, what a wrong
  * placement leaves behind, and what a solve credits. These cover the P0 items of the Journey/World review (D36).
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from '../../src/app/app';
 import { Router, type CanonicalRoute } from '../../src/ui/router';
 import { gameScreen } from '../../src/ui/screens/game';
@@ -276,5 +276,95 @@ describe('level 21: the bridge, then the lesson', () => {
     expect(document.querySelector('.cell.is-guide')).not.toBeNull();
     expect(coach()).toMatch(/Now two animals/);
     expect(app.save.onboarding.pairRulesSeen).toBe(true);
+  });
+});
+
+describe('the win sheet: milestones first, ordinary wins quick (PR 4)', () => {
+  // The sheet rises a beat after the last placement (the faces celebrate first).
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+  function solveBoard(): void {
+    placeAll();
+    vi.advanceTimersByTime(700);
+  }
+  function placeAll(): void {
+    const s = app.active!.session;
+    for (let r = 0; r < s.size; r++)
+      for (let c = 0; c < s.size; c++) {
+        const want = s.puzzle.solution[r][c];
+        if (want === EMPTY || s.givenMask[r][c] || s.cells[r][c] === want) continue;
+        toolBtn(want === CAT ? 'cat' : 'dog')?.click();
+        tap(r, c);
+        if (s.outcome === 'won') return;
+      }
+  }
+  const sheet = () => document.querySelector('.win-sheet');
+
+  it('an ordinary win: no hero, Play next is the one big button, the visit is quiet, the world line says +1', () => {
+    app.save.world.growth.farm = 1;
+    app.save.inventory.companions.cotton = { unlockedAt: '2026-10-30T00:00:00.000Z' };
+    start(4);
+    solveBoard();
+    expect(sheet()).not.toBeNull();
+    expect(sheet()!.classList.contains('win-sheet--milestone')).toBe(false);
+    expect(sheet()!.querySelector('.win-hero')).toBeNull();
+    const blocks = [...sheet()!.querySelectorAll<HTMLElement>('.sheet__actions .btn--block')];
+    expect(blocks.map((b) => b.textContent)).toEqual(['Play level 5']);
+    expect(blocks[0].dataset.act).toBe('next');
+    expect(sheet()!.querySelector('.win-secondary [data-act="region"]')?.textContent).toContain('Visit the Farm');
+    expect(sheet()!.textContent).toMatch(/Farm \+1/);
+  });
+
+  it('an arrival: the newcomer is the hero, Meet is the main action and Play next a full second button', () => {
+    app.save.world.growth.farm = 3; // Truffle arrives at 4
+    app.save.inventory.companions.cotton = { unlockedAt: '2026-10-30T00:00:00.000Z' };
+    start(4);
+    solveBoard();
+    const sh = sheet()!;
+    expect(sh.classList.contains('win-sheet--milestone')).toBe(true);
+    expect(sh.querySelector('[data-hero="arrived"]')?.textContent).toMatch(/Truffle the piglet came home!/);
+    const blocks = [...sh.querySelectorAll<HTMLElement>('.sheet__actions .btn--block')];
+    expect(blocks.map((b) => [b.dataset.act, b.textContent])).toEqual([
+      ['meet', 'Meet Truffle'],
+      ['next', 'Play level 5'],
+    ]);
+    // The news waits on the World until the Farm is visited.
+    expect(app.save.world.unseen.farm?.animals).toEqual(['truffle']);
+    (blocks[0] as HTMLButtonElement).click();
+    expect(app.router.route).toMatchObject({ screen: 'region', id: 'farm' });
+  });
+
+  it('a region opening on the same solve outranks the arrival: Explore is the main action and goes there', () => {
+    app.save.journey.nextLevel = 10; // clearing level 10 opens the Outback
+    app.save.world.growth.farm = 3;
+    app.save.inventory.companions.cotton = { unlockedAt: '2026-10-30T00:00:00.000Z' };
+    start(10);
+    solveBoard();
+    const sh = sheet()!;
+    expect(sh.querySelector('[data-hero="opened"]')?.textContent).toMatch(/The Outback Sanctuary is open!/);
+    // The arrival still shows, below.
+    expect(sh.textContent).toMatch(/Truffle the piglet came home to the Farm/);
+    const primary = sh.querySelector<HTMLElement>('.sheet__actions .btn--block')!;
+    expect(primary.textContent).toBe('Explore the Outback');
+    // Both hold news until each is visited (the real sanctuary screens clear it; see navigation.dom.test).
+    expect(app.save.world.unseen.outback).toMatchObject({ opened: true });
+    expect(app.save.world.unseen.farm?.animals).toEqual(['truffle']);
+    primary.click();
+    expect(app.router.route).toMatchObject({ screen: 'region', id: 'outback' });
+  });
+
+  it('a replay of the level that brought an animal home is an ordinary win: no hero, nothing re-fired', () => {
+    app.save.world.growth.farm = 3;
+    app.save.inventory.companions.cotton = { unlockedAt: '2026-10-30T00:00:00.000Z' };
+    start(4);
+    solveBoard();
+    expect(sheet()!.querySelector('.win-hero')).not.toBeNull();
+    (sheet()!.querySelector('[data-act="next"]') as HTMLButtonElement).click();
+    // Back to level 4 on purpose: a replay.
+    start(4);
+    solveBoard();
+    expect(sheet()!.querySelector('.win-hero')).toBeNull();
+    expect(sheet()!.textContent).not.toMatch(/came home/);
+    expect(app.save.world.growth.farm).toBe(5);
   });
 });

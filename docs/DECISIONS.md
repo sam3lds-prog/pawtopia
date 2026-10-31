@@ -607,3 +607,20 @@ every Journey, Daily and Zen solve counts (replays too); the Paw Cup never does.
   player who leaves the first board or visits the Farm after it comes back to the Journey, not to "Meet Cotton"), and
   "Play level N instead" while a Journey board with progress is saved asks first, naming the board and its moves,
   since the game keeps one board at a time.
+
+### PR 4 — the win sheet: milestones first, ordinary wins quick (P1)
+- **Two kinds of win** (`game.ts::showWin`, `world.isMilestone`). An ordinary win is quick: stars and time, Paw
+  Points, the rewards, the world line ("Farm +1 · Buttercup the calf is on the way: 4 more puzzles"), one big button
+  (the next level) and a quiet Visit. A milestone win — someone came home, a stage was reached, a sanctuary opened or
+  finished — puts the event first as the sheet's centerpiece (`heroMarkup`: the region's land with a New badge, the
+  newcomer's portrait with a Home badge, or the stage) and makes the visit the main action (Meet Truffle, Explore the
+  Outback, Visit the Farm), with the next level a full-size second button. Nothing waits on a visit: the next puzzle is
+  always one tap away.
+- **The biggest news leads** (`heroOf`): a region that opened outranks an arrival, which outranks a finished sanctuary,
+  which outranks a stage; the rest is listed under the stats. The Paw Cup never shows a hero.
+- **"New" until visited** (`world.unseen`, `noteUnseen`, `unseenIn`, `markSeen`): a milestone the player skips waits
+  as a coral chip on the World card ("New: Truffle came home" / "New: just opened" / "New: barn raising"), a dot on
+  the map pin and on the World tab, and a chip on the Journey's goal card, until that sanctuary is opened. Opening it
+  clears the marker and greets the newcomers (the toast and the hello the sanctuary already gave to arrivals from this
+  win). Arrivals and stages can only happen once, so a replayed level or a reopened app never re-raises old news; the
+  sheet itself is never persisted.

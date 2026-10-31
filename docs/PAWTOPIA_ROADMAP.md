@@ -74,9 +74,12 @@ Defects confirmed in source and fixed in Sprint 0:
   as options, existing players told once; level 21 bridge; coaching and How to play per scheme
 - [x] **Sprint W** (D36, PR 3) — four tabs (Journey · World · Challenges · Shop); Home and Play become one Journey hub
   with a goal card and one Continue; the World's goal above its map, honest status lines; Back with scroll restoration
+- [x] **Sprint X** (D36, PR 4) — the win sheet in two kinds: ordinary (one big button, +1 world line) and milestone
+  (the newcomer, region or stage as centerpiece, Meet/Explore first, Next a full second button); "New" markers on the
+  World, its pins, the tab and the goal card until a sanctuary is visited
 - [ ] Game Center and online Paw Cup leagues — not started
 
-Test count: 393 unit tests + 128 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
+Test count: 400 unit tests + 135 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.

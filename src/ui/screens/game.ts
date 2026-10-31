@@ -24,7 +24,8 @@ import type { ScoreBreakdown } from '../../competitions/scoring';
 import { afterSolve, type MetaNews } from '../../app/events';
 import { DECOR_BY_ID } from '../../meta/catalogs/decor';
 import { SANCTUARY_BY_ID, isRegionId, type SanctuaryId } from '../../meta/catalogs/sanctuaries';
-import { activeSanctuary, arrivalProgress, countsForGrowth, creditSolve, nextStage, openRegions, stageOf, type GrowthNews } from '../../meta/world';
+import { activeSanctuary, arrivalProgress, countsForGrowth, creditSolve, isMilestone, nextStage, openRegions, stageOf, type GrowthNews } from '../../meta/world';
+import { regionThumb } from '../art/regions';
 import { animalInfo, withArticle, type AnimalId } from '../../meta/animals';
 import { castFor, castWord, type Cast } from '../../meta/cast';
 import { queueSolve, syncLeaderboard } from '../../app/leaderboardSync';
@@ -1034,14 +1035,62 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     return `<div class="win-rewards">${coins}${decor}${pantry}</div>`;
   }
 
+  /** The one event a milestone win is about, biggest first: a sanctuary opened, an animal came home, a sanctuary finished, a stage reached. */
+  type Hero = { kind: 'opened'; region: SanctuaryId } | { kind: 'arrived'; animal: AnimalId } | { kind: 'completed' } | { kind: 'stage' } | null;
+  function heroOf(g: GrowthNews | null): Hero {
+    if (!g) return null;
+    if (g.opened.length) return { kind: 'opened', region: g.opened[0] };
+    if (g.growth > 0 && g.arrived.length) return { kind: 'arrived', animal: g.arrived[0] };
+    if (g.growth > 0 && g.completed) return { kind: 'completed' };
+    if (g.growth > 0 && g.stageUp) return { kind: 'stage' };
+    return null;
+  }
+
+  /** The milestone, as the centerpiece of the win sheet (in place of the small appreciative face). */
+  function heroMarkup(g: GrowthNews, hero: NonNullable<Hero>): string {
+    const def = SANCTUARY_BY_ID[g.sanctuary];
+    switch (hero.kind) {
+      case 'opened': {
+        const r = SANCTUARY_BY_ID[hero.region];
+        const art = isRegionId(hero.region) ? `<svg viewBox="0 40 360 220" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${regionThumb(hero.region, 0, 'win-hero')}</svg>` : '';
+        return `<div class="win-hero win-hero--opened" style="--accent:${r.accent}" data-hero="opened">
+          <div class="win-hero__scene">${art}<span class="win-hero__badge">${ICON.globe}New</span></div>
+          <h3 class="win-hero__title">The ${esc(r.name)} is open!</h3>
+          <p class="win-hero__sub">${esc(r.blurb)}</p>
+        </div>`;
+      }
+      case 'arrived': {
+        const a = animalInfo(hero.animal);
+        return `<div class="win-hero win-hero--arrived" style="--accent:${def.accent}" data-hero="arrived">
+          <div class="win-hero__portrait portrait" style="--tint:${def.accent}">${animalPortrait(hero.animal, 'happy')}<span class="win-hero__badge">${ICON.heart}Home</span></div>
+          <h3 class="win-hero__title">${esc(a.name)} the ${esc(a.noun)} came home!</h3>
+          <p class="win-hero__sub">${esc(/[.!?]$/.test(a.trait) ? a.trait : `${a.trait}.`)} Now living at the ${esc(def.short)}.</p>
+        </div>`;
+      }
+      case 'completed':
+        return `<div class="win-hero win-hero--stage" style="--accent:${def.accent}" data-hero="completed">
+          <div class="win-hero__icon">${ICON.sparkle}</div>
+          <h3 class="win-hero__title">The ${esc(def.name)} is complete!</h3>
+          <p class="win-hero__sub">Every friend has a home.${g.coins ? ` <b class="num">+${g.coins}</b> Paw Coins.` : ''}</p>
+        </div>`;
+      case 'stage':
+        return `<div class="win-hero win-hero--stage" style="--accent:${def.accent}" data-hero="stage">
+          <div class="win-hero__icon">${ICON.sprout}</div>
+          <h3 class="win-hero__title">${esc(def.short)}: ${esc(g.stageUp!.name)}!</h3>
+          <p class="win-hero__sub">${esc(g.stageUp!.change)}.</p>
+        </div>`;
+    }
+  }
+
   /**
-   * What this solve did for the world: the sanctuary growing, a new stage, an animal coming home, a region opening, and
-   * how far the next animal is.
+   * What this solve did for the world, below the stats: anything the hero didn't already show (a second region, more
+   * arrivals, a stage reached on the same solve as an arrival), then how far the next animal is.
    */
-  function growthMarkup(g: GrowthNews | null): string {
+  function growthMarkup(g: GrowthNews | null, hero: Hero): string {
     if (!g) return '';
     const parts: string[] = [];
     for (const r of g.opened) {
+      if (hero?.kind === 'opened' && hero.region === r) continue;
       const def = SANCTUARY_BY_ID[r];
       parts.push(
         `<div class="reward-item"><span class="reward-item__art reward-item__art--pantry" style="color:${def.accent}">${ICON.globe}</span><span><b>The ${esc(def.name)} is open!</b><small>${esc(def.blurb)}</small></span></div>`,
@@ -1054,16 +1103,17 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         parts.push(`<p class="win-note muted">${ICON.info}The ${esc(from.name)} is finished, so this board helped the ${esc(def.short)} instead.</p>`);
       }
       for (const id of g.arrived) {
+        if (hero?.kind === 'arrived' && hero.animal === id) continue;
         const a = animalInfo(id);
         parts.push(
           `<div class="reward-item reward-item--arrival"><span class="reward-item__art">${animalPortrait(id, 'happy')}</span><span><b>${esc(a.name)} the ${esc(a.noun)} came home to the ${esc(def.short)}!</b><small>${esc(a.trait)}</small></span></div>`,
         );
       }
-      if (g.completed)
+      if (g.completed && hero?.kind !== 'completed')
         parts.push(
           `<div class="win-growth is-up" style="--accent:${def.accent}">${ICON.sparkle}<span><b>The ${esc(def.name)} is complete!</b>${g.coins ? ` <span class="num">+${g.coins}</span> Paw Coins` : ''}</span></div>`,
         );
-      else if (g.stageUp)
+      else if (g.stageUp && hero?.kind !== 'stage' && hero?.kind !== 'completed')
         parts.push(
           `<div class="win-growth is-up" style="--accent:${def.accent}">${ICON.sprout}<span><b>${esc(def.short)}: ${esc(g.stageUp.name)}!</b> ${esc(g.stageUp.change)}.</span></div>`,
         );
@@ -1099,7 +1149,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       )
       .join('');
     const missions = nw.missions.length
-      ? `<p class="win-missions">${ICON.check}${nw.missions.length === 1 ? `Mission done: ${esc(nw.missions[0].title)}` : `${nw.missions.length} missions done`}. Claim on Home.</p>`
+      ? `<p class="win-missions">${ICON.check}${nw.missions.length === 1 ? `Mission done: ${esc(nw.missions[0].title)}` : `${nw.missions.length} missions done`}. Claim on Journey.</p>`
       : '';
     return `<div class="win-news">${badges}${missions}</div>`;
   }
@@ -1154,19 +1204,25 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
   }
   function showWin(rec: WinRecord, seconds: number, rewards: RewardSummary, news: MetaNews, cupScore: ScoreBreakdown | null, growth: GrowthNews | null): void {
     // A visit worth making: a newly opened sanctuary first (that is the news), else a new stage or a new friend.
-    const worldVisit: SanctuaryId | null = growth ? (growth.opened[0] ?? (growth.stageUp || growth.arrived.length ? growth.sanctuary : null)) : null;
+    const worldVisit: SanctuaryId | null = growth ? (growth.opened[0] ?? (growth.stageUp || growth.arrived.length || growth.completed ? growth.sanctuary : null)) : null;
     const next = nextAfterWin(mode);
     const arrived = growth?.growth ? growth.arrived : [];
     const meet = arrived.length > 0;
-    const firstBoard = mode.kind === 'level' && mode.level === 1 && rec.firstClear;
-    const primaryLabel =
-      firstBoard && meet
-        ? `Meet ${animalInfo(arrived[0]).name}`
-        : typeof next === 'object' && next.kind === 'level'
-          ? `Play level ${next.level}`
-          : next === 'cup'
-            ? 'Back to Paw Cup'
-            : 'Back to Journey';
+    const hero = heroOf(growth);
+    // A milestone win puts the event first and the visit as its main action; the next puzzle stays one tap away as a
+    // full-size second button. An ordinary win is quick: the next puzzle is the main action, the visit a quiet one.
+    const milestone = isMilestone(growth) && mode.kind !== 'cup';
+    const nextLabel = typeof next === 'object' && next.kind === 'level' ? `Play level ${next.level}` : next === 'cup' ? 'Back to Paw Cup' : 'Back to Journey';
+    const visitAct = hero?.kind === 'opened' ? 'region' : meet ? 'meet' : 'region';
+    const visitLabel =
+      hero?.kind === 'opened'
+        ? `Explore the ${SANCTUARY_BY_ID[hero.region].short}`
+        : meet
+          ? `Meet ${animalInfo(arrived[0]).name}`
+          : worldVisit
+            ? `Visit the ${SANCTUARY_BY_ID[worldVisit].short}`
+            : 'Visit sanctuary';
+    const primaryLabel = milestone ? visitLabel : nextLabel;
     const badges: string[] = [];
     if (rec.clean) badges.push(`<span class="chip chip--brand">${ICON.check}Clean solve</span>`);
     if (rec.isBest && rec.prevBest !== null) badges.push(`<span class="chip chip--gold">${ICON.sparkle}New best</span>`);
@@ -1180,9 +1236,9 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       title: 'Harmony restored!',
       center: true,
       dismissible: false,
-      className: 'win-sheet',
+      className: `win-sheet${milestone ? ' win-sheet--milestone' : ''}`,
       body: `
-        ${winPet ? `<div class="win-pet">${animalSvg(winPet, { mood: 'proud' })}</div>` : ''}
+        ${milestone && hero && growth ? heroMarkup(growth, hero) : winPet ? `<div class="win-pet">${animalSvg(winPet, { mood: 'proud' })}</div>` : ''}
         <div class="win-stage win-stage-1">
           ${stars}
           <div class="stats">
@@ -1199,16 +1255,22 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         </div>
         <div class="win-stage win-stage-3">
           ${rewardsMarkup(rewards)}
-          ${growthMarkup(growth)}
+          ${growthMarkup(growth, hero)}
           ${newsMarkup(news)}
           ${growth ? '' : nextFriendMarkup(activeSanctuary(app.save))}
         </div>
         <div class="sheet__actions">
-          <button class="btn btn--block" data-act="${firstBoard && meet ? 'meet' : 'next'}" data-autofocus>${esc(primaryLabel)}</button>
+          ${
+            milestone
+              ? `<button class="btn btn--block" data-act="${visitAct}" data-autofocus>${esc(primaryLabel)}</button>
+          <button class="btn btn--secondary btn--block" data-act="next">${esc(nextLabel)}</button>
+          <div class="win-secondary"><button class="btn btn--quiet" data-act="share" aria-label="Share result">${ICON.share}Share</button></div>`
+              : `<button class="btn btn--block" data-act="next" data-autofocus>${esc(primaryLabel)}</button>
           <div class="win-secondary">
-            ${firstBoard && meet ? '' : growth?.opened.length && worldVisit ? `<button class="btn btn--quiet" data-act="region">${ICON.globe}Explore the ${esc(SANCTUARY_BY_ID[worldVisit].short)}</button>` : meet ? `<button class="btn btn--quiet" data-act="meet">${ICON.home}Meet ${esc(animalInfo(arrived[0]).name)}</button>` : worldVisit ? `<button class="btn btn--quiet" data-act="region">${ICON.globe}Visit the ${esc(SANCTUARY_BY_ID[worldVisit].short)}</button>` : `<button class="btn btn--quiet" data-act="sanctuary">${ICON.home}Visit sanctuary</button>`}
-            <button class="btn btn--quiet" data-act="share" aria-label="Share result">${ICON.share}${firstBoard ? 'Share result' : 'Share'}</button>
-          </div>
+            ${mode.kind === 'cup' ? '' : worldVisit ? `<button class="btn btn--quiet" data-act="region">${ICON.globe}Visit the ${esc(SANCTUARY_BY_ID[worldVisit].short)}</button>` : growth?.growth ? `<button class="btn btn--quiet" data-act="region">${ICON.home}Visit the ${esc(SANCTUARY_BY_ID[growth.sanctuary].short)}</button>` : `<button class="btn btn--quiet" data-act="sanctuary">${ICON.home}Visit sanctuary</button>`}
+            <button class="btn btn--quiet" data-act="share" aria-label="Share result">${ICON.share}Share</button>
+          </div>`
+          }
         </div>`,
     });
     const ws = sheet;
@@ -1245,7 +1307,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       leaving = true;
       ws.close();
       if (a.act === 'meet' || a.act === 'sanctuary' || a.act === 'region') {
-        // The sanctuary the news is about: a newcomer's home, the region that opened, or the one being built.
+        // The sanctuary the news is about: a newcomer's home, the region that opened (or the one that grew), or the one being built.
         const where: SanctuaryId =
           a.act === 'meet' ? (growth?.sanctuary ?? 'harmony') : a.act === 'region' ? (worldVisit ?? growth?.sanctuary ?? 'harmony') : (activeSanctuary(app.save) ?? 'harmony');
         const welcome = a.act === 'meet' ? arrived : [];

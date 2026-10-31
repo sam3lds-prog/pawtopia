@@ -161,6 +161,10 @@ try {
 
   await solveActive();
   check('the first win brings Cotton home and offers to meet her', (await page.textContent('[data-act="meet"]'))?.includes('Meet Cotton') && /Cotton the sheep came home/.test((await page.textContent('.win-sheet')) ?? ''));
+  check('the newcomer is the centerpiece: Meet is the main action and Play level 2 a full second button', await page.evaluate(() => {
+    const blocks = [...document.querySelectorAll('.win-sheet .sheet__actions .btn--block')];
+    return !!document.querySelector('.win-sheet [data-hero="arrived"]') && blocks.length === 2 && blocks[0].dataset.act === 'meet' && blocks[1].dataset.act === 'next' && /level 2/.test(blocks[1].textContent);
+  }));
   check('the win sheet shows who comes next', /Truffle the piglet/.test((await page.textContent('.win-sheet')) ?? ''));
   const afterFirst = await coins();
   check('first clear pays coins', afterFirst >= 45, String(afterFirst));
@@ -173,10 +177,11 @@ try {
   check('starter flow continues to level 2', (await title()) === 'Level 2');
   check('level 2 shows the next animal on its way (Truffle)', await page.evaluate(() => window.__pt.app.active.cast.a === 'truffle'));
 
-  // Next level advances (v1 regression)
+  // Next level advances (v1 regression); an ordinary win is quick: one big button, no hero
   await solveActive();
   const nextLabel = await page.textContent('[data-act="next"]');
   check('win sheet offers the NEXT level', nextLabel?.includes('level 3'), nextLabel ?? '');
+  check('an ordinary win has one big button and no milestone hero', (await page.$$('.win-sheet .sheet__actions .btn--block')).length === 1 && !(await page.$('.win-sheet .win-hero')) && /Farm \+1/.test((await page.textContent('.win-sheet')) ?? ''));
   await page.click('[data-act="next"]');
   await page.waitForTimeout(200);
   check('"Next level" opens level 3', (await title()) === 'Level 3');
@@ -594,6 +599,32 @@ try {
   check('the win sheet credits the sanctuary by name (+1)', /Farm \+1/.test((await page.textContent('.win-sheet')) ?? ''));
   await page.click('[data-act="next"]');
   await page.waitForTimeout(200);
+
+  // A milestone the player skips waits as "New" on the World until the sanctuary is visited
+  await page.evaluate(() => {
+    const s = window.__pt.app.save;
+    s.world.growth.farm = 3; // Truffle arrives on the next solve
+    delete s.inventory.companions.truffle;
+    window.__pt.app.persist();
+    window.__pt.start({ kind: 'level', level: 6 });
+  });
+  await page.waitForTimeout(200);
+  await solveActive();
+  check('an arrival makes the newcomer the hero of the win sheet', /Truffle the piglet came home!/.test((await page.textContent('.win-sheet [data-hero="arrived"]')) ?? ''));
+  await page.click('.win-sheet [data-act="next"]');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => window.__pt.go({ screen: 'world' }));
+  await page.waitForSelector('.world-map');
+  check('skipping the visit leaves a "New" marker on the Farm and the World tab', !!(await page.$('.world-card[data-go="farm"] .chip--news')) && !!(await page.$('.world-pin[data-go="farm"] .news-dot')) && !!(await page.$('.nav [data-tab="world"].has-news')));
+  await page.click('.world-card[data-go="farm"]');
+  await page.waitForSelector('.region .sanctuary__scene svg');
+  await page.waitForTimeout(300);
+  check('visiting greets the newcomer and clears the marker', /Truffle the piglet came home/.test((await page.textContent('.toast')) ?? '') && (await page.evaluate(() => !window.__pt.app.save.world.unseen.farm)));
+  await page.click('.region [data-act="back"]');
+  await page.waitForSelector('.world-map');
+  check('the marker is gone after the visit', !(await page.$('.world-card[data-go="farm"] .chip--news')) && (await page.evaluate(() => !window.__pt.app.save.world.unseen.farm)));
+  // The Savanna opened when level 25 was cleared a moment ago and nobody has been: it says so.
+  check('a region that opened unvisited says "New: just opened"', /New: just opened/.test((await page.textContent('.world-card[data-go="savanna"] .chip--news').catch(() => '')) ?? ''));
 
   // A board helps the sanctuary it started for: start a Farm board, choose to build the Pet Garden, come back and finish it
   await page.evaluate(() => window.__pt.start({ kind: 'level', level: 5 }));

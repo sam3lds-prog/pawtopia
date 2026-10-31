@@ -236,6 +236,22 @@ describe('the World', () => {
     expect(document.querySelector('.world-tip')).toBeNull();
   });
 
+  it('news waits as "New" on the World, the goal card and the tab until the sanctuary is visited', () => {
+    app.save.world.unseen = { farm: { animals: ['truffle'], stage: null, opened: false, at: '2026-10-31T00:00:00.000Z' } };
+    app.save.inventory.companions.truffle = { unlockedAt: '2026-10-31T00:00:00.000Z' };
+    router.reset({ screen: 'journey' });
+    expect(text('.goal-card .chip--news')).toBe('New');
+    expect(el('.nav [data-tab="world"]')?.classList.contains('has-news')).toBe(true);
+    router.reset({ screen: 'world' });
+    expect(text('.world-card[data-go="farm"] .chip--news')).toMatch(/New: Truffle came home/);
+    expect(el('.world-pin[data-go="farm"] .news-dot')).not.toBeNull();
+    router.go({ screen: 'region', id: 'farm' });
+    expect(app.save.world.unseen.farm).toBeUndefined();
+    router.back({ screen: 'world' });
+    expect(el('.world-card[data-go="farm"] .chip--news')).toBeNull();
+    expect(el('.nav [data-tab="world"]')?.classList.contains('has-news')).toBe(false);
+  });
+
   it('the world line names a complete sanctuary as complete, and keeps it on the map', () => {
     app.save.world.growth.farm = 26;
     for (const id of ['cotton', 'truffle', 'buttercup', 'pepper', 'marigold', 'hazel']) app.save.inventory.companions[id as 'cotton'] = { unlockedAt: '2026-10-30T00:00:00.000Z' };
