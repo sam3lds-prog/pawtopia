@@ -195,9 +195,11 @@ try {
   await page.waitForTimeout(200);
   await solveActive({ stopAfter: 1 }).catch(() => {});
   await reload();
-  await page.waitForSelector('.home');
+  await page.waitForSelector('.journey');
+  check('the app opens on the Journey tab, with four tabs', (await page.$$eval('.nav [data-tab]', (els) => els.map((e) => e.dataset.tab))).join(',') === 'journey,world,challenges,shop' && (await page.getAttribute('.nav [data-tab="journey"]', 'aria-current')) === 'page');
+  check('the Journey shows the goal (sanctuary and next animal), the level and Continue in its first screen', !!(await page.$('.goal-card')) && /Truffle/.test((await page.textContent('.goal-card')) ?? '') && (await page.evaluate(() => document.querySelector('.continue__go').getBoundingClientRect().bottom <= window.innerHeight)));
   const cont = await page.textContent('[data-act="continue"]');
-  check('home offers to resume the board in progress', /Resume/i.test(cont ?? ''), cont ?? '');
+  check('the Journey offers to resume the board in progress', /Resume/i.test(cont ?? ''), cont ?? '');
   await page.click('[data-act="continue"]');
   await page.waitForTimeout(300);
   const placedCount = await page.evaluate(() => window.__pt.app.active.session.placedCount());
@@ -538,14 +540,45 @@ try {
   const dGivens = await page.evaluate(() => window.__pt.app.active.session.puzzle.givens.length);
   check('tapping the Daily again continues the saved daily', dPlaced === dGivens + 1, `${dPlaced} vs ${dGivens + 1}`);
 
-  // World map: a pin for every sanctuary; the Farm is built first; every solve grows the sanctuary being built
+  // World map: the goal first, then a pin for every sanctuary; the Farm is built first; every solve grows the sanctuary being built
   await page.evaluate(() => window.__pt.go({ screen: 'home' }));
   await page.click('.nav [data-tab="world"]');
   await page.waitForSelector('.world-map');
+  check('the World shows what you are building and a Play button before the map', await page.evaluate(() => {
+    const f = document.querySelector('.world-focus');
+    const m = document.querySelector('.world-map');
+    return !!f && !!m && f.getBoundingClientRect().top < m.getBoundingClientRect().top && f.querySelector('[data-act="play"]').getBoundingClientRect().bottom <= window.innerHeight;
+  }));
   check('the World tab shows a pin for every sanctuary', (await page.$$('.world-pin')).length === 6);
   check('the Farm is being built', !!(await page.$('.world-pin.is-building[data-go="farm"]')));
   check('the Outback is open by level 25', !(await page.$('.world-pin.is-locked[data-go="outback"]')));
   check('later sanctuaries stay locked until their level', !!(await page.$('.world-pin.is-locked[data-go="amazon"]')));
+  check('open sanctuaries say "Build here", never "Paused"', /^Build here/.test((await page.textContent('.world-card[data-go="outback"] .world-card__status'))?.trim() ?? '') && !/Paused/.test((await page.textContent('.world')) ?? ''));
+  // Back from a sanctuary returns to the World where you were, not Home.
+  await page.evaluate(() => window.scrollTo(0, 420));
+  await page.waitForTimeout(100);
+  const scrollBefore = await page.evaluate(() => window.scrollY);
+  await page.click('.world-card[data-go="farm"]');
+  await page.waitForSelector('.region .sanctuary__scene svg');
+  await page.click('.region [data-act="back"]');
+  await page.waitForSelector('.world-map');
+  await page.waitForTimeout(100);
+  check('Back from the Farm returns to the World at the same scroll position', Math.abs((await page.evaluate(() => window.scrollY)) - scrollBefore) < 4 && (await page.getAttribute('.nav [data-tab="world"]', 'aria-current')) === 'page', `${scrollBefore} → ${await page.evaluate(() => window.scrollY)}`);
+  await page.click('.world-card[data-go="farm"]');
+  await page.waitForSelector('.region .sanctuary__scene svg');
+  // The Shop opened from the Farm comes back to the Farm.
+  await page.click('.region [data-act="shop"]');
+  await page.waitForSelector('.shop');
+  check('the Shop opened from the Farm has a Back to the Farm action', (await page.getAttribute('[data-act="back-from"]', 'aria-label')) === 'Back to the Farm');
+  await page.click('[data-act="back-from"]');
+  await page.waitForSelector('.region .sanctuary__scene svg');
+  check('…which returns to the Farm', await page.evaluate(() => window.__pt.app.router.route.screen === 'region' && window.__pt.app.router.route.id === 'farm'));
+  // The Pet Garden goes back the same way.
+  await page.evaluate(() => window.__pt.go({ screen: 'world' }));
+  await page.click('.world-card[data-go="harmony"]');
+  await page.waitForSelector('.sanctuary [data-act="back"]');
+  await page.click('.sanctuary [data-act="back"]');
+  check('Back from the Pet Garden returns to the World too', await page.evaluate(() => window.__pt.app.router.route.screen === 'world'));
   await page.click('.world-card[data-go="farm"]');
   await page.waitForSelector('.region .sanctuary__scene svg');
   const g0 = await page.evaluate(() => window.__pt.app.save.world.growth.farm ?? 0);

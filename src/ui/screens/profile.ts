@@ -10,7 +10,7 @@ import { ICON } from '../icons';
 import type { ScreenDef } from '../router';
 
 export const profileScreen: ScreenDef = {
-  tab: 'home',
+  tab: 'journey',
   title: 'Journal',
   mount(root, scope) {
     const s = app.save;
@@ -23,7 +23,7 @@ export const profileScreen: ScreenDef = {
     const el = h(`
       <div class="journal">
         <header class="screen-head">
-          <button class="icon-btn" data-act="back" aria-label="Back to Home">${ICON.back}</button>
+          <button class="icon-btn" data-act="back" aria-label="Back">${ICON.back}</button>
           <h1 data-autofocus>Journal</h1>
         </header>
         <section class="card rank-card" aria-labelledby="rank-h">
@@ -81,7 +81,7 @@ export const profileScreen: ScreenDef = {
       </div>`);
     root.appendChild(el);
     scope.on(el, 'click', (e) => {
-      if ((e.target as HTMLElement).closest('[data-act="back"]')) app.router.go({ screen: 'home' });
+      if ((e.target as HTMLElement).closest('[data-act="back"]')) app.router.back({ screen: 'journey' });
     });
   },
 };

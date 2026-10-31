@@ -189,7 +189,7 @@ export function showSettings(scope: Scope, opts: SettingsOptions = {}): void {
     if (!a) return;
     if (a.act === 'leaderboard') {
       sh.close();
-      app.router.go({ screen: 'league', tab: 'leaderboard' });
+      app.router.go({ screen: 'challenges', tab: 'leaderboard' });
       return;
     }
     if (a.act === 'ad-privacy') {
@@ -258,7 +258,7 @@ function confirmErase(scope: Scope, done: () => void): void {
     app.replaceSave(fresh);
     cs.close();
     done();
-    app.router.go({ screen: 'home' });
+    app.router.reset({ screen: 'journey' });
     toast('Progress erased.');
   });
 }

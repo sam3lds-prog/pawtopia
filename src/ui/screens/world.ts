@@ -1,8 +1,9 @@
 /**
- * World: a map of every sanctuary (D35). The Farm and the Pet Garden are open from the start; each exotic region opens
- * at a Journey level. Whichever one you build grows with the puzzles you solve, and its animals come home one by one
- * (the one on its way is the animal on your boards). The map shows where each one is and how far along it is; the
- * cards below say what's next. Nothing here is for sale: puzzles are what grow a sanctuary.
+ * World: what the puzzles build (D35, D36). First the goal: the sanctuary being built, who is on the way, and the next
+ * puzzle one tap away. Then the map of every sanctuary (the Farm and the Pet Garden open from the start; each exotic
+ * region opens at a Journey level) and the list with each one's state: building here, build here, locked until a level,
+ * complete. Whichever one you build grows with the puzzles you solve, and its animals come home one by one (the one on
+ * its way is the animal on your boards). Nothing here is for sale: puzzles are what grow a sanctuary.
  */
 
 import { app } from '../../app/app';
@@ -29,16 +30,18 @@ function statusOf(id: SanctuaryDef['id']): Status {
   return activeSanctuary(app.save) === id ? 'building' : 'open';
 }
 
+/** One honest line per sanctuary: locked until a level, complete, building here, or open to build (never "paused"). */
 function statusLine(def: SanctuaryDef): string {
   const st = statusOf(def.id);
   const cleared = app.save.journey.nextLevel - 1;
-  if (st === 'locked') return `Opens after level ${def.opensAfterLevel} · ${plural(def.opensAfterLevel - cleared, 'level')} to go`;
+  if (st === 'locked') return `Locked until level ${def.opensAfterLevel} · ${plural(def.opensAfterLevel - cleared, 'level')} to go`;
   if (st === 'complete') return 'Complete · every friend has a home';
   const coming = arrivalProgress(app.save, def.id);
-  const paused = st === 'building' ? '' : 'Paused · ';
-  if (coming) return `${paused}${animalInfo(coming.next.id).name} comes home in ${plural(coming.left, 'puzzle')}`;
+  const lead = st === 'building' ? 'Building here · ' : 'Build here · ';
+  const tail = st === 'building' ? '' : ' while you build here';
+  if (coming) return `${lead}${animalInfo(coming.next.id).name} comes home in ${plural(coming.left, 'puzzle')}${tail}`;
   const next = nextStage(app.save, def.id);
-  return next ? `${paused}${plural(next.need - next.have, 'puzzle')} to ${next.stage.name.toLowerCase()}` : `${paused}Almost complete`;
+  return next ? `${lead}${plural(next.need - next.have, 'puzzle')} to ${next.stage.name.toLowerCase()}${tail}` : `${lead}almost complete`;
 }
 
 /** The friend who stands for a sanctuary on its map pin: the first one home there, if any. */
@@ -84,21 +87,21 @@ export const worldScreen: ScreenDef = {
       const body = coming
         ? (() => {
             const a = animalInfo(coming.next.id);
-            return `<div class="coming-home"><span class="coming-home__art portrait is-shy">${animalPortrait(coming.next.id, 'idle')}</span><span class="coming-home__body"><span><b>${esc(a.name)} the ${esc(a.noun)}</b> is on your boards: ${plural(coming.left, 'more puzzle')} to come home.</span>${bar(coming.have, coming.from, coming.need, `${a.name} coming home`)}</span></div>`;
+            return `<div class="coming-home"><span class="coming-home__art portrait is-shy">${animalPortrait(coming.next.id, 'idle')}</span><span class="coming-home__body"><span><b>${esc(a.name)} the ${esc(a.noun)}</b> arrives in ${plural(coming.left, 'puzzle')}.</span>${bar(coming.have, coming.from, coming.need, `${a.name} coming home`)}</span></div>`;
           })()
         : next
           ? `<p class="muted">Next: <b>${esc(next.stage.name)}</b>. ${esc(next.stage.change)}.</p>${bar(next.have, next.from, next.need, `Progress to ${next.stage.name}`)}`
           : '';
+      const others = SANCTUARIES.filter((d) => d.id !== building && statusOf(d.id) === 'open').length;
       focus = `<section class="card world-focus" style="--accent:${def.accent}" aria-labelledby="focus-title">
-        <p class="world-focus__eyebrow">${ICON.sprout}Building now</p>
+        <p class="world-focus__eyebrow">${ICON.sprout}Building now${def.stages.length ? ` · stage ${stageOf(save, building)} of ${def.stages.length - 1}` : ''}</p>
         <h2 id="focus-title">${esc(def.name)}</h2>
-        ${def.stages.length ? `<p class="muted">Stage ${stageOf(save, building)} of ${def.stages.length - 1}</p>` : ''}
         ${body}
-        <p class="world-focus__count">Every puzzle you solve helps (Paw Cup aside)</p>
         <div class="world-focus__actions">
           <button class="btn" data-act="play">Play level ${level}</button>
           <button class="btn btn--secondary" data-go="${building}">Visit</button>
         </div>
+        ${others ? `<button class="world-focus__switch" data-act="others">${ICON.globe}Build somewhere else instead</button>` : ''}
       </section>`;
     } else if (!openCount && upcoming) {
       const pct = Math.round(((level - 1) / upcoming.def.opensAfterLevel) * 100);
@@ -139,20 +142,29 @@ export const worldScreen: ScreenDef = {
       </button></li>`;
     }).join('');
 
+    // The first time here: one line on how the World works, dismissed for good with a tap.
+    const tip = !save.onboarding.worldTipSeen
+      ? `<div class="world-tip card" data-world-tip role="note">
+          <span class="world-tip__icon">${ICON.info}</span>
+          <p>Your puzzles help one home grow at a time. You can change the home you're building whenever you like; progress elsewhere is kept.</p>
+          <button class="icon-btn icon-btn--bare" data-act="tip-ok" aria-label="Got it">${ICON.close}</button>
+        </div>`
+      : '';
+
     const el = h(`
       <div class="world">
         <header class="screen-head">
           <h1 data-autofocus>World</h1>
           <div class="screen-head__end">${walletPills()}</div>
         </header>
-        <p class="muted world__lead">Solve puzzles to build sanctuaries for animals around the world.</p>
+        ${tip}
+        ${focus}
         <div class="world-map card">
           ${worldMapSvg(SANCTUARY_BY_ID.harmony)}
           ${pins}
         </div>
-        ${focus}
         <section aria-labelledby="sanct-title">
-          <div class="section-head"><h2 id="sanct-title">Sanctuaries</h2><span class="muted num">${openCount} of ${SANCTUARIES.length} open</span></div>
+          <div class="section-head"><h2 id="sanct-title">Homes</h2><span class="muted num">${openCount} of ${SANCTUARIES.length} open</span></div>
           <ul class="world-list">${cards}</ul>
         </section>
         <button class="btn btn--secondary btn--block" data-act="album">${ICON.paw}Animal album</button>
@@ -172,6 +184,12 @@ export const worldScreen: ScreenDef = {
       if (!a) return;
       if (a.dataset.act === 'play') playMode({ kind: 'level', level: app.save.journey.nextLevel });
       else if (a.dataset.act === 'album') app.router.go({ screen: 'pets' });
+      else if (a.dataset.act === 'others') el.querySelector('#sanct-title')?.scrollIntoView({ block: 'start', behavior: app.reducedMotion ? 'auto' : 'smooth' });
+      else if (a.dataset.act === 'tip-ok') {
+        app.save.onboarding.worldTipSeen = true;
+        app.persist();
+        el.querySelector('[data-world-tip]')?.remove();
+      }
     });
   },
 };

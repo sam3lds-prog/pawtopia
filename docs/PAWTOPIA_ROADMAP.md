@@ -72,9 +72,11 @@ Defects confirmed in source and fixed in Sprint 0:
   it started for (once, by board id); a region that opens is the win's visit target; the board names its sanctuary
 - [x] **Sprint V** (D36, PR 2) — one tap places (tool bar: animal(s), ✕, Erase), the D35 scheme and the tap cycle kept
   as options, existing players told once; level 21 bridge; coaching and How to play per scheme
+- [x] **Sprint W** (D36, PR 3) — four tabs (Journey · World · Challenges · Shop); Home and Play become one Journey hub
+  with a goal card and one Continue; the World's goal above its map, honest status lines; Back with scroll restoration
 - [ ] Game Center and online Paw Cup leagues — not started
 
-Test count: 380 unit tests + 120 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
+Test count: 391 unit tests + 128 browser e2e checks (plus Firestore rules tests that need the emulator). Bundle: ~167 kB JS gzipped for the app (incl. all three level packs); the 3D toys (~165 kB) load when a sanctuary opens and the Firebase SDK only when the leaderboard is used.
 
 Deferred on purpose: an optional long-press action sheet (needs a usability test against drag-marking); sanctuary
 walks between anchor points; capybara, otter, axolotl and owl (need art); seasonal recolors.

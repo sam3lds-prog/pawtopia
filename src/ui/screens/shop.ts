@@ -258,9 +258,14 @@ export const shopScreen: ScreenDef = {
         }`;
     }
 
+    // Opened from a sanctuary: Back returns there (the tab bar still opens the Shop on its own).
+    const prev = app.router.previous;
+    const from = prev?.screen === 'region' ? SANCTUARY_BY_ID[prev.id].short : prev?.screen === 'sanctuary' ? 'Pet Garden' : null;
+
     function render(): void {
       el.innerHTML = `
         <header class="screen-head">
+          ${from ? `<button class="icon-btn" data-act="back-from" aria-label="Back to the ${esc(from)}">${ICON.back}</button>` : ''}
           <h1 data-autofocus>Shop</h1>
           <div class="screen-head__end">${walletPills()}</div>
         </header>
@@ -277,6 +282,10 @@ export const shopScreen: ScreenDef = {
 
     scope.on(el, 'click', async (e) => {
       const t = e.target as HTMLElement;
+      if (t.closest('[data-act="back-from"]')) {
+        app.router.back({ screen: 'world' });
+        return;
+      }
       const pc = t.closest('[data-place]') as HTMLElement | null;
       if (pc) {
         place = lastPlace = pc.dataset.place as SanctuaryId;

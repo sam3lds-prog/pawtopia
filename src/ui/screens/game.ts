@@ -61,7 +61,7 @@ export const gameScreen: ScreenDef = {
   mount(root, scope) {
     const active = app.active;
     if (!active) {
-      app.router.go({ screen: 'home' });
+      app.router.back({ screen: 'journey' });
       return;
     }
     mountGame(root, scope, active.mode, active.session, active.spec, active.cast ?? castFor(app.save, active.session.rule, active.session.puzzle.seed), active.boardId);
@@ -879,9 +879,10 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
     faces.activity();
   }
 
+  /** Back to wherever the board was opened from (Journey, the World, a sanctuary, Challenges). */
   function leave(): void {
     app.saveActive();
-    app.router.go({ screen: mode.kind === 'level' ? 'play' : mode.kind === 'cup' ? 'league' : 'home' });
+    app.router.back({ screen: mode.kind === 'cup' ? 'challenges' : 'journey' });
   }
 
   function openPause(): void {
@@ -1165,7 +1166,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
           ? `Play level ${next.level}`
           : next === 'cup'
             ? 'Back to Paw Cup'
-            : 'Back home';
+            : 'Back to Journey';
     const badges: string[] = [];
     if (rec.clean) badges.push(`<span class="chip chip--brand">${ICON.check}Clean solve</span>`);
     if (rec.isBest && rec.prevBest !== null) badges.push(`<span class="chip chip--gold">${ICON.sparkle}New best</span>`);
@@ -1256,7 +1257,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
       // Celebration first, always. An interstitial (if any network is live) can only follow the player's tap.
       await maybeInterstitial();
       if (typeof next === 'object') startGame(next);
-      else app.router.go({ screen: next === 'cup' ? 'league' : 'home' });
+      else app.router.back({ screen: next === 'cup' ? 'challenges' : 'journey' });
     });
   }
 
@@ -1327,7 +1328,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
           ${canLife ? `<button class="btn btn--block" data-act="life">${ICON.lifePlus}Use an extra life: +1 heart<span class="btn__price">${lives()} left</span></button>` : ''}
           ${canRevive ? `<button class="btn btn--block" data-act="revive">${ICON.videoToken}Watch a short video: +1 heart</button>` : ''}
           ${mode.kind === 'cup' ? '' : `<button class="btn ${canRevive || canLife ? 'btn--secondary' : ''} btn--block" data-act="restart">${ICON.restart}Try again</button>`}
-          <button class="btn btn--quiet" data-act="leave">${mode.kind === 'cup' ? 'Back to Paw Cup' : 'Back home'}</button>
+          <button class="btn btn--quiet" data-act="leave">${mode.kind === 'cup' ? 'Back to Paw Cup' : 'Back to Journey'}</button>
         </div>`,
     });
     const ls = sheet;
@@ -1368,7 +1369,7 @@ function mountGame(root: HTMLElement, scope: Scope, mode: ModeRef, s: Session, s
         app.clearSaved(mode);
         app.active = null;
         app.persist();
-        app.router.go({ screen: mode.kind === 'cup' ? 'league' : 'home' });
+        app.router.back({ screen: mode.kind === 'cup' ? 'challenges' : 'journey' });
       }
     });
   }

@@ -14,8 +14,8 @@ describe('Next level (regression: v1 replayed the completed level)', () => {
     expect(nextAfterWin({ kind: 'level', level: 18 })).toEqual({ kind: 'level', level: 19 });
   });
   it('sends other modes back to their hub', () => {
-    expect(nextAfterWin({ kind: 'daily', dateKey: '2026-10-25' })).toBe('home');
-    expect(nextAfterWin({ kind: 'zen', size: 6, seed: 3 })).toBe('home');
+    expect(nextAfterWin({ kind: 'daily', dateKey: '2026-10-25' })).toBe('journey');
+    expect(nextAfterWin({ kind: 'zen', size: 6, seed: 3 })).toBe('journey');
     expect(nextAfterWin({ kind: 'cup', weekKey: '2026-W43', index: 0 })).toBe('cup');
   });
 });

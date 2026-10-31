@@ -77,10 +77,10 @@ export function modeKey(mode: ModeRef): string {
  * What the win sheet's primary button should open. Journey advances to the level after the one
  * just solved (the v1 bug replayed the same level); other modes go back to where they came from.
  */
-export function nextAfterWin(mode: ModeRef): ModeRef | 'home' | 'cup' {
+export function nextAfterWin(mode: ModeRef): ModeRef | 'journey' | 'cup' {
   if (mode.kind === 'level') return { kind: 'level', level: mode.level + 1 };
   if (mode.kind === 'cup') return 'cup';
-  return 'home';
+  return 'journey';
 }
 
 export function isValidModeRef(x: unknown): x is ModeRef {
