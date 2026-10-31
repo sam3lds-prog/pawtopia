@@ -16,6 +16,10 @@ import {
   countsForGrowth,
   creditSolve,
   growOnSolve,
+  isMilestone,
+  markSeen,
+  unseenIn,
+  unseenSanctuaries,
   isComplete,
   isOpen,
   nextStage,
@@ -219,6 +223,42 @@ describe('growing a sanctuary', () => {
       const back = normalizeSave(JSON.parse(JSON.stringify(s)), NOW);
       expect(back.world.credits).toEqual(s.world.credits);
       expect(normalizeSave({ progressVersion: 2, world: { growth: { farm: 2 } } }, NOW).world.credits).toEqual({});
+    });
+  });
+
+  describe('the "New" marker (PR 4)', () => {
+    it('an arrival, a stage and an opening are held as news until the sanctuary is visited; a plain solve is not news', () => {
+      const s = atLevel(3);
+      expect(unseenIn(s, 'farm')).toBeNull();
+      const first = solve(s, 1)[0]!; // Cotton comes home, first stage
+      expect(isMilestone(first)).toBe(true);
+      expect(unseenIn(s, 'farm')).toMatchObject({ animals: ['cotton'], stage: 1, opened: false });
+      expect(unseenSanctuaries(s)).toEqual(['farm']);
+      const plain = solve(s, 1)[0]!;
+      expect(isMilestone(plain)).toBe(false);
+      // Nothing new happened, so the marker is unchanged.
+      expect(unseenIn(s, 'farm')?.animals).toEqual(['cotton']);
+      expect(markSeen(s, 'farm')?.animals).toEqual(['cotton']);
+      expect(unseenIn(s, 'farm')).toBeNull();
+      expect(markSeen(s, 'farm')).toBeNull();
+      // A region that opens is news there, even when the solve grew the Farm.
+      s.journey.nextLevel = 11;
+      const opened = creditSolve(s, { boardSanctuary: 'farm', openedBefore: ['farm'] }, NOW)!;
+      expect(opened.opened).toEqual(['outback']);
+      expect(isMilestone(opened)).toBe(true);
+      expect(unseenIn(s, 'outback')).toMatchObject({ opened: true, animals: [] });
+      expect(unseenSanctuaries(s)).toEqual(['outback']);
+    });
+
+    it('survives a save round trip and never re-raises old news', () => {
+      const s = atLevel(3);
+      solve(s, 1);
+      const back = normalizeSave(JSON.parse(JSON.stringify(s)), NOW);
+      expect(unseenIn(back, 'farm')?.animals).toEqual(['cotton']);
+      markSeen(back, 'farm');
+      // Replaying boards after the arrival changes nothing about what is new.
+      solve(back, 2);
+      expect(unseenIn(back, 'farm')).toBeNull();
     });
   });
 

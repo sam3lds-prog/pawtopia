@@ -31,7 +31,7 @@ import { ICON } from '../icons';
 import type { CanonicalRoute, Scope, ScreenDef } from '../router';
 import { showSettings } from './settings';
 import { SANCTUARY_BY_ID, isRegionId, type RegionId, type SanctuaryId } from '../../meta/catalogs/sanctuaries';
-import { activeSanctuary, arrivalProgress, nextStage, nextToOpen, stageOf } from '../../meta/world';
+import { activeSanctuary, arrivalProgress, nextStage, nextToOpen, stageOf, unseenIn } from '../../meta/world';
 import { animalInfo, homeAnimals } from '../../meta/animals';
 import { animalPortrait } from '../art/animals';
 import type { CompanionId } from '../../meta/catalogs/companions';
@@ -112,7 +112,7 @@ export function goalCardMarkup(opts: { playLevel?: number } = {}): string {
         <svg viewBox="0 52 360 216" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${sanctuaryPicture(id, 'goal')}</svg>
       </button>
       <div class="goal-card__body">
-        <p class="goal-card__eyebrow">${ICON.sprout}Building now</p>
+        <p class="goal-card__eyebrow">${ICON.sprout}Building now${unseenIn(save, id) ? `<span class="chip chip--coral chip--news">${ICON.sparkle}New</span>` : ''}</p>
         <h2 id="goal-title">${esc(def.name)}</h2>
         <p class="goal-card__next">${art}<span>${line}</span></p>
         ${bar}

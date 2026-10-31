@@ -839,3 +839,145 @@
 .trick-sheet .chip {
   align-self: center;
 }
+
+/* ------------------------------------------------------------------ milestones (D36, PR 4) */
+/* The win sheet's centerpiece on a milestone: the region that opened, the animal who came home, the stage reached. */
+.win-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: -4px 0 var(--s2);
+}
+.win-hero__title {
+  font-size: 20px;
+  line-height: 1.2;
+  color: var(--ink);
+  margin: var(--s2) 0 0;
+}
+.win-hero__sub {
+  margin: 0;
+  color: var(--muted-ink);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  max-width: 30ch;
+}
+.win-hero__portrait {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.6),
+    0 0 0 4px color-mix(in srgb, var(--accent) 22%, white),
+    0 10px 24px -12px rgba(40, 52, 52, 0.45);
+  animation: hero-pop 520ms var(--ease) both;
+}
+.win-hero__portrait > .pet,
+.win-hero__portrait > svg {
+  width: 80%;
+  height: 80%;
+}
+.win-hero__scene {
+  position: relative;
+  width: min(100%, 300px);
+  aspect-ratio: 360 / 220;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--brand-tint);
+  box-shadow: 0 10px 24px -12px rgba(40, 52, 52, 0.45);
+  animation: hero-pop 520ms var(--ease) both;
+}
+.win-hero__scene svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.win-hero__icon {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 16%, white);
+  color: var(--accent);
+  animation: hero-pop 520ms var(--ease) both;
+}
+.win-hero__icon .ico {
+  width: 40px;
+  height: 40px;
+}
+.win-hero__badge {
+  position: absolute;
+  right: -6px;
+  bottom: -2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: var(--t-xs);
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(40, 52, 52, 0.25);
+}
+.win-hero__scene .win-hero__badge {
+  right: 10px;
+  bottom: 10px;
+}
+.win-hero__badge .ico {
+  width: 13px;
+  height: 13px;
+}
+@keyframes hero-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+:root[data-motion='reduce'] .win-hero__portrait,
+:root[data-motion='reduce'] .win-hero__scene,
+:root[data-motion='reduce'] .win-hero__icon {
+  animation: none;
+}
+/* "New" until visited: a coral chip on cards and the goal card, a dot on the pin and the World tab. */
+.chip--news {
+  margin-right: 6px;
+}
+.goal-card__eyebrow .chip--news {
+  margin: 0 0 0 6px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.news-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--coral);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.world-pin__ring {
+  position: relative;
+}
+.nav__item {
+  position: relative;
+}
+.nav__item.has-news::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: calc(50% + 8px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--coral);
+  box-shadow: 0 0 0 2px var(--surface);
+}

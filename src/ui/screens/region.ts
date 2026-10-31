@@ -12,8 +12,8 @@ import { COMPANIONS, COMPANION_BY_ID, type CompanionId } from '../../meta/catalo
 import { decorOf, type DecorId } from '../../meta/catalogs/decor';
 import { SANCTUARY_BY_ID, type RegionId } from '../../meta/catalogs/sanctuaries';
 import { isShown, owns, setShown, shownDecorIds } from '../../meta/sanctuary';
-import { activeSanctuary, arrivalProgress, isComplete, isOpen, nextStage, regionChat, setActive, stageOf } from '../../meta/world';
-import { animalInfo, isHome, nextArrivalIn } from '../../meta/animals';
+import { activeSanctuary, arrivalProgress, isComplete, isOpen, markSeen, nextStage, regionChat, setActive, stageOf } from '../../meta/world';
+import { animalInfo, isHome, nextArrivalIn, type AnimalId } from '../../meta/animals';
 import { animalPortrait } from '../art/animals';
 import { localDateKey } from '../../game/dates';
 import { track } from '../../services/analytics';
@@ -45,10 +45,12 @@ export const regionScreen: ScreenDef = {
     const freshStage = route.fresh ?? 0;
     const today = localDateKey();
     const firstVisitToday = app.save.world.visited[id] !== today;
+    // Whatever happened here since the last visit (the "New" marker) is seen now; newcomers get their hello below.
+    const news = markSeen(app.save, id);
     if (isOpen(app.save, id)) {
       app.save.world.visited[id] = today;
       app.persist();
-    }
+    } else if (news) app.persist();
     track('region_open', { region: id, stage: stageOf(app.save, id) });
 
     const el = h(`<div class="sanctuary region" style="--accent:${def.accent}"></div>`);
@@ -213,8 +215,8 @@ export const regionScreen: ScreenDef = {
     }
     // After the first board: a starter gift for the Farm (if the Pet Garden hasn't offered it already).
     if (isOpen(app.save, id)) offerStarterGift(scope, id, render);
-    // Someone just came home: say so, and let them say hello.
-    const newcomers = (route.welcome ?? []).filter((w) => isHome(app.save, w));
+    // Someone came home, just now or while the player was elsewhere: say so, and let them say hello.
+    const newcomers = [...new Set([...(route.welcome ?? []), ...((news?.animals ?? []) as AnimalId[])])].filter((w) => isHome(app.save, w));
     if (newcomers.length) {
       const a = animalInfo(newcomers[0]);
       toast(`${a.name} the ${a.noun} came home to the ${def.short}!`, ICON.heart);

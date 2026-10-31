@@ -9,7 +9,7 @@
 import { app } from '../../app/app';
 import { playMode } from '../../app/gameFlow';
 import { SANCTUARIES, SANCTUARY_BY_ID, isRegionId, type RegionId, type SanctuaryDef } from '../../meta/catalogs/sanctuaries';
-import { activeSanctuary, arrivalProgress, isComplete, isOpen, nextStage, nextToOpen, progressOf, stageOf } from '../../meta/world';
+import { activeSanctuary, arrivalProgress, isComplete, isOpen, nextStage, nextToOpen, progressOf, stageOf, unseenIn } from '../../meta/world';
 import { animalInfo, homeAnimals } from '../../meta/animals';
 import { animalPortrait } from '../art/animals';
 import { regionThumb } from '../art/regions';
@@ -51,10 +51,21 @@ function pinFace(def: SanctuaryDef): string {
   return first ? animalPortrait(first, 'happy') : def.beginner ? ICON.home : ICON.sprout;
 }
 
+/** "New: Truffle came home" / "New: the barn went up" / "New: just opened", until the player visits. */
+function newsLine(id: SanctuaryDef['id']): string {
+  const u = unseenIn(app.save, id);
+  if (!u) return '';
+  if (u.animals.length) return `New: ${u.animals.map((a) => animalInfo(a as Parameters<typeof animalInfo>[0]).name).join(', ')} came home`;
+  if (u.opened) return 'New: just opened';
+  if (u.stage !== null) return `New: ${SANCTUARY_BY_ID[id].stages[u.stage]?.name.toLowerCase() ?? 'a new stage'}`;
+  return 'New';
+}
+
 function pinLabel(def: SanctuaryDef): string {
   const st = statusOf(def.id);
   const pct = `, ${Math.round(progressOf(app.save, def.id) * 100)}% grown`;
-  return `${def.name}, ${def.place}. ${statusLine(def)}${st === 'locked' ? '' : pct}`;
+  const nw = newsLine(def.id);
+  return `${def.name}, ${def.place}. ${nw ? `${nw}. ` : ''}${statusLine(def)}${st === 'locked' ? '' : pct}`;
 }
 
 export const worldScreen: ScreenDef = {
@@ -71,8 +82,8 @@ export const worldScreen: ScreenDef = {
       const p = pinPercent(d.lon, d.lat);
       const st = statusOf(d.id);
       const prog = progressOf(save, d.id);
-      return `<button class="world-pin is-${st}" data-go="${d.id}" style="left:${p.left.toFixed(2)}%;top:${p.top.toFixed(2)}%;--accent:${d.accent};--p:${prog.toFixed(3)}" aria-label="${esc(pinLabel(d))}">
-        <span class="world-pin__ring" aria-hidden="true"><span class="world-pin__face">${pinFace(d)}</span></span>
+      return `<button class="world-pin is-${st}${unseenIn(save, d.id) ? ' has-news' : ''}" data-go="${d.id}" style="left:${p.left.toFixed(2)}%;top:${p.top.toFixed(2)}%;--accent:${d.accent};--p:${prog.toFixed(3)}" aria-label="${esc(pinLabel(d))}">
+        <span class="world-pin__ring" aria-hidden="true"><span class="world-pin__face">${pinFace(d)}</span>${unseenIn(save, d.id) ? '<span class="news-dot"></span>' : ''}</span>
         <span class="world-pin__label" aria-hidden="true">${esc(short(d))}</span>
       </button>`;
     }).join('');
@@ -134,7 +145,7 @@ export const worldScreen: ScreenDef = {
         <span class="world-card__body">
           <span class="world-card__name">${esc(d.name)}</span>
           <span class="world-card__place">${esc(d.place)}</span>
-          <span class="world-card__status">${st === 'building' ? `<span class="chip chip--brand">${ICON.sprout}Building</span>` : ''}${esc(statusLine(d))}</span>
+          <span class="world-card__status">${unseenIn(save, d.id) ? `<span class="chip chip--coral chip--news">${ICON.sparkle}${esc(newsLine(d.id))}</span>` : st === 'building' ? `<span class="chip chip--brand">${ICON.sprout}Building</span>` : ''}${esc(statusLine(d))}</span>
           <span class="progress world-card__bar"><span style="width:${Math.round(Math.min(1, prog) * 100)}%"></span></span>
           ${st !== 'locked' ? `<span class="world-card__friends">${have} of ${d.arrivals.length} animals home</span>` : ''}
         </span>
