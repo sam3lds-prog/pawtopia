@@ -25,8 +25,11 @@ export interface BoardView {
 }
 
 export interface BoardHandlers {
-  /** Pointer down / keyboard activate on a cell. Return a drag mode to keep painting while the finger moves. */
-  onPress(r: number, c: number): 'mark' | 'unmark' | null;
+  /**
+   * Pointer down on a cell, or an activation without a pointer (`activate`: a screen reader's or switch's "activate",
+   * which arrives as a click with no pointer taps behind it). Return a drag mode to keep painting while the finger moves.
+   */
+  onPress(r: number, c: number, activate?: boolean): 'mark' | 'unmark' | null;
   onDrag?(r: number, c: number, mode: 'mark' | 'unmark'): void;
   onKey?(r: number, c: number, key: string): boolean;
 }
@@ -327,8 +330,8 @@ export class Board {
       s.on(this.el, 'pointercancel', end);
       s.on(this.el, 'lostpointercapture', end);
     }
-    // Clicks: keyboard activation (detail 0) always; pointer taps only in pannable mode,
-    // where acting on pointerdown would fire at the start of every pan.
+    // Clicks: an activation without a pointer (detail 0: a screen reader, a switch, a keyboard that reached here)
+    // always; pointer taps only in pannable mode, where acting on pointerdown would fire at the start of every pan.
     s.on(this.el, 'click', (e: MouseEvent) => {
       const el = (e.target as HTMLElement).closest('.cell') as HTMLElement | null;
       if (!el) return;
@@ -336,7 +339,7 @@ export class Board {
       const r = Number(el.dataset.r);
       const c = Number(el.dataset.c);
       this.setRoving(r, c);
-      this.handlers.onPress(r, c);
+      this.handlers.onPress(r, c, e.detail === 0);
     });
     s.on(this.el, 'keydown', (e: KeyboardEvent) => {
       const el = (e.target as HTMLElement).closest('.cell') as HTMLElement | null;

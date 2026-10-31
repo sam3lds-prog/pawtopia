@@ -590,3 +590,79 @@ describe('hardening: large boards, assistive tech, no videos (review gaps)', () 
     }
   });
 });
+
+describe('gesture clarity (D38 PR B)', () => {
+  it('after the first animal placed on an ordinary board, one line explains the controls, once', () => {
+    start(5);
+    const s = app.active!.session;
+    expect(document.querySelector('[data-controls-tip]')).toBeNull();
+    // A ✕ alone is not the moment.
+    const [er, ec] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    tap(er, ec);
+    expect(document.querySelector('[data-controls-tip]')).toBeNull();
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    dblTap(r, c);
+    const tip = document.querySelector('[data-controls-tip]')!;
+    expect(tip).not.toBeNull();
+    expect(tip.textContent).toMatch(/Tap marks ✕ · double-tap places/);
+    expect(tip.textContent).toMatch(/Controls in Settings/);
+    expect(app.save.onboarding.controlsTipSeen).toBe(true);
+    // The coach line underneath still says what the move did; the tip takes no input away.
+    expect(coach()).toMatch(/Nicely reasoned|Settled in|That one belongs|Good spot|complete/);
+    (tip.querySelector('[data-act="tip-close"]') as HTMLButtonElement).click();
+    expect(document.querySelector('[data-controls-tip]')).toBeNull();
+    // Never again on the next board.
+    app.active = null;
+    start(6);
+    const s2 = app.active!.session;
+    const [r2, c2] = find((r, c) => s2.puzzle.solution[r][c] === CAT);
+    dblTap(r2, c2);
+    expect(document.querySelector('[data-controls-tip]')).toBeNull();
+  });
+
+  it('the tip names the two-step scheme when that is the setting, and its link opens Settings', () => {
+    start(5, 'classic');
+    const s = app.active!.session;
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    tap(r, c);
+    tap(r, c);
+    expect(s.cells[r][c]).toBe(CAT);
+    const tip = document.querySelector('[data-controls-tip]')!;
+    expect(tip.textContent).toMatch(/Two-step tap/);
+    (tip.querySelector('[data-act="tip-controls"]') as HTMLButtonElement).click();
+    expect(document.querySelector('[data-controls-tip]')).toBeNull();
+    expect(document.querySelector('.sheet')?.textContent).toMatch(/Settings/);
+    expect(document.querySelector('.sheet [data-choice="controls"][data-value="classic"]')?.textContent).toBe('Two-step tap (no timing)');
+    expect(document.querySelector('.sheet [data-choice="controls"][data-value="tap"]')?.textContent).toBe('Fast double-tap');
+    expect(document.querySelector('.sheet .cp-demo')?.getAttribute('data-scheme')).toBe('classic');
+    expect(s.paused).toBe(true);
+  });
+
+  it('an activation without a pointer (a screen reader, a switch) is two-step under the fast scheme: no timing to beat', () => {
+    start(5);
+    const s = app.active!.session;
+    const [r, c] = find((r, c) => s.puzzle.solution[r][c] === CAT);
+    // The way assistive tech activates a button: a click with no taps behind it (detail 0), seconds apart.
+    const activate = () => cell(r, c).dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    activate();
+    expect(s.cells[r][c]).toBe(MARK);
+    nowMs += 5_000;
+    activate();
+    expect(s.cells[r][c]).toBe(CAT);
+    expect(placeEvents()).toHaveLength(1);
+    // A finger still gets the fast scheme: a slow second tap clears the ✕ instead of placing.
+    const [r2, c2] = find((r, c) => s.puzzle.solution[r][c] === EMPTY);
+    tap(r2, c2);
+    tap(r2, c2);
+    expect(s.cells[r2][c2]).toBe(EMPTY);
+  });
+
+  it('the pause sheet says what the controls are and offers Settings; How to play says where the other scheme is', () => {
+    start(5);
+    document.querySelector<HTMLButtonElement>('[data-act="pause"]')!.click();
+    expect(document.querySelector('[data-pause-controls]')?.textContent).toMatch(/Tap marks ✕, double-tap places/);
+    expect(document.querySelector('.sheet [data-act="settings"]')?.textContent).toMatch(/Settings and controls/);
+    document.querySelector<HTMLButtonElement>('.sheet [data-act="rules"]')!.click();
+    expect(document.querySelector('.sheet')?.textContent).toMatch(/Prefer no timing\? Settings → Controls → Two-step tap/);
+  });
+});

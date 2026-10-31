@@ -38,8 +38,8 @@ export interface RulesOptions {
 /** The controls, in one sentence, for the scheme in Settings (D37). */
 export function controlsLine(rule: Rule, animalWord: string): string {
   const what = rule === 'solo' ? withArticle(animalWord) : 'the animal you picked below the board';
-  if (app.settings.controls === 'classic') return `<b>Tap</b> a tile once to mark it ✕, again to place ${esc(what)}. <b>Erase</b> takes ✕ marks back.`;
-  return `<b>Tap</b> a tile to mark it ✕ (drag to mark a few). <b>Double-tap</b> to place ${esc(what)}. <b>Erase</b> takes ✕ marks back. No quick double tap? Settings → Controls.`;
+  if (app.settings.controls === 'classic') return `<b>Tap</b> a tile once to mark it ✕, tap it again to place ${esc(what)}. <b>Erase</b> takes ✕ marks back. (Two-step tap; Settings → Controls has the fast double-tap.)`;
+  return `<b>Tap</b> a tile to mark it ✕ (drag to mark a few). <b>Double-tap</b> to place ${esc(what)}. <b>Erase</b> takes ✕ marks back. Prefer no timing? Settings → Controls → Two-step tap.`;
 }
 
 /** The rule the player is on now (one animal until the two-animal lesson), with the animals their boards show. */
