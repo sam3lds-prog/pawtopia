@@ -1,7 +1,8 @@
 /**
- * Journey (D36): the one place to play. First what the next puzzle is for (the sanctuary being built and the animal on
- * its way), then the next level with one big button, then the Daily and Zen, errands and notices. The chapter path
- * (every unlocked level, stars, chapter gifts) is the Journey's second view, one tap away and one tap back.
+ * Journey (D36, D38): the one place to play. One hero card: what the next puzzle is for (the sanctuary being built and
+ * the animal on its way), the next level and one big button, with the path and the sanctuary a quiet tap away; then the
+ * Daily and Zen, errands and notices. The chapter path (every unlocked level, stars, chapter gifts) is the Journey's
+ * second view, one tap away and one tap back. The World tab is the map; the hub never repeats it.
  *
  * One rule for the big button: it continues the Journey, the next unfinished level or the Journey board already on the
  * table. A saved Daily or Zen board is offered on its own line, never as the Journey's Continue.
@@ -81,10 +82,10 @@ function weekStrip(): string {
 }
 
 /**
- * The goal card: the sanctuary being built, who is on the way and how close, with a picture of the place and a way to
- * visit it. The same card sits above the Journey and above the World map, so the goal never leaves the player's sight.
+ * The goal half of the hub's hero (D38): the sanctuary being built, who is on the way and how close, with a small
+ * picture of the place. One compact row, so the level and its button stay on the first screen of a small phone.
  */
-export function goalCardMarkup(opts: { playLevel?: number } = {}): string {
+function heroGoalMarkup(): { markup: string; accent: string; visit: string; sanctuary: SanctuaryId | null } {
   const save = app.save;
   const id = activeSanctuary(save);
   if (id) {
@@ -99,39 +100,38 @@ export function goalCardMarkup(opts: { playLevel?: number } = {}): string {
       const span = Math.max(1, coming.need - coming.from);
       const pct = Math.round(((coming.have - coming.from) / span) * 100);
       line = `<b>${esc(a.name)} the ${esc(a.noun)}</b> joins in ${plural(coming.left, 'puzzle')}`;
-      art = `<span class="goal-card__friend portrait is-shy" aria-hidden="true">${animalPortrait(coming.next.id, 'idle')}</span>`;
-      bar = `<span class="progress goal-card__bar" role="progressbar" aria-label="${esc(a.name)} coming home" aria-valuemin="${coming.from}" aria-valuemax="${coming.need}" aria-valuenow="${coming.have}"><span style="width:${pct}%"></span></span><small class="muted num">${coming.have - coming.from} of ${span} toward arrival</small>`;
+      art = `<span class="hero__friend portrait is-shy" aria-hidden="true">${animalPortrait(coming.next.id, 'idle')}</span>`;
+      bar = `<span class="progress hero__bar" role="progressbar" aria-label="${esc(a.name)} coming home: ${coming.have - coming.from} of ${span} puzzles" aria-valuemin="${coming.from}" aria-valuemax="${coming.need}" aria-valuenow="${coming.have}"><span style="width:${pct}%"></span></span>`;
     } else if (next) {
       const pct = Math.round(((next.have - next.from) / Math.max(1, next.need - next.from)) * 100);
       line = `<b>${esc(next.stage.name)}</b> in ${plural(next.need - next.have, 'puzzle')}`;
-      bar = `<span class="progress goal-card__bar" role="progressbar" aria-label="Progress to ${esc(next.stage.name)}" aria-valuemin="${next.from}" aria-valuemax="${next.need}" aria-valuenow="${next.have}"><span style="width:${pct}%"></span></span>`;
+      bar = `<span class="progress hero__bar" role="progressbar" aria-label="Progress to ${esc(next.stage.name)}" aria-valuemin="${next.from}" aria-valuemax="${next.need}" aria-valuenow="${next.have}"><span style="width:${pct}%"></span></span>`;
     }
-    return `<section class="card goal-card" style="--accent:${def.accent}" aria-labelledby="goal-title" data-goal="${id}">
-      <button class="goal-card__scene" data-act="visit" data-region="${id}" aria-label="Visit the ${esc(def.name)}">
-        <svg viewBox="0 52 360 216" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${sanctuaryPicture(id, 'goal')}</svg>
-      </button>
-      <div class="goal-card__body">
-        <p class="goal-card__eyebrow">${ICON.sprout}Building now${unseenIn(save, id) ? `<span class="chip chip--coral chip--news">${ICON.sparkle}New</span>` : ''}</p>
-        <h2 id="goal-title">${esc(def.name)}</h2>
-        <p class="goal-card__next">${art}<span>${line}</span></p>
-        ${bar}
-      </div>
-      <div class="goal-card__actions">
-        <button class="btn btn--small btn--secondary" data-act="visit" data-region="${id}">Visit</button>
-        ${opts.playLevel ? `<button class="btn btn--small" data-act="play-next">Play level ${opts.playLevel}</button>` : ''}
-      </div>
-    </section>`;
+    const markup = `<div class="hero__goal" data-goal="${id}">
+        <button class="hero__scene" data-act="visit" data-region="${id}" aria-label="Visit the ${esc(def.name)}">
+          <svg viewBox="40 60 280 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${sanctuaryPicture(id, 'goal')}</svg>
+        </button>
+        <div class="hero__goal-body">
+          <p class="hero__eyebrow">${ICON.sprout}Building the <b>${esc(def.name)}</b>${unseenIn(save, id) ? `<span class="chip chip--coral chip--news">${ICON.sparkle}New</span>` : ''}</p>
+          <p class="hero__next">${art}<span>${line}</span></p>
+          ${bar}
+        </div>
+      </div>`;
+    return { markup, accent: def.accent, visit: `Visit ${def.short}`, sanctuary: id };
   }
   const up = nextToOpen(save);
-  if (!up) return '';
-  return `<section class="card goal-card" style="--accent:${up.def.accent}" aria-labelledby="goal-title">
-    <div class="goal-card__body">
-      <p class="goal-card__eyebrow">${ICON.globe}World map</p>
-      <h2 id="goal-title">${esc(up.def.name)} opens after level ${up.def.opensAfterLevel}</h2>
-      <p class="muted">${plural(up.left, 'level')} to go. Every sanctuary you can build is finished, so Journey levels are what opens the next.</p>
-    </div>
-    <div class="goal-card__actions"><button class="btn btn--small btn--secondary" data-act="world">World</button></div>
-  </section>`;
+  if (!up) return { markup: '', accent: 'var(--brand)', visit: '', sanctuary: null };
+  return {
+    markup: `<div class="hero__goal">
+      <div class="hero__goal-body">
+        <p class="hero__eyebrow">${ICON.globe}World map</p>
+        <p class="hero__next"><span><b>${esc(up.def.name)}</b> opens after level ${up.def.opensAfterLevel} · ${plural(up.left, 'level')} to go</span></p>
+      </div>
+    </div>`,
+    accent: up.def.accent,
+    visit: '',
+    sanctuary: null,
+  };
 }
 
 /** Opens the sanctuary a goal card points at: the Pet Garden's own screen, or the Farm's or a region's. */
@@ -201,12 +201,6 @@ function pathMarkup(ch: Chapter): string {
     </div>`;
 }
 
-/** "Truffle is on this board: 3 more puzzles to bring her home." */
-function comingLine(id: Parameters<typeof animalInfo>[0], left: number): string {
-  const a = animalInfo(id);
-  return left === 1 ? `Solve this one to bring ${a.name} the ${a.noun} home` : `${a.name} the ${a.noun} is on your boards: ${left} more puzzles to come home`;
-}
-
 export const journeyScreen: ScreenDef = {
   tab: 'journey',
   title: 'Pawtopia',
@@ -232,9 +226,8 @@ function mountHub(root: HTMLElement, scope: Scope): void {
   const dailyDone = !!save.daily.done[daily.dateKey];
   const streak = liveStreak(save, localDateKey());
   const weekday = WEEKDAY[new Date().getDay()];
-  const building = activeSanctuary(save);
-  const coming = building ? arrivalProgress(save, building) : null;
 
+  const goal = heroGoalMarkup();
   const curMode: ModeRef = resumeLevel ?? { kind: 'level', level };
   const curLevel = curMode.kind === 'level' ? curMode.level : level;
   const continueTitle = resumeLevel ? `Resume level ${curLevel}` : `Play level ${level}`;
@@ -254,21 +247,21 @@ function mountHub(root: HTMLElement, scope: Scope): void {
         </div>
       </header>
 
-      ${goalCardMarkup()}
-
-      <section class="continue card" aria-labelledby="continue-title">
-        <div class="continue__info">
-          <p class="continue__eyebrow">${resumeLevel ? 'Journey · board in progress' : esc(`Journey · Chapter ${chapter.index + 1}: ${chapter.name}`)}</p>
-          <h2 id="continue-title">Level ${curLevel}</h2>
-          <p class="muted" data-board-desc>${thumbSize}×${thumbSize} · ${rule}${resumeLevel ? ' · saved where you left it' : ''}</p>
-          ${coming && !resumeLevel ? `<p class="continue__next">${ICON.paw}${esc(comingLine(coming.next.id, coming.left))}</p>` : ''}
+      <section class="hero card" style="--accent:${goal.accent}" aria-labelledby="continue-title">
+        ${goal.markup}
+        <div class="hero__play">
+          <div class="hero__info">
+            <p class="hero__kicker">${resumeLevel ? 'Journey · board in progress' : esc(`Journey · Chapter ${chapter.index + 1}: ${chapter.name}`)}</p>
+            <h2 id="continue-title">Level ${curLevel}</h2>
+            <p class="muted hero__desc" data-board-desc>${thumbSize}×${thumbSize} · ${rule}${resumeLevel ? ' · saved where you left it' : ''}</p>
+          </div>
+          <div class="hero__thumb" data-thumb style="--n:${thumbSize}"></div>
         </div>
-        <div class="continue__thumb" data-thumb style="--n:${thumbSize}"></div>
         <button class="btn btn--block continue__go" data-act="continue">${esc(continueTitle)}</button>
         ${resumeLevel && curLevel !== level ? `<button class="btn btn--quiet" data-act="journey">Play level ${level} instead</button>` : ''}
-        <div class="continue__links">
-          <button class="btn btn--quiet" data-act="path">${ICON.pin}Level path</button>
-          <button class="btn btn--quiet" data-act="world">${ICON.globe}World map</button>
+        <div class="hero__links">
+          <button class="btn btn--quiet" data-act="path">${ICON.pin}View path</button>
+          ${goal.sanctuary ? `<button class="btn btn--quiet" data-act="visit" data-region="${goal.sanctuary}">${ICON.home}${esc(goal.visit)}</button>` : `<button class="btn btn--quiet" data-act="world">${ICON.globe}World</button>`}
         </div>
       </section>
 

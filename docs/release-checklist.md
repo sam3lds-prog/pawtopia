@@ -66,6 +66,16 @@
 - [ ] Pause: the Controls line reads right for both schemes; "Settings and controls" opens Settings with the board paused
 - [ ] 320 and 375 widths: the note fits in two or three lines without covering the board
 
+### D38 PR C — Journey and World hierarchy
+- [ ] SE (320×568) and SE2/8 (375×667): the hub's Play/Resume button and both quiet links sit above the tab bar without
+      scrolling; the Daily card's top edge shows
+- [ ] Hero with a saved Journey board: *Resume level N*, *Play level M instead*, both links; "New" chip when a sanctuary
+      has news; the picture opens the sanctuary
+- [ ] World at 320: one Play button, the two quiet links on one line; pills row; pin labels legible (12 px); the halo
+      breathes (still under Reduce Motion); locked pins quiet; Expand map pans and starts on the home being built
+- [ ] VoiceOver: the hero reads goal → level → Play → links; the pills announce their sanctuary; Expand map announces
+      pressed / not pressed
+
 ## Store integration (only when ready; see roadmap)
 - [ ] StoreKit products created (remove_ads, starter_decor, cozy_theme, pet_portraits, supporter); verified entitlement
       + restore via a maintained bridge (e.g. RevenueCat Capacitor SDK); sandbox buy, restore, refund, reinstall

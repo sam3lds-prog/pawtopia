@@ -1035,20 +1035,6 @@ ul.rows {
   padding: 0;
   pointer-events: none;
 }
-.continue__next {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 4px;
-  font-size: var(--t-xs);
-  font-weight: 800;
-  color: var(--coral-ink);
-}
-.continue__next .ico {
-  width: 15px;
-  height: 15px;
-}
-
 /* ---------- Pantry: treats and hint tickets ---------- */
 .ico--treat,
 .ico--ticket {
@@ -1492,8 +1478,8 @@ ul.rows {
   margin: 8px 0 10px;
 }
 .coming-home__art {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
 }
 .coming-home__body {
   flex: 1;

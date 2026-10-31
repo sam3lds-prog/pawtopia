@@ -194,7 +194,13 @@ try {
   await reload();
   await page.waitForSelector('.journey');
   check('the app opens on the Journey tab, with four tabs', (await page.$$eval('.nav [data-tab]', (els) => els.map((e) => e.dataset.tab))).join(',') === 'journey,world,challenges,shop' && (await page.getAttribute('.nav [data-tab="journey"]', 'aria-current')) === 'page');
-  check('the Journey shows the goal (sanctuary and next animal), the level and Continue in its first screen', !!(await page.$('.goal-card')) && /Truffle/.test((await page.textContent('.goal-card')) ?? '') && (await page.evaluate(() => document.querySelector('.continue__go').getBoundingClientRect().bottom <= window.innerHeight)));
+  check('the Journey shows the goal (sanctuary and next animal), the level and Continue in its first screen', !!(await page.$('.hero__goal')) && /Truffle/.test((await page.textContent('.hero__goal')) ?? '') && (await page.evaluate(() => document.querySelector('.continue__go').getBoundingClientRect().bottom <= window.innerHeight)));
+  // D38: the same on the smallest phone, with the tab bar in the way.
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.waitForTimeout(150);
+  check('at 320×568 the Play/Resume button is still on the first screen, above the tab bar', await page.evaluate(() => document.querySelector('.continue__go').getBoundingClientRect().bottom <= window.innerHeight - 64));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(150);
   const cont = await page.textContent('[data-act="continue"]');
   check('the Journey offers to resume the board in progress', /Resume/i.test(cont ?? ''), cont ?? '');
   await page.click('[data-act="continue"]');
